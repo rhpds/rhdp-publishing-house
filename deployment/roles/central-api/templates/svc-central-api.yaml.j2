@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: central-api
+  namespace: "{{ app_namespace }}"
+  labels:
+    app: central-api
+spec:
+  selector:
+    app: central-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+  type: ClusterIP

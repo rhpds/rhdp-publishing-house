@@ -1,0 +1,244 @@
+---
+# ============================================================
+# Phase 1: Apply Helm chart manifests (matching reference:
+# rhpds/agnosticg/charts/hashicorp-vault/templates/)
+# ============================================================
+
+- name: Create {{ vault_namespace }} namespace
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'namespace.yaml.j2') | from_yaml }}"
+
+# --- ServiceAccounts ---
+
+- name: Create vault ServiceAccount
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'sa-vault.yaml.j2') | from_yaml }}"
+
+# --- RBAC ---
+
+- name: Bind system:auth-delegator to vault SA
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'crb-vault-server-binding.yaml.j2') | from_yaml }}"
+
+- name: Bind edit role to vault SA
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'crb-vault-edit-binding.yaml.j2') | from_yaml }}"
+
+# --- ConfigMaps ---
+
+- name: Create vault-config ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cm-vault-config.yaml.j2') | from_yaml }}"
+
+- name: Create vault-unseal-config ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cm-unseal-config.yaml.j2') | from_yaml }}"
+
+# --- Services ---
+
+- name: Create vault Service
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'svc-vault.yaml.j2') | from_yaml }}"
+
+- name: Create vault-internal headless Service
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'svc-vault-internal.yaml.j2') | from_yaml }}"
+
+# --- StatefulSet ---
+
+- name: Create vault StatefulSet
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'ss-vault.yaml.j2') | from_yaml }}"
+
+# --- Auto-Unseal CronJob ---
+
+- name: Create vault-auto-unseal CronJob
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cronjob-auto-unseal.yaml.j2') | from_yaml }}"
+
+# --- Route ---
+
+- name: Create vault Route
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'rt-vault.yaml.j2') | from_yaml }}"
+
+# --- Vault Agent Injector ---
+
+- name: Create vault-agent-injector ServiceAccount
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'sa-vault-agent-injector.yaml.j2') | from_yaml }}"
+
+- name: Create vault-agent-injector ClusterRole
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cr-vault-agent-injector-clusterrole.yaml.j2') | from_yaml }}"
+
+- name: Create vault-agent-injector ClusterRoleBinding
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'crb-vault-agent-injector-binding.yaml.j2') | from_yaml }}"
+
+- name: Create vault-agent-injector Deployment
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'dep-vault-agent-injector.yaml.j2') | from_yaml }}"
+
+- name: Create vault-agent-injector MutatingWebhookConfiguration
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'mwh-vault-agent-injector-cfg.yaml.j2') | from_yaml }}"
+
+- name: Create vault-agent-injector NetworkPolicy
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'np-vault-agent-injector.yaml.j2') | from_yaml }}"
+
+- name: Create vault-agent-injector Service
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'svc-vault-agent-injector-svc.yaml.j2') | from_yaml }}"
+
+# ============================================================
+# Phase 2: Post-deploy tasks (matching reference:
+# rhpds/rhpds.ads/roles/ocp4_workload_gitops_vault/tasks/workload.yml)
+# ============================================================
+
+- name: Retrieve Vault Pod
+  kubernetes.core.k8s_info:
+    kind: Pod
+    name: "{{ vault_pod }}"
+    namespace: "{{ vault_namespace }}"
+  register: r_vault
+  retries: 120
+  delay: 5
+  until:
+    - r_vault.resources is defined
+    - r_vault.resources | length > 0
+    - r_vault.resources[0].status.phase is defined
+    - r_vault.resources[0].status.phase == 'Running'
+
+- name: Wait for Vault to be initialized and unsealed
+  ansible.builtin.shell: |
+    oc exec vault-0 -n {{ vault_namespace }} -- vault status -tls-skip-verify
+  register: r_vault_status
+  retries: 60
+  delay: 5
+  until: r_vault_status.rc == 0
+
+- name: Copy unsealing key
+  ansible.builtin.shell: |
+    oc exec vault-0 -n {{ vault_namespace }} --stdin --tty -- cat /vault/data/vault-auto-unseal-keys.txt > /tmp/vault-auto-unseal-keys.txt
+  register: r_unseal_keys
+  retries: 60
+  delay: 5
+  until: r_unseal_keys.rc == 0
+
+- name: Get login token
+  ansible.builtin.shell: >-
+    grep -A 0 root_token /tmp/vault-auto-unseal-keys.txt | sed 's/root_token: //g'
+  register: r_token
+
+- name: Set vault token fact
+  ansible.builtin.set_fact:
+    vault_token: "{{ r_token.stdout }}"
+
+- name: Create vault auth resources
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', item) | from_yaml }}"
+  loop:
+    - secret-vault-token.yaml.j2
+    - service-account-vault.yaml.j2
+    - cluster-role-binding-role-token-review.yaml.j2
+    - secret-vault-auth.yaml.j2
+
+- name: Login to vault
+  ansible.builtin.shell: |
+    oc exec vault-0 -n {{ vault_namespace }} --stdin --tty -- vault login {{ vault_token }}
+  register: r_vault_login
+  retries: 30
+  delay: 10
+  until: r_vault_login.rc == 0
+
+- name: Create vault policy
+  ansible.builtin.shell: |
+    oc exec vault-0 -n {{ vault_namespace }} --stdin --tty -- bash -c 'rm -rf /tmp/rhdh-policy.hcl'
+    oc exec vault-0 -n {{ vault_namespace }} --stdin --tty -- bash -c 'echo path \"*\" { >> /tmp/rhdh-policy.hcl'
+    oc exec vault-0 -n {{ vault_namespace }} --stdin --tty -- bash -c 'echo "  capabilities = [\"read\", \"list\"]" >> /tmp/rhdh-policy.hcl'
+    oc exec vault-0 -n {{ vault_namespace }} --stdin --tty -- bash -c 'echo } >> /tmp/rhdh-policy.hcl'
+    oc exec vault-0 -n {{ vault_namespace }} --stdin --tty -- bash -c 'vault policy write rhdh-policy /tmp/rhdh-policy.hcl'
+
+- name: Enable kubernetes auth
+  ansible.builtin.shell: |
+    export SA_SECRET_NAME=$(oc get secrets -n {{ vault_namespace }} --output=json \
+      | jq -r '.items[].metadata | select(.name|startswith("vault-auth-secret")).name')
+    export SA_JWT_TOKEN=$(oc get secret $SA_SECRET_NAME -n {{ vault_namespace }} \
+      --output 'go-template={% raw %}{{ .data.token }}{% endraw %}' | base64 --decode)
+    export SA_CA_CRT=$(oc config view --raw --minify --flatten \
+      --output 'jsonpath={.clusters[].cluster.certificate-authority-data}' | base64 --decode)
+    export K8S_HOST=$(oc config view --raw --minify --flatten \
+      --output 'jsonpath={.clusters[].cluster.server}')
+    oc exec vault-0 -n {{ vault_namespace }} -- vault auth enable kubernetes || true
+    oc exec vault-0 -n {{ vault_namespace }} -- vault write auth/kubernetes/config \
+      token_reviewer_jwt="$SA_JWT_TOKEN" \
+      kubernetes_host="$K8S_HOST" \
+      kubernetes_ca_cert="$SA_CA_CRT" \
+      issuer="https://kubernetes.default.svc.cluster.local"
+
+- name: Create role and service account authentication
+  ansible.builtin.shell: |
+    export SA_SECRET_NAME=$(oc get secrets -n {{ vault_namespace }} --output=json \
+      | jq -r '.items[].metadata | select(.name|startswith("vault-auth-secret")).name')
+    export SA_JWT_TOKEN=$(oc get secret $SA_SECRET_NAME -n {{ vault_namespace }} \
+      --output 'go-template={% raw %}{{ .data.token }}{% endraw %}' | base64 --decode)
+    oc exec vault-0 -n {{ vault_namespace }} -- vault write auth/kubernetes/role/rhdh-role \
+      bound_service_account_names=vault-auth \
+      bound_service_account_namespaces={{ vault_namespace }} \
+      token_policies=rhdh-policy \
+      ttl=160h
+    oc exec vault-0 -n {{ vault_namespace }} -- vault write auth/kubernetes/login \
+      role=rhdh-role \
+      jwt=$SA_JWT_TOKEN
+  register: r_role
+  retries: 10
+  delay: 5
+  until: r_role.rc == 0
+
+- name: Enable kv version 2
+  ansible.builtin.shell: |
+    oc exec vault-0 -n {{ vault_namespace }} -- vault secrets enable -version=2 kv
+  register: r_kv_enable
+  failed_when:
+    - r_kv_enable.rc != 0
+    - "'path is already in use' not in r_kv_enable.stderr"
+
+# --- Summary ---
+
+- name: Get Vault route
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    name: vault
+    namespace: "{{ vault_namespace }}"
+  register: vault_route
+
+- name: Display Vault deployment summary
+  ansible.builtin.debug:
+    msg:
+      - "Vault deployed to namespace: {{ vault_namespace }}"
+      - "Vault UI: https://{{ vault_route.resources[0].spec.host }}"
+      - "Root token stored in Secret: {{ vault_token_secret }}"
+      - "Kubernetes auth enabled with role: rhdh-role"
+      - "KV v2 secrets engine enabled"

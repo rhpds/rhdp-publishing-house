@@ -1,0 +1,258 @@
+apiVersion: sonataflow.org/v1alpha08
+kind: SonataFlow
+metadata:
+  annotations:
+    sonataflow.org/description: 4-stage content lifecycle orchestration
+    sonataflow.org/profile: dev
+    sonataflow.org/version: "2.0"
+  labels:
+    app: publishing-house
+    component: workflow
+    sonataflow.org/workflow-app: publishing-house-workflow
+  name: publishinghouseworkflow
+  namespace: "{{ app_namespace }}"
+spec:
+  flow:
+    dataInputSchema:
+      failOnValidationErrors: false
+      schema: input-schema.json
+    events:
+      - correlation:
+          - contextAttributeName: projectid
+        dataOnly: false
+        kind: consumed
+        name: IntakeCompleteEvent
+        source: claude-skill
+        type: ph.intake.complete
+      - correlation:
+          - contextAttributeName: projectid
+        dataOnly: false
+        kind: consumed
+        name: ContentReviewCompleteEvent
+        source: claude-skill
+        type: ph.content-review.complete
+      - correlation:
+          - contextAttributeName: projectid
+        dataOnly: false
+        kind: consumed
+        name: InfraReviewCompleteEvent
+        source: claude-skill
+        type: ph.infra-review.complete
+      - correlation:
+          - contextAttributeName: projectid
+        dataOnly: false
+        kind: consumed
+        name: DevelopmentReviewCompleteEvent
+        source: claude-skill
+        type: ph.development-review.complete
+      - correlation:
+          - contextAttributeName: projectid
+        dataOnly: false
+        kind: consumed
+        name: DevelopmentCompleteEvent
+        source: claude-skill
+        type: ph.development.complete
+      - correlation:
+          - contextAttributeName: projectid
+        dataOnly: false
+        kind: consumed
+        name: ReadyCompleteEvent
+        source: claude-skill
+        type: ph.ready.complete
+    functions:
+      - name: printMessage
+        operation: sysout
+        type: custom
+      - name: createjiraepic
+        operation: specs/central-api.yaml#createJiraEpic
+        type: rest
+    start:
+      stateName: Init
+    states:
+      - name: Init
+        type: inject
+        data: {}
+        transition:
+          nextState: Setup
+      - name: Setup
+        type: inject
+        data: {}
+        stateDataFilter:
+          output: |
+            . + {
+              createdAt: now(),
+              deploymentMode: .deploymentMode,
+              ssoUser: .ssoUser,
+              ssoEmail: .ssoEmail,
+              projectid: .projectId,
+              projectType: .projectType,
+              repoUrl: .repoUrl,
+              tags: (.tags // []),
+              reviews: {
+                content: false,
+                infra: false,
+                development: false
+              }
+            }
+        transition:
+          nextState: CreateEpic
+      - name: CreateEpic
+        type: operation
+        actions:
+          - name: CreateJiraEpic
+            condition: "${ .deploymentMode == \"rhdp_published\" }"
+            functionRef:
+              refName: createjiraepic
+              arguments:
+                deployment_mode: .deploymentMode
+                project_name: .projectId
+                project_type: .projectType
+            actionDataFilter:
+              toStateData: .epicResponse
+        stateDataFilter:
+          output: |
+            . + {
+              epic_key: (
+                if .epicResponse
+                then .epicResponse.epic_key
+                else ""
+                end
+              ),
+              jira_url: (
+                if .epicResponse
+                then .epicResponse.jira_url
+                else ""
+                end
+              )
+            }
+        transition:
+          nextState: Intake
+      - name: Intake
+        type: event
+        exclusive: true
+        onEvents:
+          - eventRefs:
+              - IntakeCompleteEvent
+            actions:
+              - name: LogIntakeComplete
+                functionRef:
+                  refName: printMessage
+                  arguments:
+                    message: "Intake completed, starting reviews"
+        timeouts:
+          stateExecTimeout: PT168H
+        transition:
+          nextState: DevelopmentReview
+      - name: DevelopmentReview
+        type: event
+        exclusive: true
+        onEvents:
+          - eventRefs:
+              - DevelopmentReviewCompleteEvent
+            actions:
+              - name: LogDevelopmentReviewComplete
+                functionRef:
+                  refName: printMessage
+                  arguments:
+                    message: "Development review completed"
+        timeouts:
+          stateExecTimeout: PT168H
+        transition:
+          nextState: ContentReview
+      - name: ContentReview
+        type: event
+        exclusive: true
+        onEvents:
+          - eventRefs:
+              - ContentReviewCompleteEvent
+            actions:
+              - name: LogContentReviewComplete
+                functionRef:
+                  refName: printMessage
+                  arguments:
+                    message: "Content review completed"
+        timeouts:
+          stateExecTimeout: PT168H
+        transition:
+          nextState: InfraReview
+      - name: InfraReview
+        type: event
+        exclusive: true
+        onEvents:
+          - eventRefs:
+              - InfraReviewCompleteEvent
+            actions:
+              - name: LogInfraReviewComplete
+                functionRef:
+                  refName: printMessage
+                  arguments:
+                    message: "Infra review completed"
+        timeouts:
+          stateExecTimeout: PT168H
+        transition:
+          nextState: Development
+      - name: Development
+        type: event
+        exclusive: true
+        onEvents:
+          - eventRefs:
+              - DevelopmentCompleteEvent
+            actions:
+              - name: LogDevelopmentComplete
+                functionRef:
+                  refName: printMessage
+                  arguments:
+                    message: "Development completed, transitioning to Ready"
+        timeouts:
+          stateExecTimeout: PT168H
+        transition:
+          nextState: Ready
+      - name: Ready
+        type: event
+        exclusive: true
+        onEvents:
+          - eventRefs:
+              - ReadyCompleteEvent
+            actions:
+              - name: LogReadyComplete
+                functionRef:
+                  refName: printMessage
+                  arguments:
+                    message: "Ready for publishing"
+        timeouts:
+          stateExecTimeout: PT168H
+        transition:
+          nextState: Published
+      - name: Published
+        type: inject
+        data:
+          stage: published
+          completedAt: "${ now() }"
+        end:
+          terminate: true
+  persistence:
+    dbMigrationStrategy: service
+    postgresql:
+      secretRef:
+        name: sonataflow-postgresql-svcbind
+        passwordKey: password
+        userKey: username
+      serviceRef:
+        databaseName: "{{ sonataflow_db_name }}"
+        databaseSchema: publishing-house-workflow
+        name: sonataflow-postgresql
+        port: 5432
+  podTemplate:
+    container:
+      env:
+        - name: QUARKUS_FLYWAY_MIGRATE_AT_START
+          value: "true"
+        - name: QUARKUS_FLYWAY_BASELINE_ON_MIGRATE
+          value: "true"
+  resources:
+    configMaps:
+      - configMap:
+          name: workflow-input-schema
+      - configMap:
+          name: central-api-spec
+        workflowPath: specs

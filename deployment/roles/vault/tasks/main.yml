@@ -1,0 +1,8 @@
+---
+- name: Deploy Vault infrastructure
+  ansible.builtin.include_tasks: deploy.yml
+  tags: [vault-deploy]
+
+- name: Populate Vault secrets and ExternalSecrets
+  ansible.builtin.include_tasks: secrets.yml
+  tags: [vault-secrets]

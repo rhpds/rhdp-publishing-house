@@ -1,0 +1,52 @@
+---
+# Cluster and secrets configuration for Publishing House deployment
+#
+# Copy this file OUTSIDE the repo and fill in your values:
+#   cp cluster.yml.example ~/publishing-house-cluster.yml
+#
+# Run the playbook with:
+#   ansible-playbook deploy.yml -e @~/publishing-house-cluster.yml
+#
+# This file contains ALL environment-specific values and secrets
+# for the entire deployment. Never commit the real file to git.
+
+# ─── OpenShift Cluster ───────────────────────────────────────
+ocp_api_url: https://api.cluster-xxxxx.dynamic2.redhatworkshops.io:6443
+ocp_apps_domain: apps.cluster-xxxxx.dynamic2.redhatworkshops.io
+
+# ─── Keycloak (RHBK) ────────────────────────────────────────
+keycloak_admin_password: changeme
+keycloak_db_password: changeme
+rhdh_client_secret: changeme
+portal_client_secret: changeme
+portal_cookie_secret: changeme   # generate with: openssl rand -hex 32
+
+# ─── Corporate SSO (Identity Broker) ────────────────────────
+corporate_sso_display_name: Corporate SSO
+corporate_sso_issuer_url: changeme         # e.g., https://sso.corp.example.com/auth/realms/employees
+corporate_sso_client_id: changeme          # client registered in corporate IdP for this Keycloak
+corporate_sso_client_secret: changeme
+
+# ─── Central API ─────────────────────────────────────────────
+ph_api_key: changeme             # service-to-service auth token (64 chars)
+
+# ─── GitHub ──────────────────────────────────────────────────
+github_token: changeme
+
+# ─── Jira ────────────────────────────────────────────────────
+jira_url: https://issues.redhat.com
+jira_email: you@redhat.com
+jira_api_token: changeme
+jira_project_key: RHDPCD
+
+# ─── LiteLLM ────────────────────────────────────────────────
+litellm_api_url: https://maas-rhdp.apps.maas.redhatworkshops.io
+litellm_master_key: changeme
+
+# ─── RHDH ────────────────────────────────────────────────────
+rhdh_backend_secret: changeme    # generate with: node -e "console.log(require('crypto').randomBytes(24).toString('base64'))"
+ph_catalog_url: https://github.com/treddy08/rhdh-publishing-house-central/blob/main/templates/all-locations.yaml
+
+# ─── RCARS ───────────────────────────────────────────────────
+rcars_url: https://rcars-api.apps.ocpv-infra01.dal12.infra.demo.redhat.com
+rcars_api_key: changeme

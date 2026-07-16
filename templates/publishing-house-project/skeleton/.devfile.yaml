@@ -1,0 +1,227 @@
+schemaVersion: 2.2.0
+metadata:
+  name: ${{ values.project_name }}
+  displayName: ${{ values.project_name }} - Publishing House Workspace
+  description: Workspace for creating RHDP workshop/lab/demo content with Claude AI assistance
+
+components:
+  - name: dev-tools
+    container:
+      image: quay.io/devfile/universal-developer-image:latest
+      memoryLimit: 4Gi
+      memoryRequest: 2Gi
+      cpuLimit: 2000m
+      cpuRequest: 1000m
+      mountSources: true
+      sourceMapping: /projects
+      endpoints:
+        - name: http-preview
+          targetPort: 8080
+          exposure: public
+          protocol: https
+
+commands:
+  - id: setup-workspace
+    exec:
+      component: dev-tools
+      commandLine: |
+        NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace 2>/dev/null)
+        USERNAME="${NAMESPACE%-devspaces}"
+        SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token 2>/dev/null)
+
+        # Set git email from namespace username
+        if [ -z "$(git config --global user.email)" ] && [ -n "$USERNAME" ]; then
+          git config --global user.email "${USERNAME}@redhat.com"
+        fi
+
+        AUTH_FILE=/home/user/.config/publishing-house/auth.json
+        if [ -f "$AUTH_FILE" ] && grep -q "litellm_key" "$AUTH_FILE" 2>/dev/null; then
+          echo "auth.json already configured, skipping"
+          exit 0
+        fi
+        CENTRAL_URL="${{ values.central_api_url }}"
+
+        # Step 1: Bootstrap auth — get central-api credential
+        SETUP_RESP=$(curl -sk -X POST "${CENTRAL_URL}/api/v1/workspace/setup" \
+          -H "Authorization: Bearer ${SA_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "{\"username\": \"${USERNAME}\"}")
+
+        API_KEY=$(echo "$SETUP_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['api_key'])" 2>/dev/null)
+        USER_EMAIL=$(echo "$SETUP_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['user_email'])" 2>/dev/null)
+
+        if [ -z "$API_KEY" ]; then
+          echo "WARNING: workspace setup failed, Claude AI will need manual API key"
+          exit 0
+        fi
+
+        # Step 2: Generate LiteLLM virtual key (keyed by username)
+        LITELLM_RESP=$(curl -sk -X POST "${CENTRAL_URL}/api/v1/litellm/keys/generate" \
+          -H "Authorization: Bearer ${API_KEY}" \
+          -H "Content-Type: application/json" \
+          -d "{\"project_id\": \"${{ values.project_name }}\", \"user_email\": \"${USER_EMAIL}\"}")
+
+        LITELLM_KEY=$(echo "$LITELLM_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['litellm_key'])" 2>/dev/null)
+        LITELLM_ENDPOINT=$(echo "$LITELLM_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['litellm_endpoint'])" 2>/dev/null)
+        LITELLM_MODEL=$(echo "$LITELLM_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['litellm_model'])" 2>/dev/null)
+
+        if [ -z "$LITELLM_KEY" ]; then
+          echo "WARNING: LiteLLM key generation failed, Claude AI will need manual API key"
+          exit 0
+        fi
+
+        # Write auth.json (same location Claude skill reads)
+        mkdir -p /home/user/.config/publishing-house
+        cat > "$AUTH_FILE" << AUTHEOF
+        {
+          "credential": "${API_KEY}",
+          "portal": "${CENTRAL_URL}",
+          "litellm_key": "${LITELLM_KEY}",
+          "litellm_endpoint": "${LITELLM_ENDPOINT}",
+          "litellm_model": "${LITELLM_MODEL}"
+        }
+        AUTHEOF
+
+        echo "Workspace configured: key=${LITELLM_KEY:0:8}... email=${USER_EMAIL}"
+      workingDir: /projects
+      label: "Setup Workspace Auth"
+      group:
+        kind: build
+        isDefault: false
+
+  - id: install-deps
+    exec:
+      component: dev-tools
+      commandLine: |
+        python3 -c "import yaml" 2>/dev/null && exit 0
+        sudo dnf install -y python3-pip python3-pyyaml 2>/dev/null && python3 -c "import yaml" 2>/dev/null && exit 0
+        python3 -m ensurepip --user 2>/dev/null
+        python3 -m pip install --user pyyaml 2>/dev/null && python3 -c "import yaml" 2>/dev/null && exit 0
+        curl -sS https://bootstrap.pypa.io/get-pip.py | python3 - --user 2>/dev/null
+        python3 -m pip install --user pyyaml 2>/dev/null && python3 -c "import yaml" 2>/dev/null && exit 0
+        echo "WARNING: could not install pyyaml — Claude will use json-only parsing"
+      workingDir: /projects
+      label: "Install Python dependencies"
+      group:
+        kind: build
+        isDefault: false
+
+  - id: install-claude
+    exec:
+      component: dev-tools
+      commandLine: |
+        if [ ! -f /home/user/.local/bin/claude ]; then
+          mkdir -p /home/user/.local/bin
+          curl -fsSL https://github.com/anthropics/claude-code/releases/download/v2.1.207/claude-linux-x64.tar.gz -o /tmp/claude.tar.gz
+          tar -xzf /tmp/claude.tar.gz -C /home/user/.local/bin claude
+          chmod +x /home/user/.local/bin/claude
+          rm /tmp/claude.tar.gz
+        fi
+      workingDir: /projects
+      label: "Install Claude CLI"
+      group:
+        kind: build
+        isDefault: false
+
+  - id: setup-env-script
+    exec:
+      component: dev-tools
+      commandLine: |
+        AUTH_FILE=/home/user/.config/publishing-house/auth.json
+
+        cat > /home/user/.claude-env.sh << 'ENVEOF'
+        export CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1
+        AUTH_FILE=/home/user/.config/publishing-house/auth.json
+        if [ -f "$AUTH_FILE" ]; then
+          LITELLM_KEY=$(python3 -c "import json; print(json.load(open('$AUTH_FILE')).get('litellm_key',''))" 2>/dev/null)
+          LITELLM_URL=$(python3 -c "import json; print(json.load(open('$AUTH_FILE')).get('litellm_endpoint',''))" 2>/dev/null)
+          LITELLM_MODEL=$(python3 -c "import json; print(json.load(open('$AUTH_FILE')).get('litellm_model',''))" 2>/dev/null)
+          [ -n "$LITELLM_KEY" ] && {
+            export ANTHROPIC_API_KEY="$LITELLM_KEY"
+            export ANTHROPIC_BASE_URL="$LITELLM_URL"
+            export ANTHROPIC_MODEL="$LITELLM_MODEL"
+          }
+        fi
+        ENVEOF
+
+        cat > /home/user/.local/bin/claude-wrapper.sh << 'WRAPEOF'
+        #!/bin/bash
+        [ -f /home/user/.claude-env.sh ] && source /home/user/.claude-env.sh
+        [ -z "$ANTHROPIC_API_KEY" ] && {
+          echo "ANTHROPIC_API_KEY not set - export your own key or check workspace setup"
+          exit 1
+        }
+        exec /home/user/.local/bin/claude "$@"
+        WRAPEOF
+        chmod +x /home/user/.local/bin/claude-wrapper.sh
+
+        grep -q "alias claude=" /home/user/.bashrc 2>/dev/null || {
+          echo "" >> /home/user/.bashrc
+          echo "alias claude='/home/user/.local/bin/claude-wrapper.sh'" >> /home/user/.bashrc
+        }
+
+        for file in /home/user/.bashrc /home/user/.bash_profile; do
+          grep -q ".claude-env.sh" "$file" 2>/dev/null || {
+            echo "" >> "$file"
+            echo "[ -f /home/user/.claude-env.sh ] && source /home/user/.claude-env.sh" >> "$file"
+          }
+        done
+
+        source /home/user/.claude-env.sh
+      workingDir: /projects
+      label: "Setup environment script"
+      group:
+        kind: build
+        isDefault: false
+
+  - id: install-skills
+    exec:
+      component: dev-tools
+      commandLine: |
+        SKILL_DIR=/home/user/.claude/skills/publishing-house
+        mkdir -p /home/user/.claude/skills
+        [ -d "$SKILL_DIR" ] || {
+          git clone -b main https://github.com/treddy08/rhdp-publishing-house-skills.git "$SKILL_DIR" >/dev/null 2>&1
+        }
+      workingDir: /home/user
+      label: "Install Publishing House Skills"
+      group:
+        kind: build
+        isDefault: false
+
+
+  - id: start-claude
+    exec:
+      component: dev-tools
+      commandLine: |
+        PROJECT_DIR=$(ls -d /projects/*/ 2>/dev/null | head -1)
+        cd "$PROJECT_DIR"
+        exec /home/user/.local/bin/claude
+      workingDir: /projects
+      group:
+        kind: run
+        isDefault: true
+
+  - id: preview-content
+    exec:
+      component: dev-tools
+      commandLine: |
+        PROJECT_DIR=$(ls -d /projects/*/ 2>/dev/null | head -1)
+        cd "$PROJECT_DIR"
+        if [ -d "content" ]; then
+          cd content
+          python3 -m http.server 8080
+        else
+          echo "No content directory found. Create 'content/' to preview."
+        fi
+      workingDir: /projects
+      group:
+        kind: run
+
+events:
+  postStart:
+    - install-deps
+    - install-claude
+    - setup-workspace
+    - setup-env-script
+    - install-skills

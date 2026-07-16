@@ -1,0 +1,110 @@
+---
+- name: Create {{ eso_namespace }} namespace
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'namespace.yaml.j2') | from_yaml }}"
+
+# --- Install External Secrets Operator via Helm ---
+
+- name: Add External Secrets Helm repository
+  kubernetes.core.helm_repository:
+    name: external-secrets
+    repo_url: "{{ eso_helm_repo }}"
+
+- name: Install External Secrets Operator
+  kubernetes.core.helm:
+    name: external-secrets
+    chart_ref: external-secrets/external-secrets
+    chart_version: "{{ eso_chart_version }}"
+    release_namespace: "{{ eso_namespace }}"
+    create_namespace: true
+    values:
+      installCRDs: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: null
+      webhook:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: null
+      certController:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: null
+
+# --- Wait for ESO deployments ---
+
+- name: Wait for ESO controller deployment
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: external-secrets
+    namespace: "{{ eso_namespace }}"
+  register: eso_deploy
+  retries: 30
+  delay: 10
+  until:
+    - eso_deploy.resources | length > 0
+    - eso_deploy.resources[0].status.availableReplicas is defined
+    - eso_deploy.resources[0].status.availableReplicas >= 1
+
+- name: Wait for ESO webhook deployment
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: external-secrets-webhook
+    namespace: "{{ eso_namespace }}"
+  register: eso_webhook
+  retries: 30
+  delay: 10
+  until:
+    - eso_webhook.resources | length > 0
+    - eso_webhook.resources[0].status.availableReplicas is defined
+    - eso_webhook.resources[0].status.availableReplicas >= 1
+
+- name: Wait for ESO cert-controller deployment
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: external-secrets-cert-controller
+    namespace: "{{ eso_namespace }}"
+  register: eso_cert
+  retries: 30
+  delay: 10
+  until:
+    - eso_cert.resources | length > 0
+    - eso_cert.resources[0].status.availableReplicas is defined
+    - eso_cert.resources[0].status.availableReplicas >= 1
+
+- name: Wait for CRDs to be fully registered
+  ansible.builtin.pause:
+    seconds: 15
+
+# --- ClusterSecretStore ---
+
+- name: Create ClusterSecretStore for Vault
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cluster-secret-store.yaml.j2') | from_yaml }}"
+
+- name: Wait for ClusterSecretStore to be Ready
+  kubernetes.core.k8s_info:
+    api_version: external-secrets.io/v1beta1
+    kind: ClusterSecretStore
+    name: "{{ cluster_secret_store }}"
+  register: css_status
+  retries: 12
+  delay: 10
+  until:
+    - css_status.resources | length > 0
+    - css_status.resources[0].status is defined
+    - css_status.resources[0].status.conditions is defined
+    - css_status.resources[0].status.conditions | selectattr('type', 'equalto', 'Ready') | selectattr('status', 'equalto', 'True') | list | length > 0
+
+- name: Display ESO deployment summary
+  ansible.builtin.debug:
+    msg:
+      - "External Secrets Operator installed in namespace: {{ eso_namespace }}"
+      - "Chart version: {{ eso_chart_version }}"
+      - "ClusterSecretStore '{{ cluster_secret_store }}' is Ready"
+      - "Connected to Vault at: {{ vault_address }}"

@@ -1,0 +1,224 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: publishing-house-project
+  title: Publishing House Content Project
+  description: Create a new PH content project with orchestrated workflow
+  tags:
+    - publishing-house
+    - workshop
+    - devspaces
+
+spec:
+  owner: rhdp-team
+  type: service
+
+  parameters:
+    - title: Project Details
+      required:
+        - project_name
+        - project_type
+        - deployment_mode
+      properties:
+        project_name:
+          title: Project Name
+          type: string
+          description: Name for your workshop/lab/demo (letters and hyphens only)
+          ui:autofocus: true
+          ui:placeholder: "openshift-ai-workshop"
+          pattern: '^[a-z0-9-]+$'
+          ui:help: Use lowercase letters, numbers, and hyphens only
+
+        project_type:
+          title: Project Type
+          type: string
+          enum: [workshop, lab, demo]
+          default: workshop
+
+        deployment_mode:
+          title: Deployment Mode
+          type: string
+          enum:
+            - rhdp_published
+            - self_published
+          enumNames:
+            - RHDP Published (full gates, reviewer required)
+            - Self-Published (self-approval allowed)
+          default: rhdp_published
+          ui:help: Choose review rigor level
+
+        tags:
+          title: Tags
+          type: array
+          ui:options:
+            addable: true
+            orderable: false
+            removable: true
+          items:
+            type: string
+            title: Tag
+            ui:placeholder: "e.g. LB1234, openshift, ansible"
+          ui:help: "e.g. LB1234, openshift, ansible"
+
+    - title: GitHub Collaborators
+      required:
+        - github_users
+      properties:
+        github_users:
+          title: GitHub Users
+          type: array
+          minItems: 1
+          ui:options:
+            addable: true
+            orderable: false
+            removable: true
+          items:
+            type: object
+            required:
+              - user
+            properties:
+              user:
+                title: GitHub Username
+                type: string
+                ui:placeholder: "treddy08"
+              access:
+                title: Access
+                type: string
+                default: write
+                ui:widget: hidden
+
+    - title: Initiative & Content Format
+      required:
+        - initiative_key
+        - showroom_type
+      properties:
+        initiative_key:
+          title: Initiative
+          type: string
+          enum:
+            - rh1_2027
+            - summit_2027
+            - none
+          enumNames:
+            - RH1 2027
+            - Summit 2027
+            - None
+          default: rh1_2027
+          ui:help: Which initiative is this content for?
+
+        showroom_type:
+          title: Showroom Type
+          type: string
+          enum:
+            - classic
+            - zero_touch
+          enumNames:
+            - Classic (standard Showroom)
+            - Zero Touch (embedded automation)
+          default: classic
+          ui:help: Classic = standard Showroom lab. Zero Touch = embedded runtime/setup automation.
+
+  steps:
+    # Step 2: Fetch template
+    - id: fetch-template
+      name: Fetch Publishing House Template
+      action: fetch:template
+      input:
+        url: https://github.com/rhpds/rhdp-publishing-house-template/tree/rearchitecture
+        values:
+          project_name: ${{ parameters.project_name }}
+          project_type: ${{ parameters.project_type }}
+          deployment_mode: ${{ parameters.deployment_mode }}
+          github_user: ${{ parameters.github_users[0].user }}
+          user_email: ${{ user.entity.spec.profile.email }}
+
+    # Step 3: Add catalog-info to workspace
+    - id: fetch-catalog-info
+      name: Add catalog-info.yaml
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          project_name: ${{ parameters.project_name }}
+          project_type: ${{ parameters.project_type }}
+          deployment_mode: ${{ parameters.deployment_mode }}
+          github_user: ${{ parameters.github_users[0].user }}
+          user_email: ${{ user.entity.spec.profile.email }}
+          repo_url: https://github.com/rhpds/${{ parameters.project_name }}
+          initiative_key: ${{ parameters.initiative_key }}
+          showroom_type: ${{ parameters.showroom_type }}
+          devspaces_url: https://devspaces.${{ environment.parameters.baseDomain }}
+          central_api_url: https://central-api-publishing-house.${{ environment.parameters.baseDomain }}
+
+    # Step 4: Publish to GitHub with catalog-info included
+    - id: publish
+      name: Create GitHub Repository
+      action: publish:github
+      input:
+        repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
+        description: Publishing House ${{ parameters.project_type }} - ${{ parameters.project_name }}
+        defaultBranch: main
+        repoVisibility: public
+        protectDefaultBranch: false
+        collaborators: ${{ parameters.github_users }}
+
+    # Step 5: Trigger workflow via RHDH proxy
+    - id: trigger-workflow
+      name: Start Publishing House Workflow
+      action: http:backstage:request
+      input:
+        method: POST
+        path: '/proxy/sonataflow/publishinghouseworkflow?businessKey=${{ parameters.project_name }}'
+        headers:
+          content-type: 'application/json'
+        body:
+          projectId: ${{ parameters.project_name }}
+          repoUrl: ${{ steps.publish.output.remoteUrl }}
+          ssoUser: ${{ user.entity.metadata.name }}
+          ssoEmail: ${{ user.entity.spec.profile.email }}
+          deploymentMode: ${{ parameters.deployment_mode }}
+          projectType: ${{ parameters.project_type }}
+          tags: ${{ parameters.tags }}
+
+    # Step 6: Register in catalog
+    - id: register
+      name: Register in Backstage Catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+  output:
+    links:
+      - title: View Repository
+        icon: github
+        url: ${{ steps.publish.output.remoteUrl }}
+
+      - title: View in Catalog
+        icon: catalog
+        url: /catalog/default/component/${{ parameters.project_name }}
+
+      - title: Open in DevSpaces
+        icon: launch
+        url: https://devspaces.${{ environment.parameters.baseDomain }}#https://github.com/rhpds/${{ parameters.project_name }}
+
+    text:
+      - title: Next Steps
+        content: |
+          Your Publishing House project has been created!
+
+          **What just happened:**
+          1. ✅ Repository created at ${{ steps.publish.output.remoteUrl }}
+          2. ✅ catalog-info.yaml added to repository
+          3. ✅ Registered in Backstage catalog
+          4. ✅ Orchestrator workflow started
+
+          **The workflow will:**
+          - Guide you through intake (spec creation with Claude)
+          - Create Jira epic after intake completes
+          - Update catalog-info.yaml with Jira ticket
+          - Continue through Review → Development → Ready → Published
+
+          **Next:**
+          - Click "View Workflow Instances" above to find and monitor your workflow
+          - Open DevSpaces to start your content work

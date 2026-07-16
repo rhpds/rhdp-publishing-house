@@ -1,0 +1,116 @@
+---
+- name: Create {{ app_namespace }} namespace
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'namespace.yaml.j2') | from_yaml }}"
+
+- name: Create RHDH operator subscription in openshift-operators
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'subscription-rhdh.yaml.j2') | from_yaml }}"
+
+- name: Wait for RHDH operator to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: rhdh-operator
+    namespace: openshift-operators
+  register: rhdh_operator
+  until:
+    - rhdh_operator.resources | length > 0
+    - (rhdh_operator.resources[0].status.availableReplicas | default(0)) > 0
+  retries: 60
+  delay: 10
+
+# --- ServiceAccount for K8s plugin ---
+
+- name: Create RHDH K8s plugin ServiceAccount
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'sa-rhdh-k8s-plugin.yaml.j2') | from_yaml }}"
+
+- name: Create RHDH K8s plugin ClusterRoleBinding
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'crb-rhdh-k8s-plugin.yaml.j2') | from_yaml }}"
+
+- name: Create long-lived token for K8s plugin
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'secret-rhdh-k8s-integration.yaml.j2') | from_yaml }}"
+
+- name: Get K8s plugin token
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: rhdh-k8s-integration
+    namespace: "{{ app_namespace }}"
+  register: k8s_token_secret
+  until:
+    - k8s_token_secret.resources | length > 0
+    - k8s_token_secret.resources[0].data.token is defined
+  retries: 10
+  delay: 5
+
+- name: Set K8s token fact
+  ansible.builtin.set_fact:
+    k8s_sa_token: "{{ k8s_token_secret.resources[0].data.token | b64decode }}"
+
+# --- RHDH env secret (all config in one secret) ---
+
+- name: Create RHDH env secret
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'secret-rhdh-env.yaml.j2') | from_yaml }}"
+
+# --- App config ConfigMap ---
+
+- name: Create RHDH app-config ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cm-rhdh-app-config.yaml.j2') }}"
+
+# --- Dynamic plugins ConfigMap ---
+
+- name: Create RHDH dynamic plugins ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cm-rhdh-dynamic-plugins.yaml.j2') }}"
+
+# --- Backstage CR ---
+
+- name: Create Developer Hub instance
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'backstage.yaml.j2') | from_yaml }}"
+
+- name: Create custom Route for Developer Hub
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'route-rhdh.yaml.j2') | from_yaml }}"
+
+- name: Create dynamic plugins PVC
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'pvc-dynamic-plugins.yaml.j2') | from_yaml }}"
+
+- name: Wait for Developer Hub to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: "backstage-{{ rhdh_instance_name }}"
+    namespace: "{{ app_namespace }}"
+  register: rhdh_deployment
+  until:
+    - rhdh_deployment.resources | length > 0
+    - (rhdh_deployment.resources[0].status.availableReplicas | default(0)) > 0
+  retries: 60
+  delay: 15
+
+- name: Display Developer Hub summary
+  ansible.builtin.debug:
+    msg:
+      - "Developer Hub deployed successfully"
+      - "URL: https://central-publishing-house-{{ app_namespace }}.{{ ocp_apps_domain }}"
+      - "Auth: OIDC via Keycloak (publishing-house realm)"
+      - "Catalog sync: Keycloak user/group provider enabled"

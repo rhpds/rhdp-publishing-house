@@ -1,0 +1,83 @@
+# Publishing House — Project Spec
+# Lifecycle stages (managed by SonataFlow): intake → content_review → infra_review → development → ready → published
+# No secrets in this file. Tokens live in ~/.config/publishing-house/auth.json
+# Stage is managed by SonataFlow and cached in .ph-state — do not edit stage.current manually.
+
+project:
+  slug: "${{ values.project_name }}"
+  owner_email: "${{ values.user_email }}"
+  content_type: "${{ values.project_type }}"
+  deployment_mode: "${{ values.deployment_mode }}"
+  initiative_key: "${{ values.initiative_key }}"
+  showroom_type: "${{ values.showroom_type }}"
+  content_reviewer_email: "psrivastav@redhat.com"
+  infra_reviewer_email: "treddy@redhat.com"
+  jira_ticket: ""
+
+system:
+  central: "${{ values.central_api_url }}"
+
+spec:
+  title: ""
+  learning_objectives: []
+  modules: []              # [{title, duration_min}] — written by intake after Q8
+  environment:
+    ocp_version: ""        # e.g. 4.18 — Q11
+    topology: ""           # shared-cluster | per-student | cnv-pool — Q6
+    # --- Infrastructure fields (Parts 3 of gate validation spec RHDPCD-170) ---
+    max_concurrent_users: null     # required if topology = per-student or cnv-pool — Q14
+    aap_version: ""                # required if AAP in products — Q16
+    ai_requirement: ""             # maas | gpu | none — Q15
+    ai_model_tier: ""              # open-source | frontier (required if ai_requirement = maas or gpu)
+    ai_model_name: ""              # specific model e.g. granite-3.1-8b
+    ai_justification: ""           # required if ai_model_tier = frontier or ai_requirement = gpu
+    non_ga_products: []            # list of non-GA products/versions — Q18
+    non_ga_access_plan: ""         # how access will be provided for non-GA products
+    external_services: []          # named external service dependencies — Q17 e.g. [github.com]
+    worker_count: null             # number of worker nodes — Q12 extended
+    worker_cpu: null               # vCPU per worker
+    worker_ram_gb: null            # RAM per worker in GB
+    worker_disk_gb: null           # disk per worker in GB
+    gpu_nodes: 0                   # number of GPU nodes (0 = none)
+    gpu_type: ""                   # e.g. NVIDIA A100 40GB (required if gpu_nodes > 0)
+  duration_hours: null
+  audience: ""               # beginner | intermediate | advanced
+
+compliance:
+  last_hard_check: null
+  hard_result: null
+
+tracking:
+  paused: false
+  pause_reason: null
+
+# Approval checklist — filled collaboratively by author + system + reviewers
+# Authors fill: differentiation, assessment_strategy, prerequisites_verifiable
+# System auto-computes: rcars_overlap_pct, rcars_top_matches, peak_environments, cost_per_run_est
+# Reviewers fill: their decision + notes
+approval_checklist:
+
+  # Content Dev Manager — reads spec/design.md/module outlines directly; no authored fields from author
+  manager:
+    decision: null                 # approved | denied | needs_info
+    decision_notes: ""
+
+  # Content Dev Lead (Nate) — three authored fields + auto-computed RCARS overlap
+  content_lead:
+    prerequisites_verifiable: null # true | false — Q22: can lab validate prereqs automatically?
+    assessment_strategy: ""        # Q23: how success is measured per module
+    differentiation: ""            # Q24: author explains how this differs from existing content
+    rcars_overlap_pct: null        # AUTO-COMPUTED by Central intake endpoint
+    rcars_top_matches: []          # AUTO-COMPUTED: [{ci_name, display_name, url}]
+    decision: null                 # approved | denied | needs_info
+    decision_notes: ""
+
+  # Infra Team — auto-computed fields + infra fills base CI and provisioning time for non-standard
+  infra:
+    peak_environments: null        # AUTO-COMPUTED: max_concurrent_users x topology factor
+    cost_per_run_est: ""           # AUTO-COMPUTED: indicative cost from sizing
+    provisioning_time_est: ""      # AUTO-COMPUTED for standard CNV; infra fills for GPU/non-GA/non-CNV
+    agnosticv_base_ci: ""          # INFRA fills: which base CI supports this (e.g. ocp4-cluster-cnv)
+    decision: null                 # approved | denied | needs_info
+    decision_notes: ""
+    approved_by: ""                # GitHub ID of infra approver

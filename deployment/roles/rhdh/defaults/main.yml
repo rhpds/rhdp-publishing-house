@@ -1,0 +1,8 @@
+---
+app_namespace: publishing-house
+
+rhdh_operator_channel: fast-1.10
+rhdh_operator_source: redhat-operators
+
+rhdh_instance_name: developer-hub
+rhdh_replicas: 1

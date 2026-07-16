@@ -1,0 +1,47 @@
+apiVersion: org.eclipse.che/v2
+kind: CheCluster
+metadata:
+  name: devspaces
+  namespace: "{{ devspaces_namespace }}"
+  labels:
+    rht-gitops.com/openshift-gitops: devspaces
+spec:
+  components:
+    cheServer:
+      debug: false
+      logLevel: INFO
+    dashboard: {}
+    devWorkspace: {}
+    devfileRegistry: {}
+    imagePuller:
+      enable: false
+      spec: {}
+    metrics:
+      enable: true
+    pluginRegistry:
+      openVSXURL: https://open-vsx.org
+  containerRegistry: {}
+  gitServices:
+    github:
+      - secretName: github-oauth-config
+  devEnvironments:
+    defaultEditor: che-incubator/che-code/latest
+    defaultNamespace:
+      autoProvision: true
+      template: <username>-devspaces
+    maxNumberOfRunningWorkspacesPerUser: 3
+    maxNumberOfWorkspacesPerUser: -1
+    persistUserHome:
+      enabled: true
+    secondsOfInactivityBeforeIdling: -1
+    secondsOfRunBeforeIdling: -1
+    serviceAccount: devworkspace-sa
+    startTimeoutSeconds: 300
+    storage:
+      pvcStrategy: per-workspace
+  networking:
+    auth:
+      gateway:
+        configLabels:
+          app: che
+          component: che-gateway-config

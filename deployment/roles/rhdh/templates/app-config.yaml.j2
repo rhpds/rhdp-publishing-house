@@ -1,0 +1,97 @@
+app:
+  baseUrl: ${BACKEND_URL}
+  title: Publishing House Developer Hub
+
+auth:
+  environment: production
+  providers:
+    oidc:
+      production:
+        clientId: ${AUTH__OIDC__CLIENT__ID}
+        clientSecret: ${AUTH__OIDC__CLIENT__SECRET}
+        metadataUrl: ${AUTH__OIDC__METADATA__URL}
+        prompt: auto
+        signIn:
+          resolvers:
+            - resolver: preferredUsernameMatchingUserEntityName
+              dangerouslyAllowSignInWithoutUserInCatalog: true
+  session:
+    secret:
+      $env: BACKEND_SECRET
+
+backend:
+  auth:
+    externalAccess:
+      - type: legacy
+        options:
+          subject: legacy-default-config
+          secret: ${BACKEND_SECRET}
+  baseUrl: ${BACKEND_URL}
+  cors:
+    origin: ${BACKEND_URL}
+  reading:
+    allow:
+      - host: '*.{{ ocp_apps_domain }}'
+      - host: raw.githubusercontent.com
+
+catalog:
+  locations:
+    - target: ${PH__CATALOG__URL}
+      type: url
+      rules:
+        - allow:
+            - Location
+            - Template
+            - Component
+  providers:
+    keycloakOrg:
+      default:
+        baseUrl: ${KEYCLOAK__BASE__URL}
+        clientId: ${KEYCLOAK__CLIENT__ID}
+        clientSecret: ${KEYCLOAK__CLIENT__SECRET}
+        loginRealm: ${KEYCLOAK__REALM}
+        realm: ${KEYCLOAK__REALM}
+        schedule:
+          frequency:
+            minutes: 1
+          initialDelay:
+            seconds: 15
+          timeout:
+            minutes: 3
+  rules:
+    - allow:
+        - Domain
+        - Component
+        - System
+        - Group
+        - User
+        - Resource
+        - Location
+        - Template
+        - API
+
+integrations:
+  github:
+    - host: github.com
+      token: ${GITHUB_TOKEN}
+
+proxy:
+  endpoints:
+    /sonataflow:
+      target: http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local
+      changeOrigin: true
+      secure: false
+
+scaffolder:
+  defaultEnvironment:
+    parameters:
+      baseDomain: {{ ocp_apps_domain }}
+
+signInPage: oidc
+
+techdocs:
+  builder: local
+  generator:
+    runIn: local
+  publisher:
+    type: local

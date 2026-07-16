@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: central-api
+  namespace: publishing-house
+  labels:
+    app: central-api
+    component: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: central-api
+  template:
+    metadata:
+      labels:
+        app: central-api
+    spec:
+      serviceAccountName: central-api
+      containers:
+      - name: api
+        image: quay.io/treddy08/central-api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: PH_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: publishing-house-credentials
+              key: api-key
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: publishing-house-credentials
+              key: github-token
+        - name: LITELLM_API_URL
+          valueFrom:
+            secretKeyRef:
+              name: publishing-house-credentials
+              key: litellm-url
+        - name: LITELLM_MASTER_KEY
+          valueFrom:
+            secretKeyRef:
+              name: publishing-house-credentials
+              key: litellm-master-key
+        - name: JIRA_URL
+          valueFrom:
+            secretKeyRef:
+              name: publishing-house-credentials
+              key: jira-url
+        - name: JIRA_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: publishing-house-credentials
+              key: jira-email
+        - name: JIRA_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: publishing-house-credentials
+              key: jira-api-token
+        - name: JIRA_PROJECT_KEY
+          value: "RHDPCD"
+        - name: SONATAFLOW_URL
+          value: "http://publishing-house-workflow.publishing-house.svc.cluster.local:8080"
+        - name: SONATAFLOW_WORKFLOW_ID
+          value: "publishing-house-workflow"
+        - name: IN_CLUSTER
+          value: "true"
+        - name: NAMESPACE
+          value: "publishing-house"
+        - name: CENTRAL_EXTERNAL_URL
+          value: "https://central-api-publishing-house.apps.cluster-v27ps.dynamic2.redhatworkshops.io"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5

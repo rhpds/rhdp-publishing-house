@@ -1,0 +1,16 @@
+---
+# Vault deployment
+vault_namespace: vault
+vault_image: registry.connect.redhat.com/hashicorp/vault:1.15.6-ubi
+vault_unseal_image: registry.redhat.io/openshift4/ose-cli:v4.7
+vault_agent_injector_image: registry.connect.redhat.com/hashicorp/vault-k8s:1.1.0-ubi
+vault_storage_size: 10Gi
+vault_pod: vault-0
+vault_token_secret: vault-token
+
+# Vault secrets population
+app_namespace: publishing-house
+vault_secret_base_path: secrets/ph/central/secrets
+devspaces_vault_path: secrets/ph/devspaces/secrets
+cluster_secret_store: vault-secret-store
+devspaces_namespace: openshift-devspaces

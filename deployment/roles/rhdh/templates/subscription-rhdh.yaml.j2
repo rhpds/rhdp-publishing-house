@@ -1,0 +1,11 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: rhdh-operator
+  namespace: openshift-operators
+spec:
+  channel: "{{ rhdh_operator_channel }}"
+  name: rhdh
+  source: "{{ rhdh_operator_source }}"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic

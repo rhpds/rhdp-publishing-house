@@ -1,0 +1,8 @@
+---
+app_namespace: publishing-house
+sonataflow_db_user: postgres
+sonataflow_db_password: "{{ keycloak_db_password }}"
+sonataflow_db_name: sonataflow
+sonataflow_db_storage: 5Gi
+sonataflow_operator_channel: alpha
+sonataflow_operator_source: redhat-operators

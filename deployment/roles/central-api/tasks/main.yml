@@ -1,0 +1,44 @@
+---
+- name: Create central-api ServiceAccount
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'sa-central-api.yaml.j2') | from_yaml }}"
+
+- name: Create central-api TokenReview ClusterRoleBinding
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'crb-central-api-tokenreview.yaml.j2') | from_yaml }}"
+
+- name: Deploy central-api
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'deployment-central-api.yaml.j2') | from_yaml }}"
+
+- name: Create central-api Service
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'svc-central-api.yaml.j2') | from_yaml }}"
+
+- name: Create central-api Route
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'route-central-api.yaml.j2') | from_yaml }}"
+
+- name: Wait for central-api to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: central-api
+    namespace: "{{ app_namespace }}"
+  register: central_api_deployment
+  until:
+    - central_api_deployment.resources | length > 0
+    - (central_api_deployment.resources[0].status.availableReplicas | default(0)) > 0
+  retries: 30
+  delay: 10
+
+- name: Display central-api summary
+  ansible.builtin.debug:
+    msg:
+      - "Central API deployed successfully"
+      - "URL: https://central-api-{{ app_namespace }}.{{ ocp_apps_domain }}"

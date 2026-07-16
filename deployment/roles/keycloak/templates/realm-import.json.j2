@@ -1,0 +1,279 @@
+{
+  "realm": "{{ keycloak_realm }}",
+  "enabled": true,
+  "browserFlow": "Direct IdP Redirect Flow",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "default-roles-{{ keycloak_realm }}",
+        "composite": true,
+        "composites": {
+          "realm": ["offline_access", "uma_authorization"]
+        }
+      },
+      {
+        "name": "offline_access"
+      },
+      {
+        "name": "uma_authorization"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "central-api",
+      "name": "Central API Portal",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "https://central-api-{{ app_namespace }}.{{ ocp_apps_domain }}/*"
+      ],
+      "webOrigins": [
+        "https://central-api-{{ app_namespace }}.{{ ocp_apps_domain }}"
+      ],
+      "defaultClientScopes": ["profile", "email", "roles"],
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "config": {
+            "user.attribute": "email",
+            "claim.name": "email",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "preferred_username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "config": {
+            "user.attribute": "username",
+            "claim.name": "preferred_username",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "rhdh",
+      "name": "Red Hat Developer Hub",
+      "description": "RHDH OIDC client with service account for user/group sync",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "{{ rhdh_client_secret }}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "implicitFlowEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "https://central-publishing-house-{{ app_namespace }}.{{ ocp_apps_domain }}/api/auth/oidc/handler/frame",
+        "https://central-publishing-house-{{ app_namespace }}.{{ ocp_apps_domain }}/*"
+      ],
+      "webOrigins": [
+        "https://central-publishing-house-{{ app_namespace }}.{{ ocp_apps_domain }}"
+      ],
+      "defaultClientScopes": ["profile", "email", "roles"],
+      "optionalClientScopes": ["address", "phone"]
+    },
+    {
+      "clientId": "publishing-house-portal",
+      "name": "Publishing House Portal",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "{{ portal_client_secret }}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "implicitFlowEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "https://publishing-house-portal-{{ app_namespace }}.{{ ocp_apps_domain }}/oauth2/callback"
+      ],
+      "webOrigins": [
+        "https://publishing-house-portal-{{ app_namespace }}.{{ ocp_apps_domain }}"
+      ],
+      "defaultClientScopes": ["profile", "email", "roles"],
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "config": {
+            "user.attribute": "email",
+            "claim.name": "email",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "email_verified",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "config": {
+            "user.attribute": "emailVerified",
+            "claim.name": "email_verified",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "jsonType.label": "boolean"
+          }
+        }
+      ]
+    }
+  ],
+  "scopeMappings": [
+    {
+      "clientScope": "offline_access",
+      "roles": ["offline_access"]
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-rhdh",
+      "enabled": true,
+      "serviceAccountClientId": "rhdh",
+      "clientRoles": {
+        "realm-management": [
+          "query-groups",
+          "query-users",
+          "view-users",
+          "view-realm"
+        ]
+      }
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@publishing-house.local",
+      "firstName": "Admin",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "{{ keycloak_admin_password | default('admin') }}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["default-roles-{{ keycloak_realm }}"]
+    }
+  ],
+  "identityProviders": [
+    {
+      "alias": "corporate-sso",
+      "displayName": "{{ corporate_sso_display_name | default('Red Hat Internal SSO') }}",
+      "providerId": "oidc",
+      "enabled": true,
+      "trustEmail": true,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "clientId": "{{ corporate_sso_client_id }}",
+        "clientSecret": "{{ corporate_sso_client_secret }}",
+        "tokenUrl": "{{ corporate_sso_issuer_url }}/protocol/openid-connect/token",
+        "authorizationUrl": "{{ corporate_sso_issuer_url }}/protocol/openid-connect/auth",
+        "logoutUrl": "{{ corporate_sso_issuer_url }}/protocol/openid-connect/logout",
+        "userInfoUrl": "{{ corporate_sso_issuer_url }}/protocol/openid-connect/userinfo",
+        "issuer": "{{ corporate_sso_issuer_url }}",
+        "defaultProvider": "true",
+        "defaultScope": "openid email profile",
+        "syncMode": "FORCE",
+        "useJwksUrl": "true",
+        "jwksUrl": "{{ corporate_sso_issuer_url }}/protocol/openid-connect/certs",
+        "validateSignature": "true"
+      }
+    }
+  ],
+  "authenticationFlows": [
+    {
+      "alias": "Direct IdP Redirect Flow",
+      "builtIn": false,
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "requirement": "ALTERNATIVE",
+          "priority": 10
+        },
+        {
+          "authenticator": "identity-provider-redirector",
+          "authenticatorConfig": "redirector-config",
+          "requirement": "REQUIRED",
+          "priority": 20
+        }
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "redirector-config",
+      "config": {
+        "defaultProvider": "corporate-sso"
+      }
+    }
+  ],
+  "identityProviderMappers": [
+    {
+      "name": "email",
+      "identityProviderAlias": "corporate-sso",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "claim": "email",
+        "user.attribute": "email",
+        "syncMode": "INHERIT"
+      }
+    },
+    {
+      "name": "first-name",
+      "identityProviderAlias": "corporate-sso",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "claim": "given_name",
+        "user.attribute": "firstName",
+        "syncMode": "INHERIT"
+      }
+    },
+    {
+      "name": "last-name",
+      "identityProviderAlias": "corporate-sso",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "claim": "family_name",
+        "user.attribute": "lastName",
+        "syncMode": "INHERIT"
+      }
+    },
+    {
+      "name": "username",
+      "identityProviderAlias": "corporate-sso",
+      "identityProviderMapper": "oidc-username-idp-mapper",
+      "config": {
+        "template": "${CLAIM.preferred_username}",
+        "syncMode": "INHERIT"
+      }
+    }
+  ]
+}

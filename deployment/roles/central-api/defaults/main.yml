@@ -1,0 +1,4 @@
+---
+app_namespace: publishing-house
+central_api_image: quay.io/treddy08/central-api:latest
+central_api_replicas: 1

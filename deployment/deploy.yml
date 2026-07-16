@@ -1,0 +1,66 @@
+---
+# Main deployment playbook for Publishing House Platform
+#
+# Usage:
+#   ansible-playbook deploy.yml -e @~/publishing-house-cluster.yml
+#   ansible-playbook deploy.yml -e @~/publishing-house-cluster.yml --tags keycloak
+
+- name: Deploy Publishing House Platform
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  pre_tasks:
+    - name: Validate cluster configuration
+      ansible.builtin.assert:
+        that:
+          - ocp_apps_domain is defined
+          - ocp_apps_domain | length > 0
+        fail_msg: "ocp_apps_domain is required. Pass -e @/path/to/cluster.yml"
+
+    - name: Verify OpenShift connection
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: default
+      register: cluster_check
+
+    - name: Display target cluster
+      ansible.builtin.debug:
+        msg: "Connected to cluster, deploying to {{ ocp_apps_domain }}"
+
+  tasks:
+    - name: Deploy Vault and populate secrets
+      ansible.builtin.import_role:
+        name: vault
+      tags: [vault, vault-deploy, vault-secrets]
+
+    - name: Install External Secrets Operator
+      ansible.builtin.import_role:
+        name: external-secrets
+      tags: [external-secrets, eso]
+
+    - name: Deploy DevSpaces
+      ansible.builtin.import_role:
+        name: devspaces
+      tags: [devspaces]
+
+    - name: Deploy Keycloak (RHBK)
+      ansible.builtin.import_role:
+        name: keycloak
+      tags: [keycloak]
+
+    - name: Deploy RHDH (Developer Hub)
+      ansible.builtin.import_role:
+        name: rhdh
+      tags: [rhdh]
+
+    - name: Deploy Central API
+      ansible.builtin.import_role:
+        name: central-api
+      tags: [central-api]
+
+    - name: Deploy SonataFlow
+      ansible.builtin.import_role:
+        name: sonataflow
+      tags: [sonataflow]

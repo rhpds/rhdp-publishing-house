@@ -1,0 +1,94 @@
+includes:
+  - dynamic-plugins.default.yaml
+plugins:
+  - disabled: false
+    package: ./dynamic-plugins/dist/backstage-plugin-kubernetes
+  - disabled: false
+    package: ./dynamic-plugins/dist/backstage-plugin-kubernetes-backend-dynamic
+    pluginConfig:
+      kubernetes:
+        clusterLocatorMethods:
+          - clusters:
+              - authProvider: serviceAccount
+                customResources:
+                  - apiVersion: v1alpha1
+                    group: route.openshift.io
+                    plural: routes
+                  - apiVersion: v1
+                    group: tekton.dev
+                    plural: pipelineruns
+                name: ph-cluster
+                serviceAccountToken: ${K8S_SERVICEACCOUNT_TOKEN}
+                skipTLSVerify: true
+                url: https://kubernetes.default.svc
+            type: config
+        serviceLocatorMethod:
+          type: multiTenant
+  - disabled: false
+    package: ./dynamic-plugins/dist/backstage-plugin-scaffolder-backend-module-github-dynamic
+  - disabled: false
+    package: ./dynamic-plugins/dist/roadiehq-scaffolder-backend-module-http-request-dynamic
+  - disabled: false
+    package: ./dynamic-plugins/dist/backstage-community-plugin-topology
+  - disabled: false
+    package: ./dynamic-plugins/dist/backstage-plugin-techdocs
+  - disabled: false
+    package: ./dynamic-plugins/dist/backstage-plugin-techdocs-backend-dynamic
+  - disabled: false
+    package: ./dynamic-plugins/dist/backstage-community-plugin-catalog-backend-module-keycloak-dynamic
+  - disabled: false
+    package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{ '{{inherit}}' }}
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          red-hat-developer-hub.backstage-plugin-orchestrator:
+            appIcons:
+              - importName: OrchestratorIcon
+                name: orchestratorIcon
+            dynamicRoutes:
+              - importName: OrchestratorPage
+                menuItem:
+                  icon: orchestratorIcon
+                  text: Orchestrator
+                path: /orchestrator
+  - disabled: false
+    package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{ '{{inherit}}' }}
+    pluginConfig:
+      orchestrator:
+        dataIndexService:
+          url: http://sonataflow-platform-data-index-service.{{ app_namespace }}.svc.cluster.local
+  - disabled: false
+    package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{ '{{inherit}}' }}
+    pluginConfig:
+      orchestrator:
+        dataIndexService:
+          url: http://sonataflow-platform-data-index-service.{{ app_namespace }}.svc.cluster.local
+  - disabled: false
+    package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{ '{{inherit}}' }}
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          red-hat-developer-hub.backstage-plugin-orchestrator-form-widgets: {}
+  - disabled: false
+    package: 'oci://quay.io/treddy08/backstage-plugin-ph-workflows:0.1.8!backstage-plugin-ph-workflows'
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          backstage-plugin-ph-workflows:
+            appIcons:
+              - importName: PhWorkflowIcon
+                name: phWorkflowIcon
+            dynamicRoutes:
+              - importName: PhWorkflowsPage
+                menuItem:
+                  icon: phWorkflowIcon
+                  text: Publishing House
+                path: /publishing-house-workflows
+  - disabled: false
+    package: ./dynamic-plugins/dist/backstage-plugin-notifications
+  - disabled: false
+    package: ./dynamic-plugins/dist/backstage-plugin-signals
+  - disabled: false
+    package: ./dynamic-plugins/dist/backstage-plugin-notifications-backend-dynamic
+  - disabled: false
+    package: ./dynamic-plugins/dist/backstage-plugin-signals-backend-dynamic

@@ -1,0 +1,10 @@
+---
+devspaces_namespace: openshift-devspaces
+devspaces_vault_path: secrets/ph/devspaces/secrets
+cluster_secret_store: vault-secret-store
+vault_namespace: vault
+vault_pod: vault-0
+vault_token_secret: vault-token
+
+devspaces_operator_channel: stable
+devspaces_operator_source: redhat-operators

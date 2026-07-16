@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["projectId"],
+  "properties": {
+    "projectId": {
+      "type": "string",
+      "description": "Unique identifier for the publishing project"
+    },
+    "repoUrl": {
+      "type": "string",
+      "description": "Git repository URL for the content"
+    },
+    "ssoUser": {
+      "type": "string",
+      "description": "SSO/OIDC username of the project owner"
+    },
+    "ssoEmail": {
+      "type": "string",
+      "description": "SSO/OIDC email of the project owner"
+    },
+    "deploymentMode": {
+      "type": "string",
+      "description": "Deployment mode (rhdp_published or self_published)"
+    },
+    "projectType": {
+      "type": "string",
+      "description": "Project type (workshop, lab, demo)"
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional tags for filtering and search"
+    }
+  }
+}

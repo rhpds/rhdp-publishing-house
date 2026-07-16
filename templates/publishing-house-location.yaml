@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: publishing-house-templates
+  description: Publishing House software templates
+spec:
+  type: url
+  targets:
+    - https://raw.githubusercontent.com/treddy08/rhdh-publishing-house-central/main/templates/publishing-house-project/template.yaml

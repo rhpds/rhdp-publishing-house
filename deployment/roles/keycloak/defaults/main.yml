@@ -1,0 +1,13 @@
+---
+keycloak_namespace: keycloak
+keycloak_realm: publishing-house
+keycloak_instances: 1
+
+keycloak_operator_channel: stable-v26
+keycloak_operator_source: redhat-operators
+
+keycloak_db_name: keycloak
+keycloak_db_user: keycloak
+keycloak_db_storage: 5Gi
+
+app_namespace: publishing-house

@@ -1,0 +1,8 @@
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: publishing-house-components
+  description: Publishing House component resources
+spec:
+  type: url
+  targets: []

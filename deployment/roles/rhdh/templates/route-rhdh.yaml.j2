@@ -1,0 +1,15 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: central-publishing-house
+  namespace: "{{ app_namespace }}"
+spec:
+  to:
+    kind: Service
+    name: "backstage-{{ rhdh_instance_name }}"
+    weight: 100
+  port:
+    targetPort: http-backend
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

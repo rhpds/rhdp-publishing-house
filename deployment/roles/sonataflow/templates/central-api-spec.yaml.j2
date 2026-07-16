@@ -1,0 +1,46 @@
+openapi: 3.0.0
+info:
+  title: Publishing House Central API
+  version: 1.0.0
+  description: Central API for Publishing House workflow orchestration
+servers:
+  - url: https://central-api-{{ app_namespace }}.{{ ocp_apps_domain }}/api/v1
+paths:
+  /jira/epic:
+    post:
+      operationId: createJiraEpic
+      summary: Create a minimal Jira epic for a new project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - project_name
+              properties:
+                project_name:
+                  type: string
+                project_type:
+                  type: string
+                deployment_mode:
+                  type: string
+      responses:
+        '201':
+          description: Epic created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  epic_key:
+                    type: string
+                  jira_url:
+                    type: string
+      security:
+        - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer

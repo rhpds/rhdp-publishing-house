@@ -1,0 +1,8 @@
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: publishing-house-entities
+  description: Publishing House templates and components for RHDP content creation
+spec:
+  targets:
+    - ./template-locations.yaml

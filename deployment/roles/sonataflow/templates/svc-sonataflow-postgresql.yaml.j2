@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sonataflow-postgresql
+  namespace: "{{ app_namespace }}"
+  labels:
+    app: sonataflow-postgresql
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: sonataflow-postgresql
+  clusterIP: None

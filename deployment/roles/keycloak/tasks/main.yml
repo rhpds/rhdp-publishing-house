@@ -1,0 +1,110 @@
+---
+- name: Create keycloak namespace
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'namespace.yaml.j2') | from_yaml }}"
+
+- name: Create OperatorGroup
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'operatorgroup.yaml.j2') | from_yaml }}"
+
+- name: Create RHBK operator subscription
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'subscription-rhbk.yaml.j2') | from_yaml }}"
+
+- name: Wait for RHBK operator to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: rhbk-operator
+    namespace: "{{ keycloak_namespace }}"
+  register: rhbk_operator
+  until:
+    - rhbk_operator.resources | length > 0
+    - (rhbk_operator.resources[0].status.availableReplicas | default(0)) > 0
+  retries: 60
+  delay: 10
+
+# --- PostgreSQL for Keycloak ---
+
+- name: Create PostgreSQL credentials secret
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'secret-keycloak-db.yaml.j2') | from_yaml }}"
+
+- name: Deploy PostgreSQL for Keycloak
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'ss-keycloak-db.yaml.j2') | from_yaml }}"
+
+- name: Create PostgreSQL service
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'svc-keycloak-db.yaml.j2') | from_yaml }}"
+
+- name: Wait for PostgreSQL to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: StatefulSet
+    name: keycloak-db
+    namespace: "{{ keycloak_namespace }}"
+  register: keycloak_db
+  until:
+    - keycloak_db.resources | length > 0
+    - (keycloak_db.resources[0].status.readyReplicas | default(0)) > 0
+  retries: 30
+  delay: 10
+
+# --- Keycloak Server ---
+
+- name: Create Keycloak instance
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'keycloak.yaml.j2') | from_yaml }}"
+
+- name: Wait for Keycloak to be ready
+  kubernetes.core.k8s_info:
+    api_version: k8s.keycloak.org/v2alpha1
+    kind: Keycloak
+    name: keycloak
+    namespace: "{{ keycloak_namespace }}"
+  register: keycloak_instance
+  until:
+    - keycloak_instance.resources | length > 0
+    - keycloak_instance.resources[0].status is defined
+    - keycloak_instance.resources[0].status.conditions is defined
+    - keycloak_instance.resources[0].status.conditions | selectattr('type', 'equalto', 'Ready') | selectattr('status', 'equalto', 'True') | list | length > 0
+  retries: 60
+  delay: 10
+
+# --- Realm Import ---
+
+- name: Create realm import
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'keycloak-realm-import.yaml.j2') | from_yaml }}"
+
+- name: Wait for realm import to complete
+  kubernetes.core.k8s_info:
+    api_version: k8s.keycloak.org/v2alpha1
+    kind: KeycloakRealmImport
+    name: "{{ keycloak_realm }}"
+    namespace: "{{ keycloak_namespace }}"
+  register: realm_import
+  until:
+    - realm_import.resources | length > 0
+    - realm_import.resources[0].status is defined
+    - realm_import.resources[0].status.conditions is defined
+    - realm_import.resources[0].status.conditions | selectattr('type', 'equalto', 'Done') | selectattr('status', 'equalto', 'True') | list | length > 0
+  retries: 30
+  delay: 10
+
+- name: Display Keycloak deployment summary
+  ansible.builtin.debug:
+    msg:
+      - "Keycloak (RHBK) deployed successfully"
+      - "Console: https://keycloak-{{ keycloak_namespace }}.{{ ocp_apps_domain }}"
+      - "Realm: {{ keycloak_realm }}"
+      - "Clients: central-api, rhdh, publishing-house-portal"

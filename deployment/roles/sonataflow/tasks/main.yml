@@ -1,0 +1,100 @@
+---
+# --- PostgreSQL for SonataFlow ---
+
+- name: Create SonataFlow DB credentials secret
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'secret-sonataflow-db.yaml.j2') | from_yaml }}"
+
+- name: Deploy PostgreSQL for SonataFlow
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'ss-sonataflow-postgresql.yaml.j2') | from_yaml }}"
+
+- name: Create SonataFlow PostgreSQL service
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'svc-sonataflow-postgresql.yaml.j2') | from_yaml }}"
+
+- name: Wait for SonataFlow PostgreSQL to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: StatefulSet
+    name: sonataflow-postgresql
+    namespace: "{{ app_namespace }}"
+  register: sf_db
+  until:
+    - sf_db.resources | length > 0
+    - (sf_db.resources[0].status.readyReplicas | default(0)) > 0
+  retries: 30
+  delay: 10
+
+- name: Ensure sonataflow database exists
+  kubernetes.core.k8s_exec:
+    namespace: "{{ app_namespace }}"
+    pod: sonataflow-postgresql-0
+    command: >
+      psql -U {{ sonataflow_db_user }} -tc
+      "SELECT 1 FROM pg_database WHERE datname='{{ sonataflow_db_name }}'"
+  register: db_check
+
+- name: Create sonataflow database if missing
+  kubernetes.core.k8s_exec:
+    namespace: "{{ app_namespace }}"
+    pod: sonataflow-postgresql-0
+    command: >
+      psql -U {{ sonataflow_db_user }} -c
+      "CREATE DATABASE {{ sonataflow_db_name }}"
+  when: db_check.stdout | trim | length == 0
+
+# --- SonataFlowPlatform ---
+
+- name: Create SonataFlowPlatform
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'sonataflow-platform.yaml.j2') | from_yaml }}"
+
+- name: Wait for SonataFlowPlatform to be ready
+  kubernetes.core.k8s_info:
+    api_version: sonataflow.org/v1alpha08
+    kind: SonataFlowPlatform
+    name: sonataflow-platform
+    namespace: "{{ app_namespace }}"
+  register: sfp
+  until:
+    - sfp.resources | length > 0
+    - sfp.resources[0].status is defined
+    - sfp.resources[0].status.conditions is defined
+    - sfp.resources[0].status.conditions | selectattr('type', 'equalto', 'Succeed') | selectattr('status', 'equalto', 'True') | list | length > 0
+  retries: 60
+  delay: 10
+
+# --- Workflow ConfigMaps ---
+
+- name: Render workflow input schema
+  ansible.builtin.set_fact:
+    _workflow_input_schema: "{{ lookup('template', 'workflow-input-schema.json.j2') }}"
+
+- name: Create workflow input schema ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cm-workflow-input-schema.yaml.j2') }}"
+
+- name: Create central-api OpenAPI spec ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cm-central-api-spec.yaml.j2') }}"
+
+# --- SonataFlow CR ---
+
+- name: Deploy publishing house workflow
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'sonataflow-workflow.yaml.j2') | from_yaml }}"
+
+- name: Display SonataFlow summary
+  ansible.builtin.debug:
+    msg:
+      - "SonataFlow platform and workflow deployed in {{ app_namespace }}"
+      - "Data Index: http://sonataflow-platform-data-index-service.{{ app_namespace }}.svc.cluster.local"
+      - "Workflow: publishinghouseworkflow"

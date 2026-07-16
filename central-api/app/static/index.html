@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Publishing House - API Key Management</title>
+    <script src="https://cdn.jsdelivr.net/npm/keycloak-js@23/dist/keycloak.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .user-info {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-email {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+        }
+
+        .create-key-section {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .keys-list {
+            margin-top: 20px;
+        }
+
+        .key-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+
+        .key-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .key-label {
+            font-weight: 600;
+            color: #333;
+            font-size: 18px;
+        }
+
+        .key-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .key-actions button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .refresh-btn {
+            background: #ffc107;
+            color: #000;
+        }
+
+        .revoke-btn {
+            background: #dc3545;
+            color: white;
+        }
+
+        .key-meta {
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .key-value {
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            word-break: break-all;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .new-key-display {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .new-key-warning {
+            color: #721c24;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .copy-btn:hover {
+            background: #218838;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loading" class="loading">
+            <p>🔐 Authenticating with Keycloak...</p>
+        </div>
+
+        <div id="app" style="display: none;">
+            <h1>🔑 API Key Management</h1>
+            <p class="subtitle">Publishing House Central API</p>
+
+            <div class="user-info">
+                <div>
+                    <span>Logged in as: </span>
+                    <span class="user-email" id="user-email"></span>
+                </div>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+
+            <div id="error" class="error" style="display: none;"></div>
+
+            <div class="create-key-section">
+                <h2 style="margin-bottom: 15px; color: #333;">Create New API Key</h2>
+                <button class="btn" onclick="createKey()" id="create-btn">Generate New Key</button>
+
+                <div id="new-key-display" style="display: none;" class="new-key-display">
+                    <div class="new-key-warning">
+                        ⚠️ <strong>Save this key now!</strong> You won't be able to see it again.
+                    </div>
+                    <div class="key-value" id="new-key-value"></div>
+                    <button class="copy-btn" onclick="copyNewKey()">📋 Copy to Clipboard</button>
+                </div>
+            </div>
+
+            <h2 style="margin-bottom: 15px; color: #333;">Your API Keys</h2>
+            <div id="keys-list" class="keys-list"></div>
+        </div>
+    </div>
+
+    <script>
+        let keycloak;
+        let newKeyRaw = '';
+
+        // Initialize Keycloak
+        const keycloakConfig = {
+            url: 'https://keycloak-rhsso.apps.cluster-v27ps.dynamic2.redhatworkshops.io/auth',
+            realm: 'openshift',
+            clientId: 'central-api'
+        };
+
+        keycloak = new Keycloak(keycloakConfig);
+
+        keycloak.init({
+            onLoad: 'login-required',
+            checkLoginIframe: false
+        }).then(authenticated => {
+            if (authenticated) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('app').style.display = 'block';
+
+                // Display user info
+                keycloak.loadUserInfo().then(userInfo => {
+                    document.getElementById('user-email').textContent = userInfo.email || userInfo.preferred_username;
+                });
+
+                // Load keys
+                loadKeys();
+            } else {
+                showError('Authentication failed');
+            }
+        }).catch(error => {
+            console.error('Keycloak init error:', error);
+            showError('Failed to initialize authentication: ' + error);
+        });
+
+        function logout() {
+            keycloak.logout();
+        }
+
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            const options = {
+                method,
+                headers: {
+                    'Authorization': `Bearer ${keycloak.token}`,
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            if (body) {
+                options.body = JSON.stringify(body);
+            }
+
+            const response = await fetch(`/api/v1${endpoint}`, options);
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'API call failed');
+            }
+
+            if (method === 'DELETE') {
+                return null;
+            }
+
+            return response.json();
+        }
+
+        async function loadKeys() {
+            try {
+                const keys = await apiCall('/projects/keys');
+                displayKeys(keys);
+            } catch (error) {
+                showError('Failed to load keys: ' + error.message);
+            }
+        }
+
+        function displayKeys(keys) {
+            const container = document.getElementById('keys-list');
+
+            if (keys.length === 0) {
+                container.innerHTML = '<div class="empty-state">No API key yet. Click "Generate New Key" above to create one.</div>';
+                return;
+            }
+
+            container.innerHTML = keys.map(key => `
+                <div class="key-card">
+                    <div class="key-header">
+                        <div class="key-label">${key.label || 'API Key'}</div>
+                    </div>
+                    <div class="key-meta">
+                        Created: ${new Date(key.created_at).toLocaleString()}<br>
+                        Last used: ${key.last_used_at ? new Date(key.last_used_at).toLocaleString() : 'Never'}
+                    </div>
+                    <div class="key-value">${key.masked}</div>
+                    <div style="margin-top: 12px; color: #666; font-size: 13px;">
+                        💡 Click "Generate New Key" above to regenerate (invalidates this key)
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function createKey() {
+            const btn = document.getElementById('create-btn');
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+
+            try {
+                const result = await apiCall('/projects/keys', 'POST');
+                newKeyRaw = result.raw_key;
+
+                document.getElementById('new-key-value').textContent = result.raw_key;
+                document.getElementById('new-key-display').style.display = 'block';
+
+                // Reload keys list
+                await loadKeys();
+
+                btn.textContent = 'Generate New Key';
+            } catch (error) {
+                showError('Failed to create key: ' + error.message);
+                btn.textContent = 'Generate New Key';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function copyNewKey() {
+            navigator.clipboard.writeText(newKeyRaw).then(() => {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            });
+        }
+
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

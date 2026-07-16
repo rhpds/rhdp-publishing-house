@@ -1,0 +1,108 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vault-auto-unseal
+  namespace: {{ vault_namespace }}
+spec:
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: vault
+          restartPolicy: Never
+          containers:
+          - name: unsealer
+            image: {{ vault_unseal_image }}
+            volumeMounts:
+            - mountPath: /vault-unseal-config
+              name: vault-unseal-config-volume
+            command:
+            - /bin/bash
+            - -c
+            - |
+              echo "=== Vault Auto-Unseal Check at $(date) ==="
+
+              # Check if vault-0 pod exists
+              if ! oc get pod vault-0 -n {{ vault_namespace }} &>/dev/null; then
+                echo "Vault pod vault-0 not found, skipping..."
+                exit 0
+              fi
+
+              # Check vault status - capture exit code properly
+              echo "Checking Vault status..."
+              set +e  # Disable exit on error temporarily
+              oc exec vault-0 -n {{ vault_namespace }} -- vault status -tls-skip-verify
+              STATUS=$?
+              set -e  # Re-enable exit on error
+
+              echo "Status code: $STATUS"
+
+              if [ $STATUS -eq 0 ]; then
+                echo "✓ Vault is already unsealed and healthy"
+                exit 0
+              elif [ $STATUS -eq 2 ]; then
+                echo "⚠ Vault is sealed, checking initialization status..."
+
+                # Check if already initialized (keys file exists)
+                set +e
+                oc exec vault-0 -n {{ vault_namespace }} -- test -f /vault/data/vault-auto-unseal-keys.txt
+                KEYS_EXISTS=$?
+                set -e
+
+                if [ $KEYS_EXISTS -eq 0 ]; then
+                  echo "✓ Vault already initialized, unsealing with existing keys..."
+                  oc exec vault-0 -n {{ vault_namespace }} -- /bin/sh /vault/data/unseal.sh
+
+                  # Verify unseal succeeded
+                  set +e
+                  oc exec vault-0 -n {{ vault_namespace }} -- vault status -tls-skip-verify
+                  FINAL_STATUS=$?
+                  set -e
+
+                  if [ $FINAL_STATUS -eq 0 ]; then
+                    echo "✓ Successfully unsealed Vault"
+                    exit 0
+                  else
+                    echo "✗ Vault unseal failed (exit code: $FINAL_STATUS)"
+                    exit 1
+                  fi
+                else
+                  # Vault is not initialized - initialize it
+                  echo "Initializing Vault for the first time..."
+                  oc exec vault-0 --namespace={{ vault_namespace }} --stdin --tty -- vault operator init -format=yaml > /tmp/vault-auto-unseal-keys.txt
+
+                  echo "Copying unseal keys to Vault pod..."
+                  cat /tmp/vault-auto-unseal-keys.txt | oc exec -i -n {{ vault_namespace }} vault-0 -c vault "--" sh -c "cat > /vault/data/vault-auto-unseal-keys.txt"
+
+                  echo "Copying unseal script to Vault pod..."
+                  cat /vault-unseal-config/unseal.sh | oc exec -i -n {{ vault_namespace }} vault-0 -c vault "--" sh -c "cat > /vault/data/unseal.sh"
+
+                  echo "Unsealing Vault..."
+                  oc exec vault-0 --namespace={{ vault_namespace }} --stdin --tty -- /bin/sh /vault/data/unseal.sh
+
+                  # Verify unsealing succeeded
+                  set +e
+                  oc exec vault-0 --namespace={{ vault_namespace }} -- vault status -tls-skip-verify
+                  FINAL_STATUS=$?
+                  set -e
+
+                  if [ $FINAL_STATUS -eq 0 ]; then
+                    echo "✓ Vault successfully initialized and unsealed"
+                    exit 0
+                  else
+                    echo "✗ Vault unseal verification failed"
+                    exit 1
+                  fi
+                fi
+              else
+                echo "✗ Vault status check failed with unexpected code: $STATUS"
+                exit 1
+              fi
+          volumes:
+          - name: vault-unseal-config-volume
+            configMap:
+              name: vault-unseal-config

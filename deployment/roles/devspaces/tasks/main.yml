@@ -1,0 +1,101 @@
+---
+- name: Ensure openshift-devspaces namespace exists
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'namespace.yaml.j2') | from_yaml }}"
+
+# --- Install DevSpaces Operator ---
+
+- name: Create DevSpaces operator subscription
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'subscription-devspaces.yaml.j2') | from_yaml }}"
+
+- name: Wait for DevSpaces operator CSV to succeed
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-operators
+    label_selectors:
+      - "operators.coreos.com/devspaces.openshift-operators="
+  register: devspaces_csv
+  until:
+    - devspaces_csv.resources | length > 0
+    - devspaces_csv.resources[0].status.phase is defined
+    - devspaces_csv.resources[0].status.phase == "Succeeded"
+  retries: 30
+  delay: 20
+
+# --- Write GitHub OAuth to Vault ---
+
+- name: Get Vault root token
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: "{{ vault_token_secret }}"
+    namespace: "{{ vault_namespace }}"
+  register: vault_token_result
+
+- name: Set Vault token fact
+  ansible.builtin.set_fact:
+    vault_root_token: "{{ vault_token_result.resources[0].data.token | b64decode }}"
+
+- name: Write GitHub OAuth secret to Vault
+  kubernetes.core.k8s_exec:
+    namespace: "{{ vault_namespace }}"
+    pod: "{{ vault_pod }}"
+    command: >-
+      sh -c "VAULT_TOKEN={{ vault_root_token }}
+      vault kv put kv/{{ devspaces_vault_path }}/github
+      client-id='{{ github_oauth_client_id }}'
+      client-secret='{{ github_oauth_client_secret }}'"
+  changed_when: true
+
+# --- Create ExternalSecret for GitHub OAuth ---
+
+- name: Create GitHub OAuth ExternalSecret
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'externalsecret-github-oauth.yaml.j2') | from_yaml }}"
+
+- name: Wait for GitHub OAuth ExternalSecret to sync
+  kubernetes.core.k8s_info:
+    api_version: external-secrets.io/v1beta1
+    kind: ExternalSecret
+    name: github-oauth-config
+    namespace: "{{ devspaces_namespace }}"
+  register: github_es
+  until:
+    - github_es.resources | length > 0
+    - github_es.resources[0].status.conditions is defined
+    - github_es.resources[0].status.conditions | selectattr('type', 'equalto', 'Ready') | selectattr('status', 'equalto', 'True') | list | length > 0
+  retries: 12
+  delay: 10
+
+# --- Deploy CheCluster CR ---
+
+- name: Deploy CheCluster CR
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'checluster.yaml.j2') }}"
+
+- name: Wait for CheCluster to become Active
+  kubernetes.core.k8s_info:
+    api_version: org.eclipse.che/v2
+    kind: CheCluster
+    name: devspaces
+    namespace: "{{ devspaces_namespace }}"
+  register: checluster
+  until:
+    - checluster.resources | length > 0
+    - checluster.resources[0].status is defined
+    - checluster.resources[0].status.chePhase is defined
+    - checluster.resources[0].status.chePhase == "Active"
+  retries: 30
+  delay: 20
+
+- name: Display DevSpaces URL
+  ansible.builtin.debug:
+    msg:
+      - "DevSpaces deployed: {{ checluster.resources[0].status.cheURL }}"
+      - "GitHub OAuth configured via ExternalSecret"
