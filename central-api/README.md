@@ -118,10 +118,10 @@ oc exec vault-0 -n vault -- vault kv put kv/secrets/ph/central/secrets/litellm-m
 ### Build and Deploy
 ```bash
 # Build image
-podman build -t quay.io/treddy08/central-api:latest central-api/
+podman build -t quay.io/rhpds/central-api:latest central-api/
 
 # Push image
-podman push quay.io/treddy08/central-api:latest
+podman push quay.io/rhpds/central-api:latest
 
 # Deploy to cluster
 oc apply -f central-api/k8s/

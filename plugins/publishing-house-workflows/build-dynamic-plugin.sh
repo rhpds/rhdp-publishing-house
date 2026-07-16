@@ -12,7 +12,7 @@ set -euo pipefail
 VERSION="${1:-0.1.0}"
 NO_PUSH="${2:-}"
 PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
-IMAGE="quay.io/treddy08/backstage-plugin-ph-workflows:${VERSION}"
+IMAGE="quay.io/rhpds/backstage-plugin-ph-workflows:${VERSION}"
 
 echo "==> Building plugin version ${VERSION}"
 

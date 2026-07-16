@@ -80,7 +80,7 @@ spec:
               user:
                 title: GitHub Username
                 type: string
-                ui:placeholder: "treddy08"
+                ui:placeholder: "github-username"
               access:
                 title: Access
                 type: string

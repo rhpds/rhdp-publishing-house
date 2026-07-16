@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-IMAGE_NAME=${1:-quay.io/treddy08/central-api}
+IMAGE_NAME=${1:-quay.io/rhpds/central-api}
 TAG=${2:-latest}
 
 echo "Building Central API image: ${IMAGE_NAME}:${TAG}"
