@@ -1,4 +1,4 @@
 ---
 app_namespace: publishing-house
-central_api_image: quay.io/rhpds/central-api:latest
+central_api_image: quay.io/rhpds/central-api:1.0.0
 central_api_replicas: 1
