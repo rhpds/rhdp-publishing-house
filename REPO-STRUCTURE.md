@@ -8,7 +8,7 @@
 ## Directory Structure
 
 ```
-rhdh-publishing-house-central/
+rhdp-publishing-house/
 ├── ansible/                    # Deployment automation
 ├── central-api/               # Publishing House Central API (FastAPI)
 ├── devspaces/                 # OpenShift DevSpaces configuration
@@ -280,8 +280,8 @@ All secrets stored in Vault:
 
 | Repo | Purpose |
 |------|---------|
-| `rhdh-publishing-house` | Main planning/specs repo |
-| `rhdh-publishing-house-central` | **THIS REPO** - Infrastructure & automation |
+| `rhdp-publishing-house-nate` | Original Python-based implementation (legacy) |
+| `rhdp-publishing-house` | **THIS REPO** - Infrastructure & automation |
 | `ocp-getting-started-test` | Test project created by template |
 
 ---

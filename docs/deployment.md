@@ -86,8 +86,8 @@ git commit -m "Update jira-sync service with new feature
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/rhpds/rhdh-publishing-house-central.git
-cd rhdh-publishing-house-central
+git clone https://github.com/rhpds/rhdp-publishing-house.git
+cd rhdp-publishing-house
 ```
 
 ### 2. Install Python Dependencies
@@ -606,7 +606,7 @@ After successful deployment:
 
 ## References
 
-- [Architecture Documentation](../rhdh-publishing-house/docs/architecture.md)
-- [Phase Specifications](../rhdh-publishing-house/docs/specs/)
+- [Architecture Documentation](architecture/system-design.md)
+- [Phase Specifications](architecture/lifecycle-phases.md)
 - [Troubleshooting Guide](troubleshooting.md)
 - [Ansible Best Practices](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html)

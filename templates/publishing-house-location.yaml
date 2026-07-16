@@ -6,4 +6,4 @@ metadata:
 spec:
   type: url
   targets:
-    - https://raw.githubusercontent.com/treddy08/rhdh-publishing-house-central/main/templates/publishing-house-project/template.yaml
+    - https://raw.githubusercontent.com/rhpds/rhdp-publishing-house/main/templates/publishing-house-project/template.yaml

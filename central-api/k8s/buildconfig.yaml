@@ -13,7 +13,7 @@ spec:
   source:
     type: Git
     git:
-      uri: https://github.com/treddy08/rhdh-publishing-house-central.git
+      uri: https://github.com/rhpds/rhdp-publishing-house.git
       ref: main
     contextDir: central-api
   strategy:

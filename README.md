@@ -1,6 +1,6 @@
-# RHDH Publishing House Central
+# RHDP Publishing House
 
-**Central repository for RHDH Publishing House deployment automation and source code**
+**Central repository for RHDP Publishing House deployment automation and source code**
 
 This repository contains all source code, workflows, services, skills, and Ansible playbooks for deploying the RHDH Publishing House system to OpenShift clusters.
 
@@ -11,7 +11,7 @@ The RHDH Publishing House is deployed as a complete system using Ansible automat
 ## Repository Structure
 
 ```
-rhdh-publishing-house-central/
+rhdp-publishing-house/
 ├── ansible/                           # Ansible deployment automation
 │   ├── deploy.yml                     # Main deployment playbook
 │   ├── undeploy.yml                   # Cleanup playbook
@@ -108,8 +108,8 @@ rhdh-publishing-house-central/
 
 ```bash
 # 1. Clone this repository
-git clone https://github.com/rhpds/rhdh-publishing-house-central.git
-cd rhdh-publishing-house-central
+git clone https://github.com/rhpds/rhdp-publishing-house.git
+cd rhdp-publishing-house
 
 # 2. Install Ansible dependencies
 pip install -r requirements.txt
@@ -342,8 +342,7 @@ oc get postgrescluster -n backstage
 
 ## Related Repositories
 
-- [rhdh-publishing-house](https://github.com/rhpds/rhdh-publishing-house) - Architecture documentation and specifications
-- [rhdp-publishing-house](https://github.com/rhpds/rhdp-publishing-house) - Original Python-based implementation (legacy)
+- [rhdp-publishing-house-nate](https://github.com/rhpds/rhdp-publishing-house-nate) - Original Python-based implementation (legacy)
 
 ## Contributing
 
@@ -359,6 +358,6 @@ Apache 2.0
 
 ## Support
 
-- **Issues**: https://github.com/rhpds/rhdh-publishing-house-central/issues
+- **Issues**: https://github.com/rhpds/rhdp-publishing-house/issues
 - **Slack**: #rhdp-publishing-house
 - **Email**: rhdp-team@redhat.com

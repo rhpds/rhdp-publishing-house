@@ -222,7 +222,7 @@ oc port-forward svc/sonataflow-platform-data-index-service 8080:80 -n backstage
 ## File Structure
 
 ```
-rhdh-publishing-house-central/
+rhdp-publishing-house/
 ├── workflows/                             ✅ Created
 │   ├── main-publishing-workflow.sw.yaml  ✅ Complete
 │   ├── sub-workflows/
