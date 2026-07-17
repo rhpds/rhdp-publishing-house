@@ -1,6 +1,6 @@
 # Publishing House — Project Spec
 # Lifecycle stages (managed by SonataFlow): intake → content_review → infra_review → development → ready → published
-# No secrets in this file. Tokens live in ~/.config/publishing-house/ph.json
+# No secrets in this file. Tokens live in ~/.config/publishing-house/auth.json
 # Stage is managed by SonataFlow and cached in .ph-state — do not edit stage.current manually.
 
 project:
@@ -13,6 +13,7 @@ project:
   content_reviewer_email: "psrivastav@redhat.com"
   infra_reviewer_email: "treddy@redhat.com"
   jira_ticket: ""
+  workflow_id: ""
 
 spec:
   title: ""

@@ -88,7 +88,7 @@ Run silently:
 ```bash
 python3 -c "
 import json, os
-f = os.path.expanduser('~/.config/publishing-house/ph.json')
+f = os.path.expanduser('~/.config/publishing-house/auth.json')
 if os.path.exists(f):
     d = json.load(open(f))
     cred = d.get('credential', '')
@@ -126,7 +126,7 @@ Extract `central_url` from the `central:` line. This is used for all subsequent 
   python3 -c "
 import json, os
 key = 'PASTE_KEY_HERE'
-path = os.path.expanduser('~/.config/publishing-house/ph.json')
+path = os.path.expanduser('~/.config/publishing-house/auth.json')
 d = json.load(open(path)) if os.path.exists(path) else {}
 d['credential'] = key
 os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -147,71 +147,34 @@ Read `publishing-house/spec.yaml` using the Read tool. Note:
 - `project.jira_ticket` — may be blank
 - All other pre-populated fields — the intake sub-skill will skip asking about those
 
-Then query the workflow stage silently:
+Then run the shared workflow script silently:
 ```bash
-python3 -c "
-import json, os, ssl, urllib.request
-ph_path = os.path.expanduser('~/.config/publishing-house/ph.json')
-creds = json.load(open(ph_path))
-key = creds.get('credential', '')
-central = creds.get('central', '').rstrip('/')
-ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
-req = urllib.request.Request(
-    f'{central}/api/v1/projects/PROJECT_ID/workflow-data',
-    headers={'Authorization': f'Bearer {key}'}
-)
-try:
-    result = json.loads(urllib.request.urlopen(req, context=ctx, timeout=10).read().decode())
-    stage = result.get('stage', 'intake')
-    epic_key = result.get('epic_key', '')
-    jira_url = result.get('jira_url', '')
-    print(f'stage:{stage}')
-    print(f'epic_key:{epic_key}')
-    print(f'jira_url:{jira_url}')
-except Exception as e:
-    stage = 'intake'
-    print('stage:intake')
-    print('epic_key:')
-    print('jira_url:')
-creds['stage'] = stage
-with open(ph_path, 'w') as f:
-    json.dump(creds, f, indent=2)
-"
+python publishing-house/tools/ph-workflow.py
 ```
-Replace PROJECT_ID with `project_id`.
 
-Extract `stage`, `epic_key`, and `jira_url` from the output. The stage will be one of: `intake`, `review`, `development`, `ready`, or `published`.
+Extract `stage`, `epic_key`, `jira_url`, and `workflow_id` from the output. The stage will be one of: `intake`, `review`, `development`, `ready`, or `published`.
 
-**Sync Jira ticket (rhdp_published only):**
-
-If `project.deployment_mode` is `rhdp_published` AND `project.jira_ticket` in spec.yaml is blank AND `epic_key` from the workflow-data response is non-empty — update spec.yaml:
-```bash
-python3 -c "
-import yaml
-from pathlib import Path
-spec_path = Path('publishing-house/spec.yaml')
-spec = yaml.safe_load(spec_path.read_text()) or {}
-spec.setdefault('project', {})['jira_ticket'] = 'EPIC_KEY_HERE'
-with open(spec_path, 'w') as f:
-    yaml.dump(spec, f, default_flow_style=False, sort_keys=False)
-print('updated')
-"
-```
-Replace EPIC_KEY_HERE with the actual `epic_key`. Commit silently:
+The script handles everything: resolves `workflow_id` (calling `/workflow-data` if missing), syncs `jira_ticket` to spec.yaml for `rhdp_published` projects, and queries `/workflow-state` for the current stage. If spec.yaml was updated, commit silently:
 ```bash
 git add publishing-house/spec.yaml
-git commit -m "feat: sync Jira ticket from workflow" 2>/dev/null || true
+git diff --cached --quiet || git commit -m "feat: sync workflow data from Central API" 2>/dev/null || true
 ```
 
-If `project.deployment_mode` is `self_published`, skip the Jira ticket sync entirely — self-published projects don't use Jira.
+**Step 6 — Stage loop:**
 
-**Step 6 — Orient by stage:**
+This is a loop. After dispatching a skill and it returns, query the API again for the new stage and continue.
 
-- **intake** → dispatch the intake sub-skill (see below)
-- **review** → present reviews status (see Stage responses)
-- **development** → present development status (see Stage responses)
-- **ready** → present ready status (see Stage responses)
-- **published** → present published status (see Stage responses)
+```
+Loop:
+  If stage is intake → dispatch rhdp-publishing-house:intake, wait for return
+                        → query API again (same as Step 5), extract new stage, continue loop
+  If stage is development → show development status (see below), stop
+  If stage is review → show review status (see below), stop
+  If stage is ready → show ready status (see below), stop
+  If stage is published → show published status (see below), stop
+```
+
+To query the API again after a skill returns, run the same script from Step 5 and extract the new `stage`.
 
 ## Intake stage — dispatch rhdp-publishing-house:intake
 
@@ -221,136 +184,9 @@ When stage is `intake`, dispatch the intake sub-skill immediately:
 Dispatch: rhdp-publishing-house:intake
 ```
 
-The intake sub-skill will:
-1. Read spec.yaml and skip fields that are already populated
-2. Conduct the requirements interview (one question at a time)
-3. Write `publishing-house/spec/design.md` from the interview answers
-4. Write `publishing-house/spec/modules/module-0N-*.md` outlines (one per module)
-5. Update spec.yaml with structured data from the interview
-6. Present the completed design to the author for review
-
-**When the intake sub-skill signals it has finished writing the spec, the orchestrator MUST:**
-
-Ask the author explicitly — do NOT proceed without this confirmation:
-
-> Here's what was designed for your lab. Take a moment to review `publishing-house/spec/design.md` and the module outlines in `publishing-house/spec/modules/`.
->
-> **Are you happy with the design and ready to submit for review?**
-> - Type **yes** (or "looks good", "proceed") to submit
-> - Or give feedback and I'll update the spec
-
-**Wait for the author's response. Do NOT auto-proceed.**
-
-- **If feedback** → send the feedback back to the intake sub-skill and wait again
-- **If yes/looks good/proceed** → immediately execute the following steps WITHOUT asking again:
-
-**Step A0 — Generate mkdocs.yml and add TechDocs annotation:**
-
-Generate `mkdocs.yml` at the repo root so RHDH TechDocs can render the spec as documentation.
-Run silently:
-```bash
-python3 -c "
-import yaml, glob, os
-from pathlib import Path
-
-# Read spec for project title
-spec = yaml.safe_load(Path('publishing-house/spec.yaml').read_text()) or {}
-title = spec.get('spec', {}).get('title', spec.get('project', {}).get('slug', 'Publishing House Project'))
-
-# Generate index.md with links to design and modules
-modules = sorted(glob.glob('publishing-house/spec/modules/module-*.md'))
-index_lines = [f'# {title}', '', 'Welcome to the project spec. Use the navigation to browse the design and module outlines.', '', '- [Design Spec](design.md)']
-for m in modules:
-    fname = os.path.basename(m)
-    parts = fname.replace('.md', '').split('-', 2)
-    num = int(parts[1]) if len(parts) > 1 else 0
-    label = parts[2].replace('-', ' ').title() if len(parts) > 2 else fname
-    index_lines.append(f'- [Module {num} - {label}](modules/{fname})')
-Path('publishing-house/spec/index.md').write_text(chr(10).join(index_lines) + chr(10))
-
-# Build nav from spec/modules directory
-nav = [{'Home': 'index.md'}, {'Design Spec': 'design.md'}]
-if modules:
-    mod_nav = []
-    for m in modules:
-        fname = os.path.basename(m)
-        # Convert module-01-some-title.md -> 'Module 1 - Some Title'
-        parts = fname.replace('.md', '').split('-', 2)
-        num = int(parts[1]) if len(parts) > 1 else 0
-        label = parts[2].replace('-', ' ').title() if len(parts) > 2 else fname
-        mod_nav.append({f'Module {num} - {label}': f'modules/{fname}'})
-    nav.append({'Modules': mod_nav})
-
-# Check for other spec files
-if Path('publishing-house/spec/automation-manifest.yaml').exists():
-    nav.append({'Automation Manifest': 'automation-manifest.yaml'})
-if Path('publishing-house/spec/module-outline-template.md').exists():
-    nav.append({'Module Outline Template': 'module-outline-template.md'})
-
-mkdocs = {
-    'site_name': title,
-    'docs_dir': 'publishing-house/spec',
-    'nav': nav,
-    'plugins': ['techdocs-core'],
-}
-with open('mkdocs.yml', 'w') as f:
-    yaml.dump(mkdocs, f, default_flow_style=False, sort_keys=False)
-print('mkdocs.yml created')
-"
-```
-
-Then add the `backstage.io/techdocs-ref` annotation to `catalog-info.yaml`:
-```bash
-python3 -c "
-import yaml
-from pathlib import Path
-
-ci_path = Path('catalog-info.yaml')
-ci = yaml.safe_load(ci_path.read_text()) or {}
-annotations = ci.setdefault('metadata', {}).setdefault('annotations', {})
-if 'backstage.io/techdocs-ref' not in annotations:
-    annotations['backstage.io/techdocs-ref'] = 'dir:.'
-    with open(ci_path, 'w') as f:
-        yaml.dump(ci, f, default_flow_style=False, sort_keys=False)
-    print('techdocs annotation added')
-else:
-    print('techdocs annotation already present')
-"
-```
-
-**Step A — Commit and push:**
-```bash
-git add publishing-house/ mkdocs.yml catalog-info.yaml
-git commit -m "feat: intake complete — design spec and module outlines"
-git push
-```
-
-**Step B — Submit intake to Central API:**
-```bash
-python publishing-house/tools/ph-intake.py 2>&1
-```
-
-**Run this immediately. Do NOT ask the author. Do NOT wait for confirmation. Just run it.**
-
-`ph-intake.py` reads `project_id` from `catalog-info.yaml`, reads spec data from `spec.yaml`,
-calls `POST {central_url}/api/v1/projects/{project_id}/intake`, and updates `spec.yaml`
-with the returned Jira ticket.
-
-Parse the JSON output from ph-intake.py.
-
-**Step C — Commit and push the updated spec.yaml (with Jira ticket):**
-```bash
-git add publishing-house/spec.yaml
-git commit -m "feat: add Jira ticket from intake submission"
-git push
-```
-
-**Run this immediately. Do NOT ask the author.**
-
-**Step D — Tell the author what happened:**
-> ✅ Spec submitted.
-> [For rhdp_published: "Jira ticket: **{epic_key}** — {jira_url}". For self_published: "No Jira — self-published mode."]
-> Stage is now **{stage}**. [Explain what happens next in one sentence.]
+The intake skill handles the full flow: interview → spec writing → author approval →
+mkdocs generation → commit → API submission → result display. When it returns, the
+orchestrator queries the API again for the new stage and continues the loop.
 
 ## Stage responses (non-intake)
 
@@ -378,18 +214,7 @@ git push
 - Never tell the author to run any script except opening the portal URL during first-time key setup
 - ALWAYS show the portal URL in the conversation — never rely solely on `open` working (DevSpaces has no browser)
 - **`project_id`** comes from `catalog-info.yaml` `metadata.name` — this is the canonical identifier
-- **`central_url`** comes from `~/.config/publishing-house/ph.json` `central` field — written by DevSpaces setup
-- Stage is read from the Central API, never from local files
-- After intake approval: run git commit, ph-intake.py, and update IMMEDIATELY. No confirmation. No asking.
+- **`central_url`** comes from `~/.config/publishing-house/auth.json` `central` field — written by DevSpaces setup
+- Stage is always read from the Central API — auth.json does not store stage
 - No `.ph-state` file — all state comes from catalog-info.yaml, spec.yaml, and the Central API
-
-## Post-Intake: Project Structure Cleanup
-
-When returning from intake, check `project.showroom_type` in spec.yaml.
-
-- **If `classic`** (or empty/unset): Remove Zero-Touch directories silently:
-  ```bash
-  rm -rf runtime-automation/ setup-automation/
-  git add -A runtime-automation/ setup-automation/ 2>/dev/null || true
-  ```
-- **If `zero_touch`**: Keep `runtime-automation/` and `setup-automation/` in place.
+- The orchestrator dispatches skills but does not own submission or advancement — each skill calls its own API endpoint

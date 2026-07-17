@@ -27,9 +27,13 @@ source (Path C). This is input gathering, not state management.
 
 **ALWAYS complete these steps first:**
 
-1. **Check stage** — read `~/.config/publishing-house/ph.json` and check the `stage` field.
+1. **Check stage** — run silently:
+   ```bash
+   python publishing-house/tools/ph-workflow.py
+   ```
+   Extract `stage` from the output.
    If stage is not `intake` → show:
-   > This skill requires the project to be in **intake** stage but it is currently in **{stage}**. Run `/rhdp-publishing-house` to check status.
+   > Cannot start this skill because the project is in **{stage}** stage. This skill requires **intake**.
 
    **STOP — do not proceed.**
 
@@ -349,7 +353,140 @@ Before handing back to the orchestrator, run ALL of the following checks.
 
 **If any A/B/C/E/F check fails:** fix directly or ask the author. Do NOT proceed until resolved.
 **If any D check (CV-1 to CV-5) fails:** report the inconsistency, fix CV-1/CV-5 directly, report CV-2/CV-3/CV-4 as warnings for author to review.
-**When all checks pass:** signal to the orchestrator that intake is complete.
+**When all checks pass:** proceed to Step 5.
+
+#### Step 5: Author Approval Checkpoint
+
+Ask the author explicitly — do NOT proceed without confirmation:
+
+> Here's what was designed for your lab. Take a moment to review `publishing-house/spec/design.md` and the module outlines in `publishing-house/spec/modules/`.
+>
+> **Are you happy with the design and ready to submit for review?**
+> - Type **yes** (or "looks good", "proceed") to submit
+> - Or give feedback and I'll update the spec
+
+**Wait for the author's response. Do NOT auto-proceed.**
+
+- **If feedback** → update the spec and re-validate, then ask again
+- **If yes/looks good/proceed** → immediately execute Steps 6–9 WITHOUT asking again
+
+#### Step 6: Generate mkdocs.yml and TechDocs annotation
+
+Generate `mkdocs.yml` at the repo root so RHDH TechDocs can render the spec as documentation.
+Run silently:
+```bash
+python3 -c "
+import yaml, glob, os
+from pathlib import Path
+
+spec = yaml.safe_load(Path('publishing-house/spec.yaml').read_text()) or {}
+title = spec.get('spec', {}).get('title', spec.get('project', {}).get('slug', 'Publishing House Project'))
+
+modules = sorted(glob.glob('publishing-house/spec/modules/module-*.md'))
+index_lines = [f'# {title}', '', 'Welcome to the project spec. Use the navigation to browse the design and module outlines.', '', '- [Design Spec](design.md)']
+for m in modules:
+    fname = os.path.basename(m)
+    parts = fname.replace('.md', '').split('-', 2)
+    num = int(parts[1]) if len(parts) > 1 else 0
+    label = parts[2].replace('-', ' ').title() if len(parts) > 2 else fname
+    index_lines.append(f'- [Module {num} - {label}](modules/{fname})')
+Path('publishing-house/spec/index.md').write_text(chr(10).join(index_lines) + chr(10))
+
+nav = [{'Home': 'index.md'}, {'Design Spec': 'design.md'}]
+if modules:
+    mod_nav = []
+    for m in modules:
+        fname = os.path.basename(m)
+        parts = fname.replace('.md', '').split('-', 2)
+        num = int(parts[1]) if len(parts) > 1 else 0
+        label = parts[2].replace('-', ' ').title() if len(parts) > 2 else fname
+        mod_nav.append({f'Module {num} - {label}': f'modules/{fname}'})
+    nav.append({'Modules': mod_nav})
+
+if Path('publishing-house/spec/automation-manifest.yaml').exists():
+    nav.append({'Automation Manifest': 'automation-manifest.yaml'})
+
+mkdocs = {
+    'site_name': title,
+    'docs_dir': 'publishing-house/spec',
+    'nav': nav,
+    'plugins': ['techdocs-core'],
+}
+with open('mkdocs.yml', 'w') as f:
+    yaml.dump(mkdocs, f, default_flow_style=False, sort_keys=False)
+print('mkdocs.yml created')
+"
+```
+
+Then add the `backstage.io/techdocs-ref` annotation to `catalog-info.yaml`:
+```bash
+python3 -c "
+import yaml
+from pathlib import Path
+
+ci_path = Path('catalog-info.yaml')
+ci = yaml.safe_load(ci_path.read_text()) or {}
+annotations = ci.setdefault('metadata', {}).setdefault('annotations', {})
+if 'backstage.io/techdocs-ref' not in annotations:
+    annotations['backstage.io/techdocs-ref'] = 'dir:.'
+    with open(ci_path, 'w') as f:
+        yaml.dump(ci, f, default_flow_style=False, sort_keys=False)
+    print('techdocs annotation added')
+else:
+    print('techdocs annotation already present')
+"
+```
+
+#### Step 7: Commit and push
+
+```bash
+git add publishing-house/ mkdocs.yml catalog-info.yaml
+git commit -m "feat: intake complete — design spec and module outlines"
+git push
+```
+
+**Run this immediately. Do NOT ask the author.**
+
+#### Step 8: Submit intake to Central API
+
+```bash
+python publishing-house/tools/ph-intake.py 2>&1
+```
+
+**Run this immediately. Do NOT ask the author. Do NOT wait for confirmation.**
+
+`ph-intake.py` calls `POST {central_url}/api/v1/projects/{project_id}/intake` and updates
+`spec.yaml` with the returned Jira ticket. Parse the JSON output.
+
+If ph-intake.py fails with a 409 error, show the error message and **STOP**.
+
+Then commit the updated spec.yaml:
+```bash
+git add publishing-house/spec.yaml
+git commit -m "feat: add Jira ticket from intake submission"
+git push
+```
+
+#### Step 8b: Project structure cleanup
+
+Check `project.showroom_type` in spec.yaml:
+
+- **If `classic`** (or empty/unset): Remove Zero-Touch directories silently:
+  ```bash
+  rm -rf runtime-automation/ setup-automation/
+  git add -A runtime-automation/ setup-automation/ 2>/dev/null || true
+  git commit -m "chore: remove zero-touch dirs (classic showroom)" 2>/dev/null || true
+  git push 2>/dev/null || true
+  ```
+- **If `zero_touch`**: Keep `runtime-automation/` and `setup-automation/` in place.
+
+#### Step 9: Report result and return
+
+> Spec submitted.
+> [For rhdp_published: "Jira ticket: **{epic_key}** — {jira_url}". For self_published: "No Jira — self-published mode."]
+> Stage is now **{stage}**.
+
+**Return to the orchestrator.** The orchestrator will query the API for the new stage and continue.
 
 ## Key Behavioral Notes
 

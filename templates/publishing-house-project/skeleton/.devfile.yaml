@@ -34,9 +34,9 @@ commands:
           git config --global user.email "${USERNAME}@redhat.com"
         fi
 
-        AUTH_FILE=/home/user/.config/publishing-house/ph.json
+        AUTH_FILE=/home/user/.config/publishing-house/auth.json
         if [ -f "$AUTH_FILE" ] && grep -q "litellm_key" "$AUTH_FILE" 2>/dev/null; then
-          echo "ph.json already configured, skipping"
+          echo "auth.json already configured, skipping"
           exit 0
         fi
         CENTRAL_URL="${{ values.central_api_url }}"
@@ -70,7 +70,7 @@ commands:
           exit 0
         fi
 
-        # Write ph.json (same location Claude skill reads)
+        # Write auth.json (same location Claude skill reads)
         mkdir -p /home/user/.config/publishing-house
         cat > "$AUTH_FILE" << AUTHEOF
         {
@@ -127,11 +127,11 @@ commands:
     exec:
       component: dev-tools
       commandLine: |
-        AUTH_FILE=/home/user/.config/publishing-house/ph.json
+        AUTH_FILE=/home/user/.config/publishing-house/auth.json
 
         cat > /home/user/.claude-env.sh << 'ENVEOF'
         export CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1
-        AUTH_FILE=/home/user/.config/publishing-house/ph.json
+        AUTH_FILE=/home/user/.config/publishing-house/auth.json
         if [ -f "$AUTH_FILE" ]; then
           LITELLM_KEY=$(python3 -c "import json; print(json.load(open('$AUTH_FILE')).get('litellm_key',''))" 2>/dev/null)
           LITELLM_URL=$(python3 -c "import json; print(json.load(open('$AUTH_FILE')).get('litellm_endpoint',''))" 2>/dev/null)

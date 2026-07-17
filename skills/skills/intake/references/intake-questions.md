@@ -200,7 +200,7 @@ Q22-Q24 numbers are preserved to maintain alignment with the gate validation spe
 
 **Before asking this question, the intake skill MUST:**
 
-1. Read `central` from `~/.config/publishing-house/ph.json` to get the Central API URL
+1. Read `central` from `~/.config/publishing-house/auth.json` to get the Central API URL
 2. Build the products list from Q3 answers and audience from Q2
 3. Call: `GET {central_url}/api/v1/rcars/overlap?products={products}&audience={audience}&limit=5`
 4. Present the results inline before asking the differentiation question

@@ -25,9 +25,13 @@ the manifest. Phase gate requests are the orchestrator's responsibility.
 
 ## Before Starting
 
-1. **Check stage** — read `~/.config/publishing-house/ph.json` and check the `stage` field.
+1. **Check stage** — run silently:
+   ```bash
+   python publishing-house/tools/ph-workflow.py
+   ```
+   Extract `stage` from the output.
    If stage is not `intake` → show:
-   > This skill requires the project to be in **intake** stage but it is currently in **{stage}**. Run `/rhdp-publishing-house` to check status.
+   > Cannot start this skill because the project is in **{stage}** stage. This skill requires **intake**.
 
    **STOP — do not proceed.**
 

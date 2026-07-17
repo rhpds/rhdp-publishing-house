@@ -19,7 +19,7 @@ spec:
       serviceAccountName: central-api
       containers:
       - name: api
-        image: quay.io/rhpds/central-api:1.0.5
+        image: quay.io/rhpds/central-api:1.0.6
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
@@ -39,7 +39,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: publishing-house-credentials
-              key: litellm-master-key
+              key: litellm-api-key
         - name: JIRA_URL
           valueFrom:
             secretKeyRef:

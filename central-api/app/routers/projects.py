@@ -125,9 +125,9 @@ def _require_auth(
     return rec.owner_email
 
 
-def _advance_workflow(project_id: str, epic_key: str, jira_url: str, settings=None) -> str:
+def _advance_workflow(workflow_id: str, epic_key: str, jira_url: str, settings=None) -> str:
     """Send IntakeCompleteEvent CloudEvent to SonataFlow.
-    SonataFlow correlates by the 'projectid' extension attribute.
+    Uses kogitoprocinstanceid for direct instance routing.
     Returns the new stage name."""
     if not settings:
         settings = get_settings()
@@ -138,11 +138,9 @@ def _advance_workflow(project_id: str, epic_key: str, jira_url: str, settings=No
             "type": "ph.intake.complete",
             "source": "claude-skill",
             "id": str(uuid.uuid4()),
-            "kogitobusinesskey": project_id,
-            "projectid": project_id,
+            "kogitoprocinstanceid": workflow_id,
             "datacontenttype": "application/json",
             "data": {
-                "projectid": project_id,
                 "epic_key": epic_key,
                 "jira_url": jira_url
             }
@@ -154,10 +152,10 @@ def _advance_workflow(project_id: str, epic_key: str, jira_url: str, settings=No
         )
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
             pass
-        logger.info("sent IntakeCompleteEvent for project=%s", project_id)
+        logger.info("sent IntakeCompleteEvent for workflow=%s", workflow_id)
         return "review"
     except Exception as e:
-        logger.warning("CloudEvent send failed for %s: %s", project_id, e)
+        logger.warning("CloudEvent send failed for workflow %s: %s", workflow_id, e)
         return "intake"
 
 
@@ -205,8 +203,8 @@ def refresh_key(key_id: str, email: str = Depends(require_oidc_auth)):
 
 @router.get("/{project_id}/workflow-data")
 def get_workflow_data(project_id: str):
-    """Return workflow data subset for the orchestrator skill.
-    Queries SonataFlow GraphQL for epic_key, jira_url, and current stage."""
+    """Return workflow data subset (epic_key, jira_url).
+    Stage is NOT returned here — use /workflow-state for stage."""
     settings = get_settings()
     try:
         graphql_query = {
@@ -214,9 +212,7 @@ def get_workflow_data(project_id: str):
                 query GetWorkflowData($businessKey: String!) {
                     ProcessInstances(where: { businessKey: { equal: $businessKey } }) {
                         id
-                        state
                         variables
-                        nodes { name enter exit }
                     }
                 }
             """,
@@ -232,13 +228,14 @@ def get_workflow_data(project_id: str):
         instances = result.get("data", {}).get("ProcessInstances", [])
         if not instances:
             raise HTTPException(status_code=404, detail=f"No workflow found for {project_id}")
-        variables = instances[0].get("variables", {})
+        inst = instances[0]
+        variables = inst.get("variables", {})
         wd = variables.get("workflowdata", {}) if isinstance(variables, dict) else {}
         return {
             "project_id": project_id,
+            "workflow_id": inst.get("id", ""),
             "epic_key": wd.get("epic_key", ""),
             "jira_url": wd.get("jira_url", ""),
-            "stage": get_orchestrator_state(project_id).get("stage", "intake"),
         }
     except HTTPException:
         raise
@@ -247,24 +244,38 @@ def get_workflow_data(project_id: str):
         raise HTTPException(status_code=502, detail=f"Failed to query workflow: {e}")
 
 
-@router.get("/{project_id}/orchestrator-state")
-def get_orchestrator_state(project_id: str):
-    """Proxy SonataFlow state for the skill. project_id is the slug (canonical identifier).
-    Returns semantic stage, not process state."""
+@router.get("/{project_id}/workflow-state")
+def get_workflow_state(project_id: str, workflow_id: str = ""):
+    """Return semantic workflow stage. Uses ProcessInstanceById when workflow_id
+    is provided (fast direct lookup), falls back to businessKey filter otherwise."""
     settings = get_settings()
     try:
-        graphql_query = {
-            "query": """
-                query GetWorkflow($businessKey: String!) {
-                    ProcessInstances(where: { businessKey: { equal: $businessKey } }) {
-                        id
-                        state
-                        nodes { name enter exit }
+        if workflow_id:
+            graphql_query = {
+                "query": """
+                    query GetWorkflowById($id: String!) {
+                        ProcessInstanceById(id: $id) {
+                            id
+                            state
+                            nodes { name enter exit }
+                        }
                     }
-                }
-            """,
-            "variables": {"businessKey": project_id}
-        }
+                """,
+                "variables": {"id": workflow_id}
+            }
+        else:
+            graphql_query = {
+                "query": """
+                    query GetWorkflow($businessKey: String!) {
+                        ProcessInstances(where: { businessKey: { equal: $businessKey } }) {
+                            id
+                            state
+                            nodes { name enter exit }
+                        }
+                    }
+                """,
+                "variables": {"businessKey": project_id}
+            }
         req = urllib.request.Request(
             f"{settings.sonataflow_url.rstrip('/')}/graphql",
             data=json.dumps(graphql_query).encode(),
@@ -272,9 +283,12 @@ def get_orchestrator_state(project_id: str):
         )
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
             result = json.loads(r.read().decode())
-        instances = result.get("data", {}).get("ProcessInstances", [])
-        if instances:
-            inst = instances[0]
+        if workflow_id:
+            inst = result.get("data", {}).get("ProcessInstanceById")
+        else:
+            instances = result.get("data", {}).get("ProcessInstances", [])
+            inst = instances[0] if instances else None
+        if inst:
             process_state = inst.get("state", "")
 
             if process_state == "COMPLETED":
@@ -304,13 +318,13 @@ def get_orchestrator_state(project_id: str):
                 "source": "sonataflow",
             }
     except Exception as e:
-        logger.warning("orchestrator-state fallback for %s: %s", project_id, e)
+        logger.warning("workflow-state fallback for %s: %s", project_id, e)
     return {"stage": "intake", "project_id": project_id, "source": "fallback"}
 
 
-def _require_stage(project_id: str, allowed: list[str]) -> str:
+def _require_stage(project_id: str, allowed: list[str], workflow_id: str = "") -> str:
     """Check the workflow stage and raise 409 if not in allowed list."""
-    current = get_orchestrator_state(project_id).get("stage", "unknown")
+    current = get_workflow_state(project_id, workflow_id=workflow_id).get("stage", "unknown")
     if current not in allowed:
         raise HTTPException(
             status_code=409,
@@ -324,13 +338,14 @@ def _require_stage(project_id: str, allowed: list[str]) -> str:
 def submit_intake(
     project_id: str,
     answers: IntakeAnswers,
+    workflow_id: str = "",
     owner: str = Depends(_require_auth),
 ):
     """After author approves spec — create Jira Epic + Tasks (rhdp_published only),
     advance SonataFlow to next stage, and auto-compute RCARS overlap.
     One atomic call — no back-and-forth.
     project_id is the slug (canonical identifier, not workflow_id)."""
-    _require_stage(project_id, ["intake"])
+    _require_stage(project_id, ["intake"], workflow_id=workflow_id)
     settings = get_settings()
     epic_key = answers.epic_key
     jira_url = f"{settings.jira_url}/browse/{epic_key}" if epic_key else ""
@@ -377,7 +392,7 @@ def submit_intake(
         logger.info("intake: no epic to update for %s (mode=%s, epic_key=%s)", project_id, answers.deployment_mode, epic_key)
 
     # Advance SonataFlow workflow (both modes)
-    new_stage = _advance_workflow(project_id, epic_key, jira_url, settings)
+    new_stage = _advance_workflow(workflow_id, epic_key, jira_url, settings)
     logger.info("intake: workflow advanced to %s for project %s", new_stage, project_id)
 
     return IntakeResponse(

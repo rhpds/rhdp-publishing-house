@@ -113,7 +113,7 @@ export function createPhWorkflowsClient(options: {
   }
 
   async function sendApprovalEvent(
-    projectId: string,
+    workflowId: string,
     stage: WorkflowStage,
   ): Promise<void> {
     const typeMap: Partial<Record<WorkflowStage, string>> = {
@@ -136,10 +136,9 @@ export function createPhWorkflowsClient(options: {
         type: eventType,
         source: 'publishing-house-plugin',
         id: crypto.randomUUID(),
-        kogitobusinesskey: projectId,
-        projectid: projectId,
+        kogitoprocinstanceid: workflowId,
         datacontenttype: 'application/json',
-        data: { projectid: projectId },
+        data: {},
       }),
     });
 
