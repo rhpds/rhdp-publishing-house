@@ -169,14 +169,10 @@ commands:
       component: dev-tools
       commandLine: |
         SKILL_DIR=/home/user/.claude/skills/publishing-house
-        mkdir -p "$SKILL_DIR"
-        if [ -z "$(ls -A "$SKILL_DIR" 2>/dev/null)" ]; then
-          git clone --depth 1 --no-checkout -b main https://github.com/rhpds/rhdp-publishing-house.git /tmp/ph-repo >/dev/null 2>&1 \
-            && cd /tmp/ph-repo \
-            && git sparse-checkout set skills >/dev/null 2>&1 \
-            && git checkout >/dev/null 2>&1 \
-            && cp -r skills/.claude-plugin "$SKILL_DIR/" \
-            && cp -r skills/skills/* "$SKILL_DIR/" \
+        mkdir -p /home/user/.claude/skills
+        if [ ! -d "$SKILL_DIR" ]; then
+          git clone --depth 1 -b main https://github.com/rhpds/rhdp-publishing-house.git /tmp/ph-repo >/dev/null 2>&1 \
+            && cp -r /tmp/ph-repo/skills "$SKILL_DIR" \
             && rm -rf /tmp/ph-repo \
             || echo "WARNING: could not install skills"
         fi
