@@ -21,9 +21,7 @@ You handle the intake phase of the Publishing House lifecycle:
 
 **Do NOT use** Central API tools directly. You work locally: read files, write specs, update spec.yaml.
 
-**Exception:** You MAY use the Atlassian MCP tools (`getJiraIssue`, `getTeamworkGraphContext`)
-to read external Jira issues when the user provides a Jira issue key as their requirements
-source (Path C). This is input gathering, not state management.
+**Do NOT use** MCP tools. All external interactions go through `publishing-house/tools/` scripts.
 
 ## Before Starting
 
@@ -128,8 +126,8 @@ has a value.
 ### Path C: Jira Issue with Requirements
 
 1. Ask for the Jira issue key or URL
-2. Use Atlassian MCP tools to read the issue and any sub-tasks or linked issues
-3. Present what was found: "Here's what I pulled from PROJ-123 — does this capture it?"
+2. Ask the author to paste the relevant requirements from the Jira issue
+3. Present what was provided: "Here's what I got from the Jira issue — does this capture it?"
 4. Treat extracted requirements like an idea from Path B — follow up on gaps
 
 #### Step 1: Write Design Spec

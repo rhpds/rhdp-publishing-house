@@ -22,8 +22,8 @@ author didn't provide.
 
 ## Tool Boundaries
 
-**Do NOT use** Central MCP tools. You work locally: read files, update specs, update
-the manifest. Phase gate requests are the orchestrator's responsibility.
+**Do NOT use** MCP tools. You work locally: read files, update specs, update
+the manifest. All external interactions go through `publishing-house/tools/` scripts.
 
 ## Before Starting
 
