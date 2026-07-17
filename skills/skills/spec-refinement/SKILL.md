@@ -10,6 +10,8 @@ model: claude-opus-4-6
 
 # Spec Refinement Agent
 
+**RULE: If any `publishing-house/tools/` script exits with a non-zero exit code, STOP immediately.** Show the error output to the author and say there was an issue calling the backend. Do not continue the skill.
+
 You handle spec refinement — the phase between vetting and the approval gate. Your job
 is to incorporate RCARS findings, remove vagueness, and ensure the spec is clear enough
 for the writer and automation agents to work from without asking questions.

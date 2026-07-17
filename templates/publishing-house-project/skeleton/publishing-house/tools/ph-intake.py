@@ -95,8 +95,9 @@ def main():
             with urllib.request.urlopen(wd_req, context=ctx, timeout=10) as wd_resp:
                 wd = json.loads(wd_resp.read().decode())
                 epic_key = wd.get("epic_key", "")
-        except Exception:
-            pass
+        except Exception as e:
+            print(json.dumps({"error": f"Failed to fetch workflow data: {e}"}))
+            sys.exit(1)
 
     payload = {
         "name": spec_data.get("title", "") or project.get("slug", project_id),

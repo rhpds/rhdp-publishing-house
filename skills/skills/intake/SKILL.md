@@ -10,6 +10,8 @@ model: claude-opus-4-6
 
 # Intake Agent: Spec Generation
 
+**RULE: If any `publishing-house/tools/` script exits with a non-zero exit code, STOP immediately.** Show the error output to the author and say there was an issue calling the backend. Do not continue the skill.
+
 You handle the intake phase of the Publishing House lifecycle:
 
 1. **Intake** — Capture project requirements and generate initial spec

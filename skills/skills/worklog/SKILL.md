@@ -10,6 +10,8 @@ model: claude-sonnet-4-6
 
 # RHDP Publishing House — Worklog Manager
 
+**RULE: If any `publishing-house/tools/` script exits with a non-zero exit code, STOP immediately.** Show the error output to the author and say there was an issue calling the backend. Do not continue the skill.
+
 You manage `publishing-house/worklog.yaml` — the human-context layer that bridges
 sessions, people, and decisions. This is NOT a task tracker (the spec tracks
 structured progress). The worklog captures what falls between the cracks: decisions

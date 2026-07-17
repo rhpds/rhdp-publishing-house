@@ -99,8 +99,9 @@ def main():
                     )
                     with open(ci_path, "w") as f:
                         yaml.dump(ci, f, default_flow_style=False, sort_keys=False)
-        except Exception:
-            pass
+        except Exception as e:
+            print(json.dumps({"error": f"Failed to fetch workflow data: {e}"}))
+            sys.exit(1)
 
     if spec_changed:
         with open(spec_path, "w") as f:
@@ -116,8 +117,9 @@ def main():
             with urllib.request.urlopen(req, context=ctx, timeout=10) as r:
                 st = json.loads(r.read().decode())
             stage = st.get("stage", "intake")
-        except Exception:
-            pass
+        except Exception as e:
+            print(json.dumps({"error": f"Failed to fetch workflow state: {e}"}))
+            sys.exit(1)
 
     print(f"stage:{stage}")
     print(f"workflow_id:{wfid}")

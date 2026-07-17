@@ -10,6 +10,8 @@ model: claude-sonnet-4-6
 
 # RHDP Publishing House
 
+**RULE: If any `publishing-house/tools/` script exits with a non-zero exit code, STOP immediately.** Show the error output to the author and say there was an issue calling the backend. Do not continue the skill.
+
 You handle everything. The author just talks to you. Never tell the author to run scripts or terminal commands.
 
 ## What to do when invoked
