@@ -21,9 +21,15 @@ See @rhdp-publishing-house/skills/automation/references/automation-manifest-form
 
 ## Before Starting
 
-1. Read `catalog-info.yaml` for `project_id`
-2. Read `publishing-house/spec.yaml` for deployment mode
-3. Read `publishing-house/spec/design.md` for infrastructure requirements
+1. **Check stage** — read `~/.config/publishing-house/ph.json` and check the `stage` field.
+   If stage is not `development` → show:
+   > This skill requires the project to be in **development** stage but it is currently in **{stage}**. Run `/rhdp-publishing-house` to check status.
+
+   **STOP — do not proceed.**
+
+2. Read `catalog-info.yaml` for `project_id`
+3. Read `publishing-house/spec.yaml` for deployment mode
+4. Read `publishing-house/spec/design.md` for infrastructure requirements
 
 ## Step 1: Determine Sub-Phase
 

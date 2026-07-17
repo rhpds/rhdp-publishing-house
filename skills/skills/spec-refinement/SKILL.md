@@ -25,10 +25,16 @@ the manifest. Phase gate requests are the orchestrator's responsibility.
 
 ## Before Starting
 
-1. Read `publishing-house/spec/design.md`
-2. Read all module outlines in `publishing-house/spec/modules/`
-3. Read `catalog-info.yaml` for `project_id`
-4. Read `publishing-house/spec.yaml` for project context
+1. **Check stage** — read `~/.config/publishing-house/ph.json` and check the `stage` field.
+   If stage is not `intake` → show:
+   > This skill requires the project to be in **intake** stage but it is currently in **{stage}**. Run `/rhdp-publishing-house` to check status.
+
+   **STOP — do not proceed.**
+
+2. Read `publishing-house/spec/design.md`
+3. Read all module outlines in `publishing-house/spec/modules/`
+4. Read `catalog-info.yaml` for `project_id`
+5. Read `publishing-house/spec.yaml` for project context
 
 ## Step 1: Read Vetting Findings
 

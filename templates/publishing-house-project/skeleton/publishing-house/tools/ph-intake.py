@@ -49,20 +49,20 @@ def main():
     spec_data = spec.get("spec", {})
     env = spec_data.get("environment", {})
 
-    auth_path = Path(os.path.expanduser("~/.config/publishing-house/auth.json"))
+    auth_path = Path(os.path.expanduser("~/.config/publishing-house/ph.json"))
     if not auth_path.exists():
-        print(json.dumps({"error": "~/.config/publishing-house/auth.json not found — run the orchestrator skill first"}))
+        print(json.dumps({"error": "~/.config/publishing-house/ph.json not found — run the orchestrator skill first"}))
         sys.exit(1)
 
     creds = json.loads(auth_path.read_text())
     api_key = creds.get("credential", "")
     if not api_key:
-        print(json.dumps({"error": "No credential in auth.json"}))
+        print(json.dumps({"error": "No credential in ph.json"}))
         sys.exit(1)
 
     central_url = creds.get("central", "").rstrip("/")
     if not central_url:
-        print(json.dumps({"error": "No portal URL in auth.json"}))
+        print(json.dumps({"error": "No portal URL in ph.json"}))
         sys.exit(1)
 
     design_path = root / "publishing-house" / "spec" / "design.md"
@@ -132,6 +132,14 @@ def main():
             result = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         body = e.read().decode()[:300]
+        if e.code == 409:
+            import re
+            m = re.search(r"in '(\w+)' stage", body)
+            if m:
+                actual_stage = m.group(1)
+                creds["stage"] = actual_stage
+                with open(auth_path, "w") as f:
+                    json.dump(creds, f, indent=2)
         print(json.dumps({"error": f"Central API returned {e.code}: {body}"}))
         sys.exit(1)
     except Exception as e:

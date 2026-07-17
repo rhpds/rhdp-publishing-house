@@ -23,9 +23,15 @@ You MUST NOT write AsciiDoc files directly using the Write or Edit tools.
 
 ## Before Starting
 
-1. Read `catalog-info.yaml` for `project_id` and content type
-2. Read `publishing-house/spec.yaml` for deployment mode and spec data
-3. Confirm the project has approved module outlines in `publishing-house/spec/modules/`
+1. **Check stage** — read `~/.config/publishing-house/ph.json` and check the `stage` field.
+   If stage is not `development` → show:
+   > This skill requires the project to be in **development** stage but it is currently in **{stage}**. Run `/rhdp-publishing-house` to check status.
+
+   **STOP — do not proceed.**
+
+2. Read `catalog-info.yaml` for `project_id` and content type
+3. Read `publishing-house/spec.yaml` for deployment mode and spec data
+4. Confirm the project has approved module outlines in `publishing-house/spec/modules/`
 
 ## Step 1: Determine Which Module to Write
 

@@ -49,7 +49,7 @@ def find_repo_root():
 
 
 def get_central_url(root):
-    auth_path = Path(os.path.expanduser("~/.config/publishing-house/auth.json"))
+    auth_path = Path(os.path.expanduser("~/.config/publishing-house/ph.json"))
     if auth_path.exists():
         creds = json.loads(auth_path.read_text())
         url = creds.get("central", "")

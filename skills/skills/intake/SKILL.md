@@ -27,10 +27,16 @@ source (Path C). This is input gathering, not state management.
 
 **ALWAYS complete these steps first:**
 
-1. **Read spec.yaml** at `publishing-house/spec.yaml` to understand project state and pre-populated fields
-2. **Read design template** at `@rhdp-publishing-house/skills/intake/references/design-template.md`
-3. **Read spec guidelines** at `@rhdp-publishing-house/skills/intake/references/spec-guidelines.md`
-4. **Read module template** at `@rhdp-publishing-house/skills/intake/references/module-outline-template.md`
+1. **Check stage** — read `~/.config/publishing-house/ph.json` and check the `stage` field.
+   If stage is not `intake` → show:
+   > This skill requires the project to be in **intake** stage but it is currently in **{stage}**. Run `/rhdp-publishing-house` to check status.
+
+   **STOP — do not proceed.**
+
+2. **Read spec.yaml** at `publishing-house/spec.yaml` to understand project state and pre-populated fields
+3. **Read design template** at `@rhdp-publishing-house/skills/intake/references/design-template.md`
+4. **Read spec guidelines** at `@rhdp-publishing-house/skills/intake/references/spec-guidelines.md`
+5. **Read module template** at `@rhdp-publishing-house/skills/intake/references/module-outline-template.md`
 
 ### Pre-populated Fields
 

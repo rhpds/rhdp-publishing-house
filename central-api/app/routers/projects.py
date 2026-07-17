@@ -308,6 +308,18 @@ def get_orchestrator_state(project_id: str):
     return {"stage": "intake", "project_id": project_id, "source": "fallback"}
 
 
+def _require_stage(project_id: str, allowed: list[str]) -> str:
+    """Check the workflow stage and raise 409 if not in allowed list."""
+    current = get_orchestrator_state(project_id).get("stage", "unknown")
+    if current not in allowed:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Project '{project_id}' is in '{current}' stage. "
+                   f"This action requires stage: {', '.join(allowed)}.",
+        )
+    return current
+
+
 @router.post("/{project_id}/intake", response_model=IntakeResponse, status_code=201)
 def submit_intake(
     project_id: str,
@@ -318,6 +330,7 @@ def submit_intake(
     advance SonataFlow to next stage, and auto-compute RCARS overlap.
     One atomic call — no back-and-forth.
     project_id is the slug (canonical identifier, not workflow_id)."""
+    _require_stage(project_id, ["intake"])
     settings = get_settings()
     epic_key = answers.epic_key
     jira_url = f"{settings.jira_url}/browse/{epic_key}" if epic_key else ""

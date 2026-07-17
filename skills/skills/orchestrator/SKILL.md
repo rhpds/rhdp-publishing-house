@@ -88,7 +88,7 @@ Run silently:
 ```bash
 python3 -c "
 import json, os
-f = os.path.expanduser('~/.config/publishing-house/auth.json')
+f = os.path.expanduser('~/.config/publishing-house/ph.json')
 if os.path.exists(f):
     d = json.load(open(f))
     cred = d.get('credential', '')
@@ -126,7 +126,7 @@ Extract `central_url` from the `central:` line. This is used for all subsequent 
   python3 -c "
 import json, os
 key = 'PASTE_KEY_HERE'
-path = os.path.expanduser('~/.config/publishing-house/auth.json')
+path = os.path.expanduser('~/.config/publishing-house/ph.json')
 d = json.load(open(path)) if os.path.exists(path) else {}
 d['credential'] = key
 os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -151,7 +151,8 @@ Then query the workflow stage silently:
 ```bash
 python3 -c "
 import json, os, ssl, urllib.request
-creds = json.load(open(os.path.expanduser('~/.config/publishing-house/auth.json')))
+ph_path = os.path.expanduser('~/.config/publishing-house/ph.json')
+creds = json.load(open(ph_path))
 key = creds.get('credential', '')
 central = creds.get('central', '').rstrip('/')
 ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
@@ -168,9 +169,13 @@ try:
     print(f'epic_key:{epic_key}')
     print(f'jira_url:{jira_url}')
 except Exception as e:
+    stage = 'intake'
     print('stage:intake')
     print('epic_key:')
     print('jira_url:')
+creds['stage'] = stage
+with open(ph_path, 'w') as f:
+    json.dump(creds, f, indent=2)
 "
 ```
 Replace PROJECT_ID with `project_id`.
@@ -373,7 +378,7 @@ git push
 - Never tell the author to run any script except opening the portal URL during first-time key setup
 - ALWAYS show the portal URL in the conversation — never rely solely on `open` working (DevSpaces has no browser)
 - **`project_id`** comes from `catalog-info.yaml` `metadata.name` — this is the canonical identifier
-- **`central_url`** comes from `~/.config/publishing-house/auth.json` `central` field — written by DevSpaces setup
+- **`central_url`** comes from `~/.config/publishing-house/ph.json` `central` field — written by DevSpaces setup
 - Stage is read from the Central API, never from local files
 - After intake approval: run git commit, ph-intake.py, and update IMMEDIATELY. No confirmation. No asking.
 - No `.ph-state` file — all state comes from catalog-info.yaml, spec.yaml, and the Central API
