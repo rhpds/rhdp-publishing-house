@@ -170,9 +170,12 @@ commands:
       commandLine: |
         SKILL_DIR=/home/user/.claude/skills/publishing-house
         mkdir -p /home/user/.claude/skills
-        [ -d "$SKILL_DIR" ] || {
-          git clone -b main https://github.com/rhpds/rhdp-publishing-house.git /tmp/ph-repo >/dev/null 2>&1 && cp -r /tmp/ph-repo/skills/* "$SKILL_DIR/" && rm -rf /tmp/ph-repo
-        }
+        if [ ! -d "$SKILL_DIR" ]; then
+          git clone -b main https://github.com/rhpds/rhdp-publishing-house.git /tmp/ph-repo >/dev/null 2>&1 \
+            && cp -r /tmp/ph-repo/skills/* "$SKILL_DIR/" \
+            && rm -rf /tmp/ph-repo \
+            || echo "WARNING: could not install skills"
+        fi
       workingDir: /home/user
       label: "Install Publishing House Skills"
       group:
