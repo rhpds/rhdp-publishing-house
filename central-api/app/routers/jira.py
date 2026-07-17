@@ -34,6 +34,7 @@ class CreateEpicResponse(BaseModel):
 class UpdateEpicRequest(BaseModel):
     epic_key: str
     name: str = ""
+    slug: str = ""
     content_type: str = "lab"
     deployment_mode: str = "self_published"
     owner_email: str = ""
@@ -152,7 +153,7 @@ def update_epic(
         "version": 1,
         "content": [
             {"type": "paragraph", "content": [{"type": "text",
-             "text": f"{body.name} — {body.content_type} ({body.deployment_mode}). Full spec in spec.yaml in the project repo."}]},
+             "text": f"{body.name} — {body.content_type} ({body.slug or body.name}). Full spec in spec.yaml in the project repo."}]},
             {"type": "heading", "attrs": {"level": 3}, "content": [{"type": "text", "text": "Problem Statement"}]},
             {"type": "paragraph", "content": [{"type": "text", "text": body.problem_statement or "—"}]},
             {"type": "heading", "attrs": {"level": 3}, "content": [{"type": "text", "text": "Learning Objectives"}]},
@@ -168,7 +169,7 @@ def update_epic(
     }
 
     update_fields = {
-        "summary": f"[PH] {body.name} — {body.content_type} ({body.deployment_mode})",
+        "summary": f"[PH] {body.name} — {body.content_type} ({body.slug or body.name})",
         "description": description_adf,
     }
     req = urllib.request.Request(

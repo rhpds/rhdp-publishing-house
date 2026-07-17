@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build and push the Publishing House Workflows RHDH dynamic plugin as an OCI image
-# Prerequisites: node 18+, npx, podman, quay.io login
+# Uses a multi-stage Containerfile — no local node/npm required, only podman or docker
 #
 # Usage:
 #   ./build-dynamic-plugin.sh                    # build and push 0.1.0
@@ -14,46 +14,35 @@ NO_PUSH="${2:-}"
 PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 IMAGE="quay.io/rhpds/backstage-plugin-ph-workflows:${VERSION}"
 
-echo "==> Building plugin version ${VERSION}"
+CONTAINER_CMD="${CONTAINER_CMD:-podman}"
+if ! command -v "$CONTAINER_CMD" &>/dev/null; then
+  CONTAINER_CMD="docker"
+fi
+
+echo "==> Building plugin version ${VERSION} using ${CONTAINER_CMD}"
 
 cd "${PLUGIN_DIR}"
 
-# Clean previous build artifacts
-rm -rf dist-dynamic dist node_modules yarn.lock
-
-# Step 1: Install dependencies
-echo "==> Installing dependencies..."
-npm install --legacy-peer-deps 2>&1 | tail -3
-
-# Step 2: Export dynamic plugin
-echo "==> Exporting dynamic plugin..."
-npx --yes @red-hat-developer-hub/cli@1.8.0 plugin export 2>&1
-
-if [ ! -d "${PLUGIN_DIR}/dist-dynamic/dist-scalprum" ]; then
-  echo "ERROR: Export failed - dist-dynamic/dist-scalprum not found"
-  exit 1
-fi
-
-echo "==> Export successful"
-
-# Step 3: Package as OCI image (amd64 for cluster deployment)
-echo "==> Packaging as OCI image: ${IMAGE}"
-npx --yes @red-hat-developer-hub/cli@1.8.0 plugin package --tag "${IMAGE}"
+# Build OCI image via multi-stage Containerfile
+"${CONTAINER_CMD}" build \
+  --platform linux/amd64 \
+  -t "${IMAGE}" \
+  -f Containerfile .
 
 echo "==> Image built: ${IMAGE}"
 
-# Step 4: Push to quay.io
+# Push to quay.io
 if [ "${NO_PUSH}" = "--no-push" ]; then
   echo "==> Skipping push (--no-push)"
 else
   echo "==> Pushing to quay.io..."
-  podman push "${IMAGE}"
+  "${CONTAINER_CMD}" push "${IMAGE}"
   echo "==> Pushed: ${IMAGE}"
 fi
 
 echo ""
 echo "==> Done. Update backstage-dynamic-plugins ConfigMap:"
 echo ""
-echo "  oc get configmap backstage-dynamic-plugins -n backstage -o yaml | \\"
+echo "  oc get configmap ph-developer-hub-dynamic-plugins -n publishing-house -o yaml | \\"
 echo "    sed 's|ph-workflows:[0-9.]*|ph-workflows:${VERSION}|' | oc apply -f -"
-echo "  oc rollout restart deployment backstage-developer-hub -n backstage"
+echo "  oc rollout restart deployment backstage-developer-hub -n publishing-house"

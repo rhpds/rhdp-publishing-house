@@ -49,11 +49,13 @@ def find_repo_root():
 
 
 def get_central_url(root):
-    spec_path = root / "publishing-house" / "spec.yaml"
-    if not spec_path.exists():
-        return None
-    spec = yaml.safe_load(spec_path.read_text()) or {}
-    return spec.get("system", {}).get("central", "")
+    auth_path = Path(os.path.expanduser("~/.config/publishing-house/auth.json"))
+    if auth_path.exists():
+        creds = json.loads(auth_path.read_text())
+        url = creds.get("central", "")
+        if url:
+            return url.rstrip("/")
+    return ""
 
 
 def log(msg, level="INFO"):

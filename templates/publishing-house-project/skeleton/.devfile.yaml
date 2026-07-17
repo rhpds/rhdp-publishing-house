@@ -75,7 +75,7 @@ commands:
         cat > "$AUTH_FILE" << AUTHEOF
         {
           "credential": "${API_KEY}",
-          "portal": "${CENTRAL_URL}",
+          "central": "${CENTRAL_URL}",
           "litellm_key": "${LITELLM_KEY}",
           "litellm_endpoint": "${LITELLM_ENDPOINT}",
           "litellm_model": "${LITELLM_MODEL}"

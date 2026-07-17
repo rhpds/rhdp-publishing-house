@@ -13,248 +13,313 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Red Hat Display', 'Red Hat Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f0f0f0;
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #151515;
+            color: white;
+            padding: 0 24px;
+            height: 56px;
+            display: flex;
             align-items: center;
-            justify-content: center;
-            padding: 20px;
+            justify-content: space-between;
+            border-bottom: 2px solid #ee0000;
         }
 
-        .container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 800px;
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-logo svg {
+            height: 28px;
+            width: 28px;
+        }
+
+        .header-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #ffffff;
+            border-left: 1px solid #6a6e73;
+            padding-left: 16px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-user {
+            font-size: 13px;
+            color: #d2d2d2;
+        }
+
+        .logout-btn {
+            background: transparent;
+            color: #d2d2d2;
+            border: 1px solid #6a6e73;
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.15s;
+        }
+
+        .logout-btn:hover {
+            background: #3c3f42;
+            color: #ffffff;
+            border-color: #8a8d90;
+        }
+
+        .main-content {
+            flex: 1;
+            max-width: 960px;
             width: 100%;
-            padding: 40px;
+            margin: 0 auto;
+            padding: 32px 24px;
         }
 
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 28px;
+        .page-title {
+            color: #151515;
+            margin-bottom: 4px;
+            font-size: 24px;
+            font-weight: 600;
         }
 
         .subtitle {
-            color: #666;
-            margin-bottom: 30px;
+            color: #6a6e73;
+            margin-bottom: 28px;
             font-size: 14px;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #d2d2d2;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+
+        .card h2 {
+            color: #151515;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
         }
 
         .user-info {
             background: #f5f5f5;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 30px;
+            padding: 14px 16px;
+            border-radius: 6px;
+            margin-bottom: 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border: 1px solid #e0e0e0;
         }
 
         .user-email {
             font-weight: 600;
-            color: #667eea;
-        }
-
-        .logout-btn {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .logout-btn:hover {
-            background: #c82333;
-        }
-
-        .create-key-section {
-            background: #f9f9f9;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 30px;
+            color: #151515;
         }
 
         .btn {
-            background: #667eea;
+            background: #ee0000;
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
+            padding: 10px 20px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
-            transition: background 0.2s;
+            transition: background 0.15s;
         }
 
         .btn:hover {
-            background: #5568d3;
+            background: #a30000;
         }
 
         .btn:disabled {
-            background: #ccc;
+            background: #d2d2d2;
             cursor: not-allowed;
         }
 
         .keys-list {
-            margin-top: 20px;
+            margin-top: 8px;
         }
 
         .key-card {
             background: white;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            border: 1px solid #d2d2d2;
+            border-radius: 6px;
             padding: 20px;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
 
         .key-header {
             display: flex;
             justify-content: space-between;
             align-items: start;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
 
         .key-label {
             font-weight: 600;
-            color: #333;
-            font-size: 18px;
-        }
-
-        .key-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .key-actions button {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-
-        .refresh-btn {
-            background: #ffc107;
-            color: #000;
-        }
-
-        .revoke-btn {
-            background: #dc3545;
-            color: white;
+            color: #151515;
+            font-size: 16px;
         }
 
         .key-meta {
-            color: #666;
+            color: #6a6e73;
             font-size: 13px;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         .key-value {
             background: #f5f5f5;
             padding: 12px;
-            border-radius: 6px;
-            font-family: 'Courier New', monospace;
+            border-radius: 4px;
+            font-family: 'Red Hat Mono', 'Courier New', monospace;
             font-size: 13px;
             word-break: break-all;
-            color: #333;
-            border: 1px solid #ddd;
+            color: #151515;
+            border: 1px solid #e0e0e0;
         }
 
         .new-key-display {
-            background: #d4edda;
-            border: 2px solid #28a745;
+            background: #f0faf0;
+            border: 2px solid #3e8635;
             padding: 20px;
-            border-radius: 8px;
-            margin-top: 15px;
+            border-radius: 6px;
+            margin-top: 16px;
         }
 
         .new-key-warning {
-            color: #721c24;
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
+            color: #7d1007;
+            background: #faeae8;
+            border: 1px solid #c9190b;
             padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 10px;
+            border-radius: 4px;
+            margin-bottom: 12px;
             font-size: 14px;
         }
 
         .copy-btn {
-            background: #28a745;
+            background: #3e8635;
             color: white;
             border: none;
             padding: 8px 16px;
             border-radius: 4px;
             cursor: pointer;
             margin-top: 10px;
-            font-size: 14px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.15s;
         }
 
         .copy-btn:hover {
-            background: #218838;
+            background: #1e4f18;
         }
 
         .loading {
             text-align: center;
-            padding: 40px;
-            color: #666;
+            padding: 60px 40px;
+            color: #6a6e73;
+        }
+
+        .loading p {
+            font-size: 16px;
         }
 
         .error {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 6px;
+            background: #faeae8;
+            color: #7d1007;
+            padding: 14px;
+            border-radius: 4px;
             margin-bottom: 20px;
-            border: 1px solid #f5c6cb;
+            border: 1px solid #c9190b;
+            font-size: 14px;
         }
 
         .empty-state {
             text-align: center;
             padding: 40px;
-            color: #999;
+            color: #6a6e73;
+        }
+
+        .key-hint {
+            margin-top: 12px;
+            color: #6a6e73;
+            font-size: 13px;
         }
     </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700&family=Red+Hat+Mono&family=Red+Hat+Text:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
+    <div class="header">
+        <div class="header-left">
+            <div class="header-logo">
+                <svg viewBox="0 0 613 145" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M127.47 83.49c12.51 0 20.13-9.75 20.13-21.22S139.98 41 127.47 41c-12.51 0-20.13 9.81-20.13 21.27s7.62 21.22 20.13 21.22zm0-6.32c-8.56 0-13.26-7.2-13.26-14.9s4.7-14.95 13.26-14.95 13.26 7.26 13.26 14.95-4.7 14.9-13.26 14.9zM154 41.79h6.5v7.09h.14a13 13 0 0111.81-7.83 14.62 14.62 0 013.47.42v6.57a13.88 13.88 0 00-3.89-.58c-6.35 0-11.53 5.16-11.53 13.25v22h-6.5zm30.91-16.46h6.5v57.38h-6.5zm27.93 58.12c-10.71 0-18.49-8.06-18.49-19.47s7.78-19.53 18.49-19.53a15.79 15.79 0 0113.57 7.09l-5.06 3.57a10 10 0 00-8.56-4.6c-7.15 0-11.8 5.7-11.8 13.47s4.65 13.41 11.8 13.41a10 10 0 008.56-4.6l5.06 3.57a15.79 15.79 0 01-13.57 7.09zm21.28-58.12h6.5v57.38h-6.5zm63.54 7.76h-12.99v49.62h-6.8V33.09h-12.99v-6.38h32.78z" fill="white"/>
+                    <path d="M324.63 82.71h-6.5V75.4h-.14c-2.26 4.12-7.26 8.09-13.47 8.09-10.45 0-17.39-8.4-17.39-19.53s6.94-19.53 17.39-19.53c5.95 0 10.87 3.57 13.47 8.09h.14V44.79h6.5zm-18.75.78c7.62 0 12.51-6.35 12.51-14.26v-1.32c0-7.92-4.89-14.26-12.51-14.26-7.83 0-12.72 6.51-12.72 14.92s4.89 14.92 12.72 14.92zm38.87-39.9h6.5v7.09h.14a13 13 0 0111.81-7.83 14.62 14.62 0 013.47.42v6.57a13.88 13.88 0 00-3.89-.58c-6.35 0-11.53 5.16-11.53 13.25v22h-6.5zm29.38 16.42h-5.26v-5.22h5.26V44.41c0-7.31 3.84-11.19 10.82-11.19a23 23 0 014.12.37v5.37a14.57 14.57 0 00-3.16-.36c-3.37 0-5.28 1.46-5.28 5.59v10.6h8.44V60h-8.44v22.71h-6.5zm21.04 0h-5.26v-5.22h5.26V44.41c0-7.31 3.84-11.19 10.82-11.19a23 23 0 014.12.37v5.37a14.57 14.57 0 00-3.16-.36c-3.37 0-5.28 1.46-5.28 5.59v10.6h8.44V60h-8.44v22.71h-6.5z" fill="white"/>
+                    <path d="M69.61 105.59a15.75 15.75 0 0010 3.75c5.8 0 8.38-3.59 8.38-7.56 0-11-26-4.47-26-22.81 0-9.71 8.26-17.62 19.23-17.62a24.06 24.06 0 0113.36 3.9l-4.45 8.31a14 14 0 00-8.81-3.23c-4.89 0-8.38 2.87-8.38 6.81 0 10.57 26 3.87 26 22.71 0 10.35-7.29 18.54-20 18.54a26.57 26.57 0 01-15-4.69z" fill="white"/>
+                    <path d="M27.72 118.39a52.14 52.14 0 01-9.55-5.3c-3.92-2.77-6.35-5.47-6.35-9.71a8.37 8.37 0 018.63-8.24c4.89 0 7.83 3.23 7.83 7.83v.52h10.45v-.52c0-10.14-7.52-17.78-18.28-17.78-10.76 0-19.23 8.24-19.23 18.19 0 8.56 4.54 13.92 10.71 18.59A52.41 52.41 0 001 137.81h11.53a40.42 40.42 0 0115.19-19.42zm29.38-32.2c-10.71 0-19.23 8.24-19.23 18.19 0 8.56 4.54 13.92 10.71 18.59-7.78 5.37-13.57 11.88-13.57 18.84h11.53c0-7.83 6.05-14.26 15.19-19.42a52.14 52.14 0 01-9.55-5.3c-3.92-2.77-6.35-5.47-6.35-9.71a8.37 8.37 0 018.63-8.24c4.89 0 7.83 3.23 7.83 7.83v.52H73.2v-.52c-.64-10.14-8.16-17.78-16.1-17.78z" fill="#ee0000"/>
+                </svg>
+                <span class="header-title">Publishing House</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <span class="header-user" id="header-user"></span>
+            <button class="logout-btn" onclick="logout()">Log out</button>
+        </div>
+    </div>
+
+    <div class="main-content">
         <div id="loading" class="loading">
-            <p>🔐 Authenticating with Keycloak...</p>
+            <p>Authenticating with Red Hat SSO...</p>
         </div>
 
         <div id="app" style="display: none;">
-            <h1>🔑 API Key Management</h1>
-            <p class="subtitle">Publishing House Central API</p>
-
-            <div class="user-info">
-                <div>
-                    <span>Logged in as: </span>
-                    <span class="user-email" id="user-email"></span>
-                </div>
-                <button class="logout-btn" onclick="logout()">Logout</button>
-            </div>
+            <h1 class="page-title">API Key Management</h1>
+            <p class="subtitle">Manage your Publishing House Central API credentials</p>
 
             <div id="error" class="error" style="display: none;"></div>
 
-            <div class="create-key-section">
-                <h2 style="margin-bottom: 15px; color: #333;">Create New API Key</h2>
+            <div class="card">
+                <h2>Generate API Key</h2>
+                <p style="color: #6a6e73; font-size: 14px; margin-bottom: 16px;">
+                    Create a key to authenticate with the Publishing House API from DevSpaces or CLI tools.
+                </p>
                 <button class="btn" onclick="createKey()" id="create-btn">Generate New Key</button>
 
                 <div id="new-key-display" style="display: none;" class="new-key-display">
                     <div class="new-key-warning">
-                        ⚠️ <strong>Save this key now!</strong> You won't be able to see it again.
+                        <strong>Save this key now.</strong> You will not be able to view it again after leaving this page.
                     </div>
                     <div class="key-value" id="new-key-value"></div>
-                    <button class="copy-btn" onclick="copyNewKey()">📋 Copy to Clipboard</button>
+                    <button class="copy-btn" onclick="copyNewKey()">Copy to clipboard</button>
                 </div>
             </div>
 
-            <h2 style="margin-bottom: 15px; color: #333;">Your API Keys</h2>
-            <div id="keys-list" class="keys-list"></div>
+            <div class="card">
+                <h2>Your API Keys</h2>
+                <div id="keys-list" class="keys-list"></div>
+            </div>
         </div>
     </div>
 
@@ -262,37 +327,41 @@
         let keycloak;
         let newKeyRaw = '';
 
-        // Initialize Keycloak
-        const keycloakConfig = {
-            url: 'https://keycloak-rhsso.apps.cluster-v27ps.dynamic2.redhatworkshops.io/auth',
-            realm: 'openshift',
-            clientId: 'central-api'
-        };
-
-        keycloak = new Keycloak(keycloakConfig);
-
-        keycloak.init({
-            onLoad: 'login-required',
-            checkLoginIframe: false
-        }).then(authenticated => {
-            if (authenticated) {
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('app').style.display = 'block';
-
-                // Display user info
-                keycloak.loadUserInfo().then(userInfo => {
-                    document.getElementById('user-email').textContent = userInfo.email || userInfo.preferred_username;
+        // Fetch OIDC config from the API, then initialize Keycloak
+        fetch('/api/v1/auth/config')
+            .then(r => r.json())
+            .then(config => {
+                keycloak = new Keycloak({
+                    url: config.url,
+                    realm: config.realm,
+                    clientId: config.clientId
                 });
 
-                // Load keys
-                loadKeys();
-            } else {
-                showError('Authentication failed');
-            }
-        }).catch(error => {
-            console.error('Keycloak init error:', error);
-            showError('Failed to initialize authentication: ' + error);
-        });
+                return keycloak.init({
+                    onLoad: 'login-required',
+                    checkLoginIframe: false
+                });
+            })
+            .then(authenticated => {
+                if (authenticated) {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('app').style.display = 'block';
+
+                    keycloak.loadUserInfo().then(userInfo => {
+                        const display = userInfo.email || userInfo.preferred_username;
+                        document.getElementById('header-user').textContent = display;
+                    });
+
+                    loadKeys();
+                } else {
+                    showError('Authentication failed');
+                }
+            })
+            .catch(error => {
+                console.error('Init error:', error);
+                document.getElementById('loading').innerHTML =
+                    '<p style="color: #c9190b;">Failed to initialize authentication. Check the console for details.</p>';
+            });
 
         function logout() {
             keycloak.logout();
@@ -352,8 +421,8 @@
                         Last used: ${key.last_used_at ? new Date(key.last_used_at).toLocaleString() : 'Never'}
                     </div>
                     <div class="key-value">${key.masked}</div>
-                    <div style="margin-top: 12px; color: #666; font-size: 13px;">
-                        💡 Click "Generate New Key" above to regenerate (invalidates this key)
+                    <div class="key-hint">
+                        Click "Generate New Key" above to regenerate (invalidates this key)
                     </div>
                 </div>
             `).join('');
@@ -387,7 +456,7 @@
             navigator.clipboard.writeText(newKeyRaw).then(() => {
                 const btn = event.target;
                 const originalText = btn.textContent;
-                btn.textContent = '✅ Copied!';
+                btn.textContent = 'Copied!';
                 setTimeout(() => {
                     btn.textContent = originalText;
                 }, 2000);

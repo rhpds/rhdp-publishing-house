@@ -59,6 +59,20 @@ def create_app() -> FastAPI:
             timestamp=datetime.utcnow()
         )
 
+    @app.get(f"{settings.api_prefix}/auth/config")
+    async def auth_config():
+        """Public endpoint returning OIDC config for the portal UI."""
+        issuer = settings.oidc_issuer_url.rstrip("/")
+        # Extract base URL and realm from issuer URL (e.g. https://host/realms/my-realm)
+        parts = issuer.rsplit("/realms/", 1)
+        base_url = parts[0] if len(parts) == 2 else issuer
+        realm = parts[1] if len(parts) == 2 else ""
+        return {
+            "url": base_url,
+            "realm": realm,
+            "clientId": settings.oidc_client_id,
+        }
+
     @app.get(f"{settings.api_prefix}/reference/ocp-policy")
     async def get_ocp_policy():
         """Get OCP version policy (no auth required)."""

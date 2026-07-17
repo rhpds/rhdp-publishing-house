@@ -14,9 +14,6 @@ project:
   infra_reviewer_email: "treddy@redhat.com"
   jira_ticket: ""
 
-system:
-  central: "${{ values.central_api_url }}"
-
 spec:
   title: ""
   learning_objectives: []

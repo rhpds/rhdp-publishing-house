@@ -30,11 +30,6 @@ spec:
                 secretKeyRef:
                   name: publishing-house-credentials
                   key: api-key
-            - name: GITHUB_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: publishing-house-credentials
-                  key: github-token
             - name: LITELLM_API_URL
               valueFrom:
                 secretKeyRef:
@@ -64,8 +59,6 @@ spec:
               value: "{{ jira_project_key | default('RHDPCD') }}"
             - name: SONATAFLOW_URL
               value: "http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local:80"
-            - name: SONATAFLOW_WORKFLOW_ID
-              value: "publishinghouseworkflow"
             - name: OIDC_ISSUER_URL
               value: "https://keycloak-keycloak.{{ ocp_apps_domain }}/realms/publishing-house"
             - name: OIDC_CLIENT_ID
@@ -80,12 +73,6 @@ spec:
                 secretKeyRef:
                   name: publishing-house-credentials
                   key: rcars-api-key
-            - name: IN_CLUSTER
-              value: "true"
-            - name: NAMESPACE
-              value: "{{ app_namespace }}"
-            - name: CENTRAL_EXTERNAL_URL
-              value: "https://central-api-{{ app_namespace }}.{{ ocp_apps_domain }}"
           resources:
             requests:
               memory: 256Mi

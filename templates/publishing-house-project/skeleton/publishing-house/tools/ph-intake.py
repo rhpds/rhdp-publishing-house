@@ -49,9 +49,20 @@ def main():
     spec_data = spec.get("spec", {})
     env = spec_data.get("environment", {})
 
-    central_url = spec.get("system", {}).get("central", "").rstrip("/")
+    auth_path = Path(os.path.expanduser("~/.config/publishing-house/auth.json"))
+    if not auth_path.exists():
+        print(json.dumps({"error": "~/.config/publishing-house/auth.json not found — run the orchestrator skill first"}))
+        sys.exit(1)
+
+    creds = json.loads(auth_path.read_text())
+    api_key = creds.get("credential", "")
+    if not api_key:
+        print(json.dumps({"error": "No credential in auth.json"}))
+        sys.exit(1)
+
+    central_url = creds.get("central", "").rstrip("/")
     if not central_url:
-        print(json.dumps({"error": "system.central not set in spec.yaml"}))
+        print(json.dumps({"error": "No portal URL in auth.json"}))
         sys.exit(1)
 
     design_path = root / "publishing-house" / "spec" / "design.md"
@@ -72,17 +83,6 @@ def main():
         for i, f in enumerate(sorted(modules_dir.glob("module-*.md")), 1):
             title = f.stem.split("-", 2)[-1].replace("-", " ").title() if "-" in f.stem else f.stem
             modules.append({"title": title, "duration_min": 20})
-
-    auth_path = Path(os.path.expanduser("~/.config/publishing-house/auth.json"))
-    if not auth_path.exists():
-        print(json.dumps({"error": "~/.config/publishing-house/auth.json not found — run the orchestrator skill first"}))
-        sys.exit(1)
-
-    creds = json.loads(auth_path.read_text())
-    api_key = creds.get("credential", "")
-    if not api_key:
-        print(json.dumps({"error": "No credential in auth.json"}))
-        sys.exit(1)
 
     ctx = ssl.create_default_context()
     ctx.check_hostname = False

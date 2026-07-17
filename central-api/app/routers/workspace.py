@@ -19,7 +19,6 @@ class WorkspaceSetupRequest(BaseModel):
 
 class WorkspaceSetupResponse(BaseModel):
     api_key: str
-    central_api_url: str
     user_email: str
 
 
@@ -86,6 +85,5 @@ async def workspace_setup(
 
     return WorkspaceSetupResponse(
         api_key=settings.ph_api_key,
-        central_api_url=settings.central_external_url,
         user_email=user_email,
     )

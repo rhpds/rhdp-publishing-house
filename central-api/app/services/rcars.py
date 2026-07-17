@@ -1,6 +1,6 @@
 """RCARS catalog client for cross-cluster access.
 
-Uses permanent API key auth (X-API-Key header) — cleaner than proxy-secret.
+Uses permanent API key auth (X-API-Key header).
 Key is stored in RCARS_API_KEY env var, sourced from the rcars-api-key K8s secret.
 
 Production API route (direct, no oauth-proxy):
@@ -11,12 +11,13 @@ Create/manage API keys at:
 """
 import json
 import logging
-import os
 import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Optional
+
+from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -27,18 +28,15 @@ _SSL_CTX.verify_mode = ssl.CERT_NONE
 
 def _get_headers() -> dict:
     """Build auth headers for RCARS API calls using permanent API key."""
-    api_key = os.environ.get("RCARS_API_KEY", "")
+    settings = get_settings()
     headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["X-API-Key"] = api_key
+    if settings.rcars_api_key:
+        headers["X-API-Key"] = settings.rcars_api_key
     return headers
 
 
 def _get_base_url() -> str:
-    return os.environ.get(
-        "RCARS_URL",
-        "https://rcars-api.apps.ocpv-infra01.dal12.infra.demo.redhat.com",
-    ).rstrip("/")
+    return get_settings().rcars_url.rstrip("/")
 
 
 def rcars_health() -> dict:

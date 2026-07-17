@@ -344,6 +344,7 @@ def submit_intake(
         update_body = UpdateEpicRequest(
             epic_key=epic_key,
             name=answers.name,
+            slug=answers.slug or project_id,
             content_type=answers.content_type,
             deployment_mode=answers.deployment_mode,
             owner_email=answers.owner_email,

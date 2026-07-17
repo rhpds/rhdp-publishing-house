@@ -19,7 +19,7 @@ spec:
       serviceAccountName: central-api
       containers:
       - name: api
-        image: quay.io/rhpds/central-api:1.0.0
+        image: quay.io/rhpds/central-api:1.0.5
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
@@ -30,11 +30,6 @@ spec:
             secretKeyRef:
               name: publishing-house-credentials
               key: api-key
-        - name: GITHUB_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: publishing-house-credentials
-              key: github-token
         - name: LITELLM_API_URL
           valueFrom:
             secretKeyRef:
@@ -64,14 +59,6 @@ spec:
           value: "RHDPCD"
         - name: SONATAFLOW_URL
           value: "http://publishing-house-workflow.publishing-house.svc.cluster.local:8080"
-        - name: SONATAFLOW_WORKFLOW_ID
-          value: "publishing-house-workflow"
-        - name: IN_CLUSTER
-          value: "true"
-        - name: NAMESPACE
-          value: "publishing-house"
-        - name: CENTRAL_EXTERNAL_URL
-          value: "https://central-api-publishing-house.apps.cluster-v27ps.dynamic2.redhatworkshops.io"
         resources:
           requests:
             memory: "256Mi"

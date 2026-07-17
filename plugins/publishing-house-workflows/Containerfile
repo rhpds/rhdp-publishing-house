@@ -1,0 +1,40 @@
+# Multi-stage build for Publishing House Workflows RHDH dynamic plugin
+# Produces a scratch-based OCI image compatible with RHDH dynamic plugin loading
+#
+# Usage:
+#   podman build --platform linux/amd64 -t quay.io/rhpds/backstage-plugin-ph-workflows:0.1.9 .
+#   podman push quay.io/rhpds/backstage-plugin-ph-workflows:0.1.9
+
+# Stage 1: Build and export the dynamic plugin
+FROM node:20-alpine AS builder
+
+WORKDIR /plugin
+
+COPY package.json ./
+
+# Remove platform-specific optional deps and install for linux
+RUN npm pkg delete dependencies.@rollup/rollup-darwin-arm64 \
+    dependencies.@swc/core-darwin-arm64 && \
+    npm install --legacy-peer-deps --ignore-scripts 2>&1 | tail -5
+
+COPY . .
+
+# Export as dynamic plugin (generates dist-dynamic/dist-scalprum)
+RUN npx --yes @red-hat-developer-hub/cli@1.8.0 plugin export 2>&1
+
+# Build the plugin registry metadata
+RUN node -e " \
+  const pkg = require('./dist-dynamic/package.json'); \
+  const meta = [{ [pkg.name]: { \
+    name: pkg.name + '-dynamic', \
+    version: pkg.version, \
+    backstage: pkg.backstage, \
+    license: pkg.license \
+  }}]; \
+  require('fs').writeFileSync('/plugin/dist-dynamic/index.json', JSON.stringify(meta)); \
+"
+
+# Stage 2: Scratch image with only plugin assets
+FROM scratch
+
+COPY --from=builder /plugin/dist-dynamic/ .

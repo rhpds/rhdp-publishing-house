@@ -42,7 +42,7 @@ else:
   **STOP — do not proceed.**
 - `no-spec` → show: "`publishing-house/spec.yaml` is missing. This repo may not have been scaffolded correctly." **STOP.**
 
-**Step 2 — Read project identity and Central API URL:**
+**Step 2 — Read project identity:**
 
 Run silently:
 ```bash
@@ -50,18 +50,14 @@ python3 -c "
 import yaml
 from pathlib import Path
 ci = yaml.safe_load(Path('catalog-info.yaml').read_text())
-spec = yaml.safe_load(Path('publishing-house/spec.yaml').read_text()) or {}
 pid = ci.get('metadata', {}).get('name', '')
-central = spec.get('system', {}).get('central', '')
 print(f'project_id:{pid}')
-print(f'central:{central}')
 "
 ```
 
-Extract `project_id` and `central_url` from the output. These are used for all subsequent API calls.
+Extract `project_id` from the output. This is used for all subsequent API calls.
 
 If `project_id` is empty → show error: "`metadata.name` is missing in `catalog-info.yaml`." **STOP.**
-If `central_url` is empty → show error: "`system.central` is not set in `spec.yaml`. Re-scaffold from the RHDH template." **STOP.**
 
 **Step 3 — Check git identity:**
 
@@ -96,14 +92,19 @@ f = os.path.expanduser('~/.config/publishing-house/auth.json')
 if os.path.exists(f):
     d = json.load(open(f))
     cred = d.get('credential', '')
-    print('found:' + cred[:8] if cred else 'empty')
+    central = d.get('central', '')
+    print(f'cred:{cred[:8]}' if cred else 'no-cred')
+    print(f'central:{central}')
 else:
     print('missing')
 "
 ```
 
-- Output starts with `found:` → credential exists. Proceed to Step 4 silently.
-- Output is `missing` or `empty` → the author needs a portal key.
+Extract `central_url` from the `central:` line. This is used for all subsequent API calls.
+
+- Output has `cred:` and `central:` → auth is configured. Proceed to Step 5 silently.
+- Output is `missing` → show error: "Workspace auth is not configured. Restart the DevSpaces workspace to trigger setup." **STOP.**
+- Output is `no-cred` → the author needs a portal key.
 
   **ALWAYS show this message:**
 
@@ -125,20 +126,19 @@ else:
   python3 -c "
 import json, os
 key = 'PASTE_KEY_HERE'
-central = 'CENTRAL_URL_HERE'
 path = os.path.expanduser('~/.config/publishing-house/auth.json')
+d = json.load(open(path)) if os.path.exists(path) else {}
+d['credential'] = key
 os.makedirs(os.path.dirname(path), exist_ok=True)
 with open(path, 'w') as f:
-    json.dump({'credential': key, 'portal': central}, f, indent=2)
+    json.dump(d, f, indent=2)
 os.chmod(path, 0o600)
 print('saved')
 "
   ```
-  Replace PASTE_KEY_HERE with the actual key and CENTRAL_URL_HERE with `central_url`.
+  Replace PASTE_KEY_HERE with the actual key.
 
   Confirm: > Got it — you're all set.
-
-  Proceed to Step 4 immediately.
 
 **Step 5 — Read spec.yaml and check workflow state:**
 
@@ -153,9 +153,10 @@ python3 -c "
 import json, os, ssl, urllib.request
 creds = json.load(open(os.path.expanduser('~/.config/publishing-house/auth.json')))
 key = creds.get('credential', '')
+central = creds.get('central', '').rstrip('/')
 ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
 req = urllib.request.Request(
-    'CENTRAL_URL/api/v1/projects/PROJECT_ID/workflow-data',
+    f'{central}/api/v1/projects/PROJECT_ID/workflow-data',
     headers={'Authorization': f'Bearer {key}'}
 )
 try:
@@ -172,7 +173,7 @@ except Exception as e:
     print('jira_url:')
 "
 ```
-Replace CENTRAL_URL with `central_url` and PROJECT_ID with `project_id`.
+Replace PROJECT_ID with `project_id`.
 
 Extract `stage`, `epic_key`, and `jira_url` from the output. The stage will be one of: `intake`, `review`, `development`, `ready`, or `published`.
 
@@ -372,7 +373,7 @@ git push
 - Never tell the author to run any script except opening the portal URL during first-time key setup
 - ALWAYS show the portal URL in the conversation — never rely solely on `open` working (DevSpaces has no browser)
 - **`project_id`** comes from `catalog-info.yaml` `metadata.name` — this is the canonical identifier
-- **`central_url`** comes from `spec.yaml` `system.central` — used for ALL API calls
+- **`central_url`** comes from `~/.config/publishing-house/auth.json` `central` field — written by DevSpaces setup
 - Stage is read from the Central API, never from local files
 - After intake approval: run git commit, ph-intake.py, and update IMMEDIATELY. No confirmation. No asking.
 - No `.ph-state` file — all state comes from catalog-info.yaml, spec.yaml, and the Central API
