@@ -26,7 +26,7 @@ commands:
       component: dev-tools
       commandLine: |
         NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace 2>/dev/null)
-        USERNAME="${NAMESPACE%-devspaces}"
+        USERNAME=$(echo "$NAMESPACE" | cut -d'-' -f1)
         SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token 2>/dev/null)
 
         # Set git email from namespace username
@@ -37,42 +37,30 @@ commands:
         AUTH_FILE=/home/user/.config/publishing-house/auth.json
         if [ -f "$AUTH_FILE" ] && grep -q "litellm_key" "$AUTH_FILE" 2>/dev/null; then
           echo "auth.json already configured, skipping"
-          exit 0
-        fi
-        CENTRAL_URL="${{ values.central_api_url }}"
+        else
+          CENTRAL_URL="${{ values.central_api_url }}"
 
-        # Step 1: Bootstrap auth — get central-api credential
-        SETUP_RESP=$(curl -sk -X POST "${CENTRAL_URL}/api/v1/workspace/setup" \
-          -H "Authorization: Bearer ${SA_TOKEN}" \
-          -H "Content-Type: application/json" \
-          -d "{\"username\": \"${USERNAME}\"}")
+          SETUP_RESP=$(curl -sk -X POST "${CENTRAL_URL}/api/v1/workspace/setup" \
+            -H "Authorization: Bearer ${SA_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"username\": \"${USERNAME}\"}")
 
-        API_KEY=$(echo "$SETUP_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['api_key'])" 2>/dev/null)
-        USER_EMAIL=$(echo "$SETUP_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['user_email'])" 2>/dev/null)
+          API_KEY=$(echo "$SETUP_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['api_key'])" 2>/dev/null)
+          USER_EMAIL=$(echo "$SETUP_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['user_email'])" 2>/dev/null)
 
-        if [ -z "$API_KEY" ]; then
-          echo "WARNING: workspace setup failed, Claude AI will need manual API key"
-          exit 0
-        fi
+          if [ -n "$API_KEY" ]; then
+            LITELLM_RESP=$(curl -sk -X POST "${CENTRAL_URL}/api/v1/litellm/keys/generate" \
+              -H "Authorization: Bearer ${API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "{\"project_id\": \"${{ values.project_name }}\", \"user_email\": \"${USER_EMAIL}\"}")
 
-        # Step 2: Generate LiteLLM virtual key (keyed by username)
-        LITELLM_RESP=$(curl -sk -X POST "${CENTRAL_URL}/api/v1/litellm/keys/generate" \
-          -H "Authorization: Bearer ${API_KEY}" \
-          -H "Content-Type: application/json" \
-          -d "{\"project_id\": \"${{ values.project_name }}\", \"user_email\": \"${USER_EMAIL}\"}")
+            LITELLM_KEY=$(echo "$LITELLM_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['litellm_key'])" 2>/dev/null)
+            LITELLM_ENDPOINT=$(echo "$LITELLM_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['litellm_endpoint'])" 2>/dev/null)
+            LITELLM_MODEL=$(echo "$LITELLM_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['litellm_model'])" 2>/dev/null)
 
-        LITELLM_KEY=$(echo "$LITELLM_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['litellm_key'])" 2>/dev/null)
-        LITELLM_ENDPOINT=$(echo "$LITELLM_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['litellm_endpoint'])" 2>/dev/null)
-        LITELLM_MODEL=$(echo "$LITELLM_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['litellm_model'])" 2>/dev/null)
-
-        if [ -z "$LITELLM_KEY" ]; then
-          echo "WARNING: LiteLLM key generation failed, Claude AI will need manual API key"
-          exit 0
-        fi
-
-        # Write auth.json (same location Claude skill reads)
-        mkdir -p /home/user/.config/publishing-house
-        cat > "$AUTH_FILE" << AUTHEOF
+            if [ -n "$LITELLM_KEY" ]; then
+              mkdir -p /home/user/.config/publishing-house
+              cat > "$AUTH_FILE" << AUTHEOF
         {
           "credential": "${API_KEY}",
           "central": "${CENTRAL_URL}",
@@ -81,8 +69,14 @@ commands:
           "litellm_model": "${LITELLM_MODEL}"
         }
         AUTHEOF
-
-        echo "Workspace configured: key=${LITELLM_KEY:0:8}... email=${USER_EMAIL}"
+              echo "Workspace configured: key=${LITELLM_KEY:0:8}... email=${USER_EMAIL}"
+            else
+              echo "WARNING: LiteLLM key generation failed, Claude AI will need manual API key"
+            fi
+          else
+            echo "WARNING: workspace setup failed, Claude AI will need manual API key"
+          fi
+        fi
       workingDir: /projects
       label: "Setup Workspace Auth"
       group:
@@ -93,13 +87,9 @@ commands:
     exec:
       component: dev-tools
       commandLine: |
-        python3 -c "import yaml" 2>/dev/null && exit 0
-        sudo dnf install -y python3-pip python3-pyyaml 2>/dev/null && python3 -c "import yaml" 2>/dev/null && exit 0
-        python3 -m ensurepip --user 2>/dev/null
-        python3 -m pip install --user pyyaml 2>/dev/null && python3 -c "import yaml" 2>/dev/null && exit 0
-        curl -sS https://bootstrap.pypa.io/get-pip.py | python3 - --user 2>/dev/null
-        python3 -m pip install --user pyyaml 2>/dev/null && python3 -c "import yaml" 2>/dev/null && exit 0
-        echo "WARNING: could not install pyyaml — Claude will use json-only parsing"
+        command -v python3 >/dev/null 2>&1 || sudo dnf install -y python3 2>/dev/null
+        command -v pip3 >/dev/null 2>&1 || python3 -m ensurepip --user 2>/dev/null || sudo dnf install -y python3-pip 2>/dev/null
+        python3 -c "import yaml" 2>/dev/null || pip3 install --user pyyaml 2>/dev/null || echo "WARNING: could not install pyyaml"
       workingDir: /projects
       label: "Install Python dependencies"
       group:
