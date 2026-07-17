@@ -28,7 +28,7 @@ See @rhdp-publishing-house/skills/editor/references/editing-checklist.md for the
 
    **STOP — do not proceed.**
 
-2. Read `catalog-info.yaml` for `project_id`
+2. Read `publishing-house/spec.yaml` for `project_id` (`project.slug`)
 3. Read `publishing-house/spec.yaml` for project context
 4. Confirm the project has drafted modules
 

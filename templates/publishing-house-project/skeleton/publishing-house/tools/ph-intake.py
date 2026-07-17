@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Submit intake to Publishing House Central API.
 
-Reads project data from catalog-info.yaml and spec.yaml,
+Reads project data from spec.yaml,
 builds the IntakeAnswers payload, POSTs to Central API,
 and updates spec.yaml with the returned Jira ticket.
 """
@@ -31,21 +31,19 @@ def main():
         print(json.dumps({"error": "catalog-info.yaml not found — not a Publishing House project"}))
         sys.exit(1)
 
-    ci_path = root / "catalog-info.yaml"
     spec_path = root / "publishing-house" / "spec.yaml"
 
     if not spec_path.exists():
         print(json.dumps({"error": "publishing-house/spec.yaml not found"}))
         sys.exit(1)
 
-    ci = yaml.safe_load(ci_path.read_text())
-    project_id = ci.get("metadata", {}).get("name", "")
-    if not project_id:
-        print(json.dumps({"error": "metadata.name missing in catalog-info.yaml"}))
-        sys.exit(1)
-
     spec = yaml.safe_load(spec_path.read_text()) or {}
     project = spec.get("project", {})
+
+    project_id = project.get("slug", "")
+    if not project_id:
+        print(json.dumps({"error": "project.slug missing in spec.yaml"}))
+        sys.exit(1)
     spec_data = spec.get("spec", {})
     env = spec_data.get("environment", {})
 
@@ -117,9 +115,10 @@ def main():
     }
 
     workflow_id = project.get("workflow_id", "")
-    url = f"{central_url}/api/v1/projects/{project_id}/intake"
-    if workflow_id:
-        url += f"?workflow_id={workflow_id}"
+    if not workflow_id:
+        print(json.dumps({"error": "workflow_id missing in spec.yaml — run the orchestrator skill first"}))
+        sys.exit(1)
+    url = f"{central_url}/api/v1/projects/intake/{workflow_id}"
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode(),

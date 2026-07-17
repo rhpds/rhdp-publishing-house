@@ -49,15 +49,15 @@ Run silently:
 python3 -c "
 import yaml
 from pathlib import Path
-ci = yaml.safe_load(Path('catalog-info.yaml').read_text())
-pid = ci.get('metadata', {}).get('name', '')
+spec = yaml.safe_load(Path('publishing-house/spec.yaml').read_text()) or {}
+pid = spec.get('project', {}).get('slug', '')
 print(f'project_id:{pid}')
 "
 ```
 
 Extract `project_id` from the output. This is used for all subsequent API calls.
 
-If `project_id` is empty → show error: "`metadata.name` is missing in `catalog-info.yaml`." **STOP.**
+If `project_id` is empty → show error: "`project.slug` is missing in `spec.yaml`." **STOP.**
 
 **Step 3 — Check git identity:**
 
@@ -213,7 +213,7 @@ orchestrator queries the API again for the new stage and continues the loop.
 
 - Never tell the author to run any script except opening the portal URL during first-time key setup
 - ALWAYS show the portal URL in the conversation — never rely solely on `open` working (DevSpaces has no browser)
-- **`project_id`** comes from `catalog-info.yaml` `metadata.name` — this is the canonical identifier
+- **`project_id`** comes from `spec.yaml` `project.slug` — this is the canonical identifier
 - **`central_url`** comes from `~/.config/publishing-house/auth.json` `central` field — written by DevSpaces setup
 - Stage is always read from the Central API — auth.json does not store stage
 - No `.ph-state` file — all state comes from catalog-info.yaml, spec.yaml, and the Central API

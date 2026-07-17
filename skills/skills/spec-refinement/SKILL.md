@@ -37,7 +37,7 @@ the manifest. Phase gate requests are the orchestrator's responsibility.
 
 2. Read `publishing-house/spec/design.md`
 3. Read all module outlines in `publishing-house/spec/modules/`
-4. Read `catalog-info.yaml` for `project_id`
+4. Read `publishing-house/spec.yaml` for `project_id` (`project.slug`)
 5. Read `publishing-house/spec.yaml` for project context
 
 ## Step 1: Read Vetting Findings

@@ -33,7 +33,7 @@ You MUST NOT write AsciiDoc files directly using the Write or Edit tools.
 
    **STOP — do not proceed.**
 
-2. Read `catalog-info.yaml` for `project_id` and content type
+2. Read `publishing-house/spec.yaml` for `project_id` (`project.slug`) and content type
 3. Read `publishing-house/spec.yaml` for deployment mode and spec data
 4. Confirm the project has approved module outlines in `publishing-house/spec/modules/`
 

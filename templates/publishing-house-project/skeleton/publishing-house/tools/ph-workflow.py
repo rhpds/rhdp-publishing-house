@@ -47,15 +47,14 @@ def main():
         print(json.dumps({"error": "Missing credential or central in auth.json"}))
         sys.exit(1)
 
-    ci = yaml.safe_load((root / "catalog-info.yaml").read_text())
-    project_id = ci.get("metadata", {}).get("name", "")
-    if not project_id:
-        print(json.dumps({"error": "metadata.name missing in catalog-info.yaml"}))
-        sys.exit(1)
-
     spec_path = root / "publishing-house" / "spec.yaml"
     spec = yaml.safe_load(spec_path.read_text()) or {} if spec_path.exists() else {}
     project = spec.get("project", {})
+
+    project_id = project.get("slug", "")
+    if not project_id:
+        print(json.dumps({"error": "project.slug missing in spec.yaml"}))
+        sys.exit(1)
     wfid = project.get("workflow_id", "")
     epic_key = project.get("jira_ticket", "")
     jira_url = ""
@@ -88,6 +87,18 @@ def main():
                 epic_key = wd_epic
                 spec.setdefault("project", {})["jira_ticket"] = epic_key
                 spec_changed = True
+
+            if jira_url and deployment_mode == "rhdp_published":
+                ci_path = root / "catalog-info.yaml"
+                ci = yaml.safe_load(ci_path.read_text())
+                links = ci.get("metadata", {}).get("links", [])
+                has_jira = any(l.get("url") == jira_url for l in links)
+                if not has_jira:
+                    ci.setdefault("metadata", {}).setdefault("links", []).append(
+                        {"url": jira_url, "title": "Jira Epic", "icon": "dashboard"}
+                    )
+                    with open(ci_path, "w") as f:
+                        yaml.dump(ci, f, default_flow_style=False, sort_keys=False)
         except Exception:
             pass
 
@@ -96,16 +107,17 @@ def main():
             yaml.dump(spec, f, default_flow_style=False, sort_keys=False)
 
     stage = "intake"
-    try:
-        url = f"{central}/api/v1/projects/{project_id}/workflow-state"
-        if wfid:
-            url += f"?workflow_id={wfid}"
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, context=ctx, timeout=10) as r:
-            st = json.loads(r.read().decode())
-        stage = st.get("stage", "intake")
-    except Exception:
-        pass
+    if wfid:
+        try:
+            req = urllib.request.Request(
+                f"{central}/api/v1/projects/workflow-state/{wfid}",
+                headers=headers,
+            )
+            with urllib.request.urlopen(req, context=ctx, timeout=10) as r:
+                st = json.loads(r.read().decode())
+            stage = st.get("stage", "intake")
+        except Exception:
+            pass
 
     print(f"stage:{stage}")
     print(f"workflow_id:{wfid}")

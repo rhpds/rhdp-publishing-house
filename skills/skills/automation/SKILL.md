@@ -31,7 +31,7 @@ See @rhdp-publishing-house/skills/automation/references/automation-manifest-form
 
    **STOP — do not proceed.**
 
-2. Read `catalog-info.yaml` for `project_id`
+2. Read `publishing-house/spec.yaml` for `project_id` (`project.slug`)
 3. Read `publishing-house/spec.yaml` for deployment mode
 4. Read `publishing-house/spec/design.md` for infrastructure requirements
 

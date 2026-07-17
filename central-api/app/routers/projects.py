@@ -244,38 +244,23 @@ def get_workflow_data(project_id: str):
         raise HTTPException(status_code=502, detail=f"Failed to query workflow: {e}")
 
 
-@router.get("/{project_id}/workflow-state")
-def get_workflow_state(project_id: str, workflow_id: str = ""):
-    """Return semantic workflow stage. Uses ProcessInstanceById when workflow_id
-    is provided (fast direct lookup), falls back to businessKey filter otherwise."""
+@router.get("/workflow-state/{workflow_id}")
+def get_workflow_state(workflow_id: str):
+    """Return semantic workflow stage via direct ProcessInstanceById lookup."""
     settings = get_settings()
     try:
-        if workflow_id:
-            graphql_query = {
-                "query": """
-                    query GetWorkflowById($id: String!) {
-                        ProcessInstanceById(id: $id) {
-                            id
-                            state
-                            nodes { name enter exit }
-                        }
+        graphql_query = {
+            "query": """
+                query GetWorkflowById($id: String!) {
+                    ProcessInstanceById(id: $id) {
+                        id
+                        state
+                        nodes { name enter exit }
                     }
-                """,
-                "variables": {"id": workflow_id}
-            }
-        else:
-            graphql_query = {
-                "query": """
-                    query GetWorkflow($businessKey: String!) {
-                        ProcessInstances(where: { businessKey: { equal: $businessKey } }) {
-                            id
-                            state
-                            nodes { name enter exit }
-                        }
-                    }
-                """,
-                "variables": {"businessKey": project_id}
-            }
+                }
+            """,
+            "variables": {"id": workflow_id}
+        }
         req = urllib.request.Request(
             f"{settings.sonataflow_url.rstrip('/')}/graphql",
             data=json.dumps(graphql_query).encode(),
@@ -283,11 +268,7 @@ def get_workflow_state(project_id: str, workflow_id: str = ""):
         )
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
             result = json.loads(r.read().decode())
-        if workflow_id:
-            inst = result.get("data", {}).get("ProcessInstanceById")
-        else:
-            instances = result.get("data", {}).get("ProcessInstances", [])
-            inst = instances[0] if instances else None
+        inst = result.get("data", {}).get("ProcessInstanceById")
         if inst:
             process_state = inst.get("state", "")
 
@@ -314,38 +295,36 @@ def get_workflow_state(project_id: str, workflow_id: str = ""):
 
             return {
                 "stage": stage,
-                "project_id": project_id,
+                "workflow_id": workflow_id,
                 "source": "sonataflow",
             }
     except Exception as e:
-        logger.warning("workflow-state fallback for %s: %s", project_id, e)
-    return {"stage": "intake", "project_id": project_id, "source": "fallback"}
+        logger.warning("workflow-state fallback for %s: %s", workflow_id, e)
+    return {"stage": "intake", "workflow_id": workflow_id, "source": "fallback"}
 
 
-def _require_stage(project_id: str, allowed: list[str], workflow_id: str = "") -> str:
+def _require_stage(workflow_id: str, allowed: list[str]) -> str:
     """Check the workflow stage and raise 409 if not in allowed list."""
-    current = get_workflow_state(project_id, workflow_id=workflow_id).get("stage", "unknown")
+    current = get_workflow_state(workflow_id).get("stage", "unknown")
     if current not in allowed:
         raise HTTPException(
             status_code=409,
-            detail=f"Project '{project_id}' is in '{current}' stage. "
+            detail=f"Workflow '{workflow_id}' is in '{current}' stage. "
                    f"This action requires stage: {', '.join(allowed)}.",
         )
     return current
 
 
-@router.post("/{project_id}/intake", response_model=IntakeResponse, status_code=201)
+@router.post("/intake/{workflow_id}", response_model=IntakeResponse, status_code=201)
 def submit_intake(
-    project_id: str,
+    workflow_id: str,
     answers: IntakeAnswers,
-    workflow_id: str = "",
     owner: str = Depends(_require_auth),
 ):
     """After author approves spec — create Jira Epic + Tasks (rhdp_published only),
     advance SonataFlow to next stage, and auto-compute RCARS overlap.
-    One atomic call — no back-and-forth.
-    project_id is the slug (canonical identifier, not workflow_id)."""
-    _require_stage(project_id, ["intake"], workflow_id=workflow_id)
+    One atomic call — no back-and-forth."""
+    _require_stage(workflow_id, ["intake"])
     settings = get_settings()
     epic_key = answers.epic_key
     jira_url = f"{settings.jira_url}/browse/{epic_key}" if epic_key else ""
@@ -361,9 +340,10 @@ def submit_intake(
     )
     rcars_overlap_pct = overlap_result.get("overlap_pct", 0.0)
     rcars_top_matches = overlap_result.get("top_matches", [])
+    slug = answers.slug or answers.name
     logger.info(
-        "intake: RCARS overlap for project %s = %.1f%% (%d top matches)",
-        project_id, rcars_overlap_pct, len(rcars_top_matches)
+        "intake: RCARS overlap for %s = %.1f%% (%d top matches)",
+        slug, rcars_overlap_pct, len(rcars_top_matches)
     )
 
     if answers.deployment_mode == "rhdp_published" and epic_key:
@@ -372,7 +352,7 @@ def submit_intake(
         update_body = UpdateEpicRequest(
             epic_key=epic_key,
             name=answers.name,
-            slug=answers.slug or project_id,
+            slug=slug,
             content_type=answers.content_type,
             deployment_mode=answers.deployment_mode,
             owner_email=answers.owner_email,
@@ -387,13 +367,12 @@ def submit_intake(
             rcars_top_matches=rcars_top_matches,
         )
         result = update_epic(epic_key, update_body, settings)
-        logger.info("intake: updated Epic %s for project %s (%d tasks)", epic_key, project_id, result.tasks_created)
+        logger.info("intake: updated Epic %s for %s (%d tasks)", epic_key, slug, result.tasks_created)
     else:
-        logger.info("intake: no epic to update for %s (mode=%s, epic_key=%s)", project_id, answers.deployment_mode, epic_key)
+        logger.info("intake: no epic to update for %s (mode=%s, epic_key=%s)", slug, answers.deployment_mode, epic_key)
 
-    # Advance SonataFlow workflow (both modes)
     new_stage = _advance_workflow(workflow_id, epic_key, jira_url, settings)
-    logger.info("intake: workflow advanced to %s for project %s", new_stage, project_id)
+    logger.info("intake: workflow advanced to %s for %s", new_stage, slug)
 
     return IntakeResponse(
         epic_key=epic_key,
