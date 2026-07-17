@@ -52,8 +52,13 @@ class LiteLLMService:
                     return key_id
 
                 if response.status_code == 400 and "already exists" in response.text:
-                    logger.info(f"Key alias {alias} created between check and generate, retrieving")
-                    return await self._get_key_by_alias(alias)
+                    existing = await self._get_key_by_alias(alias)
+                    if existing:
+                        logger.info(f"Key alias {alias} exists, returning: {existing[:8]}...")
+                        return existing
+                    logger.warning(f"Orphaned key alias {alias}, deleting and retrying")
+                    await self._delete_key_by_alias(alias)
+                    return await self.generate_key(project_id, user_email, max_budget)
 
                 logger.error(f"Failed to generate LiteLLM key: {response.status_code} {response.text}")
                 return None
@@ -81,6 +86,23 @@ class LiteLLMService:
         except Exception as e:
             logger.error(f"Error retrieving key by alias {alias}: {e}")
             return None
+
+    async def _delete_key_by_alias(self, alias: str) -> bool:
+        """Delete a key by its alias to clean up orphaned entries."""
+        try:
+            async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+                response = await client.post(
+                    f"{self.api_url}/key/delete",
+                    headers=self.headers,
+                    json={"key_aliases": [alias]}
+                )
+                if response.status_code == 200:
+                    logger.info(f"Deleted orphaned key alias: {alias}")
+                    return True
+                return False
+        except Exception as e:
+            logger.error(f"Error deleting key alias {alias}: {e}")
+            return False
 
     async def delete_key(self, key_id: str) -> bool:
         """
