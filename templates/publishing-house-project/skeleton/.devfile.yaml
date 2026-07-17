@@ -172,7 +172,8 @@ commands:
         mkdir -p "$SKILL_DIR"
         if [ -z "$(ls -A "$SKILL_DIR" 2>/dev/null)" ]; then
           git clone -b main https://github.com/rhpds/rhdp-publishing-house.git /tmp/ph-repo >/dev/null 2>&1 \
-            && cp -r /tmp/ph-repo/skills/* "$SKILL_DIR/" \
+            && cp -r /tmp/ph-repo/skills/.claude-plugin "$SKILL_DIR/" \
+            && cp -r /tmp/ph-repo/skills/skills/* "$SKILL_DIR/" \
             && rm -rf /tmp/ph-repo \
             || echo "WARNING: could not install skills"
         fi
