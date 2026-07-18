@@ -69,9 +69,7 @@ After each answer, immediately write to spec.yaml.
 
 ## Q10: Difficulty Level
 
-> **What difficulty level best describes this content?** Beginner, intermediate, or advanced?
-
-- **spec.yaml field:** `spec.audience` (update if different from Q2; use a separate `spec.difficulty_level` field if the audience level and difficulty differ)
+**Skip — already captured in Q2** (`spec.audience`). Do not ask again.
 
 ## Q11: OpenShift Version
 

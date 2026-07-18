@@ -59,6 +59,11 @@ spec:
               value: "{{ jira_project_key | default('RHDPCD') }}"
             - name: SONATAFLOW_URL
               value: "http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local:80"
+            - name: SONATAFLOW_GRAPHQL_URL
+              # dev mode: runtime pod has embedded /graphql
+              value: "http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local:80"
+              # preview mode: use platform data-index service
+              # value: "http://sonataflow-platform-data-index-service.{{ app_namespace }}.svc.cluster.local:80"
             - name: OIDC_ISSUER_URL
               value: "https://keycloak-keycloak.{{ ocp_apps_domain }}/realms/publishing-house"
             - name: OIDC_CLIENT_ID

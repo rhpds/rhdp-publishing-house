@@ -127,7 +127,7 @@ def _require_auth(
 
 def _advance_workflow(workflow_id: str, epic_key: str, jira_url: str, settings=None) -> str:
     """Send IntakeCompleteEvent CloudEvent to SonataFlow.
-    Uses kogitoprocinstanceid for direct instance routing.
+    Uses kogitobusinesskey + projectid extension attributes for correlation.
     Returns the new stage name."""
     if not settings:
         settings = get_settings()
@@ -138,9 +138,11 @@ def _advance_workflow(workflow_id: str, epic_key: str, jira_url: str, settings=N
             "type": "ph.intake.complete",
             "source": "claude-skill",
             "id": str(uuid.uuid4()),
-            "kogitoprocinstanceid": workflow_id,
+            "kogitobusinesskey": workflow_id,
+            "projectid": workflow_id,
             "datacontenttype": "application/json",
             "data": {
+                "projectid": workflow_id,
                 "epic_key": epic_key,
                 "jira_url": jira_url
             }
@@ -219,7 +221,7 @@ def get_workflow_data(project_id: str):
             "variables": {"businessKey": project_id}
         }
         req = urllib.request.Request(
-            f"{settings.sonataflow_url.rstrip('/')}/graphql",
+            f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
             data=json.dumps(graphql_query).encode(),
             headers={"Content-Type": "application/json"}
         )
@@ -246,29 +248,30 @@ def get_workflow_data(project_id: str):
 
 @router.get("/workflow-state/{workflow_id}")
 def get_workflow_state(workflow_id: str):
-    """Return semantic workflow stage via direct ProcessInstanceById lookup."""
+    """Return semantic workflow stage by businessKey lookup."""
     settings = get_settings()
     try:
         graphql_query = {
             "query": """
-                query GetWorkflowById($id: String!) {
-                    ProcessInstanceById(id: $id) {
+                query GetWorkflowByBK($businessKey: String!) {
+                    ProcessInstances(where: { businessKey: { equal: $businessKey } }) {
                         id
                         state
                         nodes { name enter exit }
                     }
                 }
             """,
-            "variables": {"id": workflow_id}
+            "variables": {"businessKey": workflow_id}
         }
         req = urllib.request.Request(
-            f"{settings.sonataflow_url.rstrip('/')}/graphql",
+            f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
             data=json.dumps(graphql_query).encode(),
             headers={"Content-Type": "application/json"}
         )
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
             result = json.loads(r.read().decode())
-        inst = result.get("data", {}).get("ProcessInstanceById")
+        instances = result.get("data", {}).get("ProcessInstances", [])
+        inst = instances[0] if instances else None
         if inst:
             process_state = inst.get("state", "")
 
