@@ -57,7 +57,6 @@ def main():
         sys.exit(1)
     wfid = project.get("workflow_id", "")
     epic_key = project.get("jira_ticket", "")
-    jira_url = ""
 
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -76,7 +75,6 @@ def main():
                 wd = json.loads(r.read().decode())
             wfid = wd.get("workflow_id", "")
             wd_epic = wd.get("epic_key", "")
-            jira_url = wd.get("jira_url", "")
 
             if wfid:
                 spec.setdefault("project", {})["workflow_id"] = wfid
@@ -87,21 +85,24 @@ def main():
                 epic_key = wd_epic
                 spec.setdefault("project", {})["jira_ticket"] = epic_key
                 spec_changed = True
-
-            if jira_url and deployment_mode == "rhdp_published":
-                ci_path = root / "catalog-info.yaml"
-                ci = yaml.safe_load(ci_path.read_text())
-                links = ci.get("metadata", {}).get("links", [])
-                has_jira = any(l.get("url") == jira_url for l in links)
-                if not has_jira:
-                    ci.setdefault("metadata", {}).setdefault("links", []).append(
-                        {"url": jira_url, "title": "Jira Epic", "icon": "dashboard"}
-                    )
-                    with open(ci_path, "w") as f:
-                        yaml.dump(ci, f, default_flow_style=False, sort_keys=False)
         except Exception as e:
             print(json.dumps({"error": f"Failed to fetch workflow data: {e}"}))
             sys.exit(1)
+
+    jira_url = ""
+    if epic_key:
+        jira_url = f"https://redhat.atlassian.net/browse/{epic_key}"
+        deployment_mode = project.get("deployment_mode", "self_published")
+        if deployment_mode == "rhdp_published":
+            ci_path = root / "catalog-info.yaml"
+            ci = yaml.safe_load(ci_path.read_text())
+            links = ci.get("metadata", {}).get("links", [])
+            if not any(l.get("url") == jira_url for l in links):
+                ci.setdefault("metadata", {}).setdefault("links", []).append(
+                    {"url": jira_url, "title": "Jira Epic", "icon": "dashboard"}
+                )
+                with open(ci_path, "w") as f:
+                    yaml.dump(ci, f, default_flow_style=False, sort_keys=False)
 
     if spec_changed:
         with open(spec_path, "w") as f:

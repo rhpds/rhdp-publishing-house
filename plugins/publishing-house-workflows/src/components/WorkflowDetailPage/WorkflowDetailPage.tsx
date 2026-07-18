@@ -25,6 +25,7 @@ import {
 import { Alert } from '@material-ui/lab';
 import GitHubIcon from '@material-ui/icons/GitHub';
 import BugReportIcon from '@material-ui/icons/BugReport';
+import RefreshIcon from '@material-ui/icons/Refresh';
 import { createPhWorkflowsClient } from '../../api/client';
 import { WorkflowStage } from '../../api/types';
 import { STAGE_LABELS } from '../../utils/stageMapping';
@@ -88,13 +89,14 @@ export function WorkflowDetailPage() {
     if (!result) return;
     setApprovingStage(stage);
     try {
-      await client.sendApprovalEvent(result.summary.id, stage, result.summary.businessKey);
+      await client.sendApprovalEvent(result.summary.id, stage, result.summary.projectId);
       setSnackbar({
         open: true,
         severity: 'success',
-        message: `${STAGE_LABELS[stage]} approved`,
+        message: `${STAGE_LABELS[stage]} approved — refreshing...`,
       });
-      setTimeout(() => setRefreshKey(k => k + 1), 1500);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      setRefreshKey(k => k + 1);
     } catch (err: any) {
       setSnackbar({
         open: true,
@@ -170,6 +172,15 @@ export function WorkflowDetailPage() {
               {summary.epicKey}
             </Button>
           )}
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<RefreshIcon />}
+            onClick={() => setRefreshKey(k => k + 1)}
+            disabled={loading}
+          >
+            Refresh
+          </Button>
         </div>
 
         <InfoCard title="Workflow Progress">

@@ -134,10 +134,10 @@ export function createPhWorkflowsClient(options: {
       body: JSON.stringify({
         specversion: '1.0',
         type: eventType,
-        source: 'publishing-house-plugin',
+        source: 'publishing-house',
         id: crypto.randomUUID(),
-        kogitoprocinstanceid: workflowId,
-        projectid: projectId ?? '',
+        kogitobusinesskey: projectId ?? workflowId,
+        projectid: projectId ?? workflowId,
         datacontenttype: 'application/json',
         data: {},
       }),

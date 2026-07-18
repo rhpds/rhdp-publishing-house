@@ -4,6 +4,7 @@ import json
 import logging
 import secrets
 import ssl
+import time
 import urllib.request
 import uuid
 from datetime import datetime, timezone
@@ -15,7 +16,6 @@ from pydantic import BaseModel
 
 from ..auth.oidc import require_oidc_auth
 from ..config import get_settings
-from ..services.rcars import rcars_overlap_check
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -64,29 +64,8 @@ class KeyCreatedResponse(BaseModel):
 
 # ── Project Schemas ───────────────────────────────────────────────────────────
 
-class IntakeAnswers(BaseModel):
-    name: str
-    slug: str = ""
-    content_type: str = "lab"
-    deployment_mode: str = "self_published"
-    owner_email: str = ""
-    problem_statement: str = ""
-    audience_role: str = ""
-    learning_objectives: list[str] = []
-    modules: list[dict] = []
-    ocp_version: str = ""
-    topology: str = "shared-cluster"
-    duration_hours: float = 0
-    epic_key: str = ""
-
-
 class IntakeResponse(BaseModel):
-    epic_key: str
-    jira_url: str
-    jira_ticket: str            # same as epic_key — explicit field for skill to read
-    stage: str                  # new stage after advancing the workflow
-    rcars_overlap_pct: float    # AUTO-COMPUTED: RCARS catalog overlap percentage (0-100)
-    rcars_top_matches: list     # AUTO-COMPUTED: top 3 RCARS matches [{ci_name, display_name, url}]
+    stage: str
 
 
 # ── Auth Helpers ──────────────────────────────────────────────────────────────
@@ -125,10 +104,11 @@ def _require_auth(
     return rec.owner_email
 
 
-def _advance_workflow(workflow_id: str, epic_key: str, jira_url: str, settings=None) -> str:
-    """Send IntakeCompleteEvent CloudEvent to SonataFlow.
-    Uses kogitobusinesskey + projectid extension attributes for correlation.
-    Returns the new stage name."""
+def _advance_workflow(project_slug: str, wf_uuid: str, epic_key: str, jira_url: str, settings=None) -> str:
+    """Send IntakeCompleteEvent CloudEvent to SonataFlow and verify advancement.
+    project_slug is the business key for event correlation.
+    wf_uuid is the process instance UUID for state polling.
+    Returns the new stage name or raises HTTPException if workflow didn't advance."""
     if not settings:
         settings = get_settings()
 
@@ -136,13 +116,13 @@ def _advance_workflow(workflow_id: str, epic_key: str, jira_url: str, settings=N
         cloud_event = {
             "specversion": "1.0",
             "type": "ph.intake.complete",
-            "source": "claude-skill",
+            "source": "publishing-house",
             "id": str(uuid.uuid4()),
-            "kogitobusinesskey": workflow_id,
-            "projectid": workflow_id,
+            "kogitobusinesskey": project_slug,
+            "projectid": project_slug,
             "datacontenttype": "application/json",
             "data": {
-                "projectid": workflow_id,
+                "projectid": project_slug,
                 "epic_key": epic_key,
                 "jira_url": jira_url
             }
@@ -154,11 +134,23 @@ def _advance_workflow(workflow_id: str, epic_key: str, jira_url: str, settings=N
         )
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
             pass
-        logger.info("sent IntakeCompleteEvent for workflow=%s", workflow_id)
-        return "submitted"
+        logger.info("sent IntakeCompleteEvent for workflow=%s", project_slug)
     except Exception as e:
-        logger.warning("CloudEvent send failed for workflow %s: %s", workflow_id, e)
-        return "error"
+        logger.warning("CloudEvent send failed for workflow %s: %s", project_slug, e)
+        raise HTTPException(status_code=502, detail=f"CloudEvent send failed: {e}")
+
+    for attempt in range(3):
+        time.sleep(5)
+        stage = get_workflow_state(wf_uuid).get("stage", "intake")
+        if stage != "intake":
+            logger.info("workflow %s advanced to %s after %d poll(s)", project_slug, stage, attempt + 1)
+            return stage
+
+    raise HTTPException(
+        status_code=502,
+        detail=f"Workflow '{project_slug}' did not advance from intake after 15s. "
+               "CloudEvent was sent but SonataFlow may not have processed it.",
+    )
 
 
 # ── Auth Endpoints (Portal key management) ────────────────────────────────────
@@ -237,7 +229,6 @@ def get_workflow_data(project_id: str):
             "project_id": project_id,
             "workflow_id": inst.get("id", ""),
             "epic_key": wd.get("epic_key", ""),
-            "jira_url": wd.get("jira_url", ""),
         }
     except HTTPException:
         raise
@@ -248,20 +239,20 @@ def get_workflow_data(project_id: str):
 
 @router.get("/workflow-state/{workflow_id}")
 def get_workflow_state(workflow_id: str):
-    """Return semantic workflow stage by businessKey lookup."""
+    """Return semantic workflow stage by process instance UUID."""
     settings = get_settings()
     try:
         graphql_query = {
             "query": """
-                query GetWorkflowByBK($businessKey: String!) {
-                    ProcessInstances(where: { businessKey: { equal: $businessKey } }) {
+                query GetWorkflowById($id: String!) {
+                    ProcessInstances(where: { id: { equal: $id } }) {
                         id
                         state
                         nodes { name enter exit }
                     }
                 }
             """,
-            "variables": {"businessKey": workflow_id}
+            "variables": {"id": workflow_id}
         }
         req = urllib.request.Request(
             f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
@@ -322,45 +313,23 @@ def _require_stage(workflow_id: str, allowed: list[str]) -> str:
     return current
 
 
-@router.post("/intake/{workflow_id}", response_model=IntakeResponse, status_code=201)
+@router.post("/intake/{project_slug}", response_model=IntakeResponse, status_code=201)
 def submit_intake(
-    workflow_id: str,
-    answers: IntakeAnswers,
+    project_slug: str,
     owner: str = Depends(_require_auth),
 ):
-    """After author approves spec — create Jira Epic + Tasks (rhdp_published only),
-    advance SonataFlow to next stage, and auto-compute RCARS overlap.
-    One atomic call — no back-and-forth."""
-    _require_stage(workflow_id, ["intake"])
+    """Advance workflow past intake stage.
+    Sends CloudEvent and polls to confirm SonataFlow processed it."""
+    wd = get_workflow_data(project_slug)
+    wf_uuid = wd.get("workflow_id", "")
+    if not wf_uuid:
+        raise HTTPException(status_code=404, detail=f"No workflow found for {project_slug}")
+    _require_stage(wf_uuid, ["intake"])
     settings = get_settings()
-    epic_key = answers.epic_key
-    jira_url = f"{settings.jira_url}/browse/{epic_key}" if epic_key else ""
+    epic_key = wd.get("epic_key", "")
+    jira_url = f"https://redhat.atlassian.net/browse/{epic_key}" if epic_key else ""
 
-    # Auto-compute RCARS overlap
-    rcars_products = [answers.name] if answers.name else []
-    if answers.content_type:
-        rcars_products.append(answers.content_type)
-    overlap_result = rcars_overlap_check(
-        products=rcars_products,
-        audience=answers.audience_role,
-        limit=5,
-    )
-    rcars_overlap_pct = overlap_result.get("overlap_pct", 0.0)
-    rcars_top_matches = overlap_result.get("top_matches", [])
-    slug = answers.slug or answers.name
-    logger.info(
-        "intake: RCARS overlap for %s = %.1f%% (%d top matches)",
-        slug, rcars_overlap_pct, len(rcars_top_matches)
-    )
+    new_stage = _advance_workflow(project_slug, wf_uuid, epic_key, jira_url, settings)
+    logger.info("intake: workflow advanced to %s for %s", new_stage, project_slug)
 
-    new_stage = _advance_workflow(workflow_id, epic_key, jira_url, settings)
-    logger.info("intake: workflow advanced to %s for %s", new_stage, slug)
-
-    return IntakeResponse(
-        epic_key=epic_key,
-        jira_url=jira_url,
-        jira_ticket=epic_key,
-        stage=new_stage,
-        rcars_overlap_pct=rcars_overlap_pct,
-        rcars_top_matches=rcars_top_matches,
-    )
+    return IntakeResponse(stage=new_stage)

@@ -513,20 +513,12 @@ Check `project.showroom_type` in spec.yaml:
   ```
 - **If `zero_touch`**: Keep `runtime-automation/` and `setup-automation/` in place.
 
-#### Step 9: Report result and verify
+#### Step 9: Report result
 
-> Intake submitted.
-> [For rhdp_published: "Jira ticket: **{epic_key}** — {jira_url}". For self_published: "No Jira — self-published mode."]
+The intake endpoint advances the workflow and confirms the new stage. Parse `stage` from the JSON response.
 
-Then query the workflow state to confirm it advanced:
-```bash
-python publishing-house/tools/ph-workflow.py
-```
-
-Extract `stage` from the output.
-
-- If stage is `intake` → show: "Something went wrong — the workflow did not advance. Try submitting again or check the SonataFlow logs."
-- Otherwise → show: "Stage is now **{stage}**."
+- If the call succeeds → show: "Intake submitted. Stage is now **{stage}**."
+- If the call fails → show the error from the response.
 
 **Return to the orchestrator.**
 

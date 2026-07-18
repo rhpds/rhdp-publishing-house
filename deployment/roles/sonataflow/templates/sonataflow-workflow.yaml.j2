@@ -22,35 +22,35 @@ spec:
         dataOnly: false
         kind: consumed
         name: IntakeCompleteEvent
-        source: claude-skill
+        source: publishing-house
         type: ph.intake.complete
       - correlation:
           - contextAttributeName: projectid
         dataOnly: false
         kind: consumed
         name: ContentReviewCompleteEvent
-        source: claude-skill
+        source: publishing-house
         type: ph.content-review.complete
       - correlation:
           - contextAttributeName: projectid
         dataOnly: false
         kind: consumed
         name: InfraReviewCompleteEvent
-        source: claude-skill
+        source: publishing-house
         type: ph.infra-review.complete
       - correlation:
           - contextAttributeName: projectid
         dataOnly: false
         kind: consumed
         name: DevelopmentCompleteEvent
-        source: claude-skill
+        source: publishing-house
         type: ph.development.complete
       - correlation:
           - contextAttributeName: projectid
         dataOnly: false
         kind: consumed
         name: ReadyCompleteEvent
-        source: claude-skill
+        source: publishing-house
         type: ph.ready.complete
     functions:
       - name: printMessage
