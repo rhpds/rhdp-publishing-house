@@ -88,7 +88,7 @@ export function WorkflowDetailPage() {
     if (!result) return;
     setApprovingStage(stage);
     try {
-      await client.sendApprovalEvent(result.summary.id, stage);
+      await client.sendApprovalEvent(result.summary.id, stage, result.summary.businessKey);
       setSnackbar({
         open: true,
         severity: 'success',

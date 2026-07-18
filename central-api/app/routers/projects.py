@@ -153,10 +153,10 @@ def _advance_workflow(workflow_id: str, epic_key: str, jira_url: str, settings=N
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
             pass
         logger.info("sent IntakeCompleteEvent for workflow=%s", workflow_id)
-        return "review"
+        return "submitted"
     except Exception as e:
         logger.warning("CloudEvent send failed for workflow %s: %s", workflow_id, e)
-        return "intake"
+        return "error"
 
 
 # ── Auth Endpoints (Portal key management) ────────────────────────────────────

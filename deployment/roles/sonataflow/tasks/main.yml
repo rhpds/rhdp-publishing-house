@@ -73,7 +73,7 @@
 
 - name: Render workflow input schema
   ansible.builtin.set_fact:
-    _workflow_input_schema: "{{ lookup('template', 'workflow-input-schema.json.j2') }}"
+    _workflow_input_schema: "{{ lookup('template', 'workflow-input-schema.json.j2') | string }}"
 
 - name: Create workflow input schema ConfigMap
   kubernetes.core.k8s:

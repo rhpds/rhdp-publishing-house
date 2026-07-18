@@ -115,6 +115,7 @@ export function createPhWorkflowsClient(options: {
   async function sendApprovalEvent(
     workflowId: string,
     stage: WorkflowStage,
+    projectId?: string,
   ): Promise<void> {
     const typeMap: Partial<Record<WorkflowStage, string>> = {
       content_review: 'ph.content-review.complete',
@@ -136,6 +137,7 @@ export function createPhWorkflowsClient(options: {
         source: 'publishing-house-plugin',
         id: crypto.randomUUID(),
         kogitoprocinstanceid: workflowId,
+        projectid: projectId ?? '',
         datacontenttype: 'application/json',
         data: {},
       }),

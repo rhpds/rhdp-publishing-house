@@ -11,6 +11,9 @@ metadata:
     ph.rhdp.io/deployment-mode: ${{ values.deployment_mode }}
     ph.rhdp.io/github-user: ${{ values.github_user }}
 
+    # TechDocs
+    backstage.io/techdocs-ref: dir:.
+
     # Repository annotations
     github.com/project-slug: ${{ values.repo_url | replace('https://github.com/', '') }}
   tags:

@@ -65,7 +65,7 @@ If `project_id` is empty → show error: "`project.slug` is missing in `spec.yam
 
 Run silently:
 ```bash
-git config --global user.name
+git config --global user.name || echo ""
 ```
 
 If the output is empty (no user.name configured), ask the author:

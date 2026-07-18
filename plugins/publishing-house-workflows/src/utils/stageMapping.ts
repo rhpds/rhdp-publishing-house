@@ -7,23 +7,33 @@ export function deriveStage(
   if (processState === 'COMPLETED') return 'published';
   if (processState === 'ERROR') return 'error';
 
+  let best: WorkflowStage = 'intake';
+  let bestIdx = -1;
+
   for (const node of nodes) {
     if (node.enter && !node.exit) {
       const name = node.name.toLowerCase();
-      if (name === 'contentreview') return 'content_review';
-      if (name === 'infrareview') return 'infra_review';
-      if (name === 'jirasync') return 'jira_sync';
-      if (name.includes('createepic')) return 'setup';
-      if (name.includes('development') || name.includes('writing'))
-        return 'development';
-      if (name.includes('ready') || name.includes('final')) return 'ready';
-      if (name.includes('publish')) return 'published';
-      if (name.includes('intake')) return 'intake';
-      if (name.includes('setup')) return 'setup';
-      if (name.includes('init')) return 'init';
+      let candidate: WorkflowStage | undefined;
+      if (name === 'contentreview') candidate = 'content_review';
+      else if (name === 'infrareview') candidate = 'infra_review';
+      else if (name === 'jirasync') candidate = 'jira_sync';
+      else if (name.includes('createepic')) candidate = 'setup';
+      else if (name.includes('development') || name.includes('writing'))
+        candidate = 'development';
+      else if (name.includes('ready') || name.includes('final'))
+        candidate = 'ready';
+      else if (name.includes('publish')) candidate = 'published';
+
+      if (candidate) {
+        const idx = STAGE_ORDER.indexOf(candidate);
+        if (idx > bestIdx) {
+          best = candidate;
+          bestIdx = idx;
+        }
+      }
     }
   }
-  return 'intake';
+  return best;
 }
 
 export const STAGE_ORDER: WorkflowStage[] = [

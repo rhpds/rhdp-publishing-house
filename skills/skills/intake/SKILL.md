@@ -476,24 +476,7 @@ print('mkdocs.yml created')
 "
 ```
 
-Then add the `backstage.io/techdocs-ref` annotation to `catalog-info.yaml`:
-```bash
-python3 -c "
-import yaml
-from pathlib import Path
-
-ci_path = Path('catalog-info.yaml')
-ci = yaml.safe_load(ci_path.read_text()) or {}
-annotations = ci.setdefault('metadata', {}).setdefault('annotations', {})
-if 'backstage.io/techdocs-ref' not in annotations:
-    annotations['backstage.io/techdocs-ref'] = 'dir:.'
-    with open(ci_path, 'w') as f:
-        yaml.dump(ci, f, default_flow_style=False, sort_keys=False)
-    print('techdocs annotation added')
-else:
-    print('techdocs annotation already present')
-"
-```
+The `backstage.io/techdocs-ref` annotation is already in `catalog-info.yaml` from the project template — no action needed.
 
 #### Step 7: Commit and push
 
@@ -513,17 +496,9 @@ python publishing-house/tools/ph-intake.py 2>&1
 
 **Run this immediately. Do NOT ask the author. Do NOT wait for confirmation.**
 
-`ph-intake.py` calls `POST {central_url}/api/v1/projects/{project_id}/intake` and updates
-`spec.yaml` with the returned Jira ticket. Parse the JSON output.
+`ph-intake.py` calls `POST {central_url}/api/v1/projects/{project_id}/intake`. Parse the JSON output.
 
 If ph-intake.py fails with a 409 error, show the error message and **STOP**.
-
-Then commit the updated spec.yaml:
-```bash
-git add publishing-house/spec.yaml
-git commit -m "feat: add Jira ticket from intake submission"
-git push
-```
 
 #### Step 8b: Project structure cleanup
 
@@ -538,13 +513,22 @@ Check `project.showroom_type` in spec.yaml:
   ```
 - **If `zero_touch`**: Keep `runtime-automation/` and `setup-automation/` in place.
 
-#### Step 9: Report result and return
+#### Step 9: Report result and verify
 
-> Spec submitted.
+> Intake submitted.
 > [For rhdp_published: "Jira ticket: **{epic_key}** — {jira_url}". For self_published: "No Jira — self-published mode."]
-> Stage is now **{stage}**.
 
-**Return to the orchestrator.** The orchestrator will query the API for the new stage and continue.
+Then query the workflow state to confirm it advanced:
+```bash
+python publishing-house/tools/ph-workflow.py
+```
+
+Extract `stage` from the output.
+
+- If stage is `intake` → show: "Something went wrong — the workflow did not advance. Try submitting again or check the SonataFlow logs."
+- Otherwise → show: "Stage is now **{stage}**."
+
+**Return to the orchestrator.**
 
 ## Key Behavioral Notes
 
