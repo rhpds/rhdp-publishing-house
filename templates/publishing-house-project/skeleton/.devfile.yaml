@@ -6,6 +6,9 @@ metadata:
 
 components:
   - name: dev-tools
+    attributes:
+      che-code.eclipse.org/vscode-extensions:
+        - https://marketplace.visualstudio.com/_apis/public/gallery/publishers/anthropic/vsextensions/claude-code/latest/vspackage
     container:
       image: quay.io/devfile/universal-developer-image:latest
       memoryLimit: 4Gi

@@ -72,7 +72,7 @@ If the output is empty (no user.name configured), ask the author:
 
 > **Git identity is not configured in this workspace.**
 >
-> What is your Git username? (e.g. `treddy`)
+> What is your Git username? (e.g. `githubuser1`)
 
 Wait for the author to respond. Once they provide a username, run:
 ```bash
