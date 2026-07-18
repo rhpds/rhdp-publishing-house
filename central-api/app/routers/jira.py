@@ -140,7 +140,7 @@ def sync_jira_tasks(
         raise HTTPException(status_code=503, detail="GitHub token not configured")
 
     gh = GitHubService(token=settings.github_token)
-    jira_yaml_content = asyncio.get_event_loop().run_until_complete(
+    jira_yaml_content = asyncio.run(
         gh.get_file_content(body.repo_url, "publishing-house/jira.yaml")
     )
     if not jira_yaml_content:
@@ -168,7 +168,7 @@ def sync_jira_tasks(
 
     desc_source = epic_info.get("description_source", "")
     if desc_source:
-        desc_content = asyncio.get_event_loop().run_until_complete(
+        desc_content = asyncio.run(
             gh.get_file_content(body.repo_url, desc_source)
         )
         if desc_content:
