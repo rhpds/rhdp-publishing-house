@@ -1,5 +1,5 @@
 # Publishing House — Project Spec
-# Lifecycle stages (managed by SonataFlow): intake → content_review → infra_review → development → ready → published
+# Lifecycle: intake → content_review → infra_review → jira_sync → development → ready → published
 # No secrets in this file. Tokens live in ~/.config/publishing-house/auth.json
 # Stage is managed by SonataFlow and cached in .ph-state — do not edit stage.current manually.
 

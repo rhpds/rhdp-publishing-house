@@ -10,9 +10,9 @@ export function deriveStage(
   for (const node of nodes) {
     if (node.enter && !node.exit) {
       const name = node.name.toLowerCase();
-      if (name === 'developmentreview') return 'development_review';
       if (name === 'contentreview') return 'content_review';
       if (name === 'infrareview') return 'infra_review';
+      if (name === 'jirasync') return 'jira_sync';
       if (name.includes('createepic')) return 'setup';
       if (name.includes('development') || name.includes('writing'))
         return 'development';
@@ -28,7 +28,6 @@ export function deriveStage(
 
 export const STAGE_ORDER: WorkflowStage[] = [
   'intake',
-  'development_review',
   'content_review',
   'infra_review',
   'development',
@@ -43,7 +42,7 @@ export const STAGE_LABELS: Record<WorkflowStage, string> = {
   review: 'Reviews',
   content_review: 'Content Review',
   infra_review: 'Infra Review',
-  development_review: 'Development Review',
+  jira_sync: 'Jira Sync',
   development: 'Development',
   ready: 'Ready',
   published: 'Published',

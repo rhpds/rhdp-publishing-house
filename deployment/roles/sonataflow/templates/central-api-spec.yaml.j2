@@ -39,6 +39,40 @@ paths:
                     type: string
       security:
         - bearerAuth: []
+  /jira/sync:
+    post:
+      operationId: syncJiraTasks
+      summary: Sync Jira tasks from project repo jira.yaml
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - repo_url
+                - epic_key
+              properties:
+                repo_url:
+                  type: string
+                epic_key:
+                  type: string
+      responses:
+        '200':
+          description: Jira sync completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  epic_key:
+                    type: string
+                  tasks_created:
+                    type: integer
+                  intake_closed:
+                    type: boolean
+      security:
+        - bearerAuth: []
 components:
   securitySchemes:
     bearerAuth:

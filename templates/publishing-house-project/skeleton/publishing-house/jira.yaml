@@ -1,0 +1,9 @@
+# Publishing House — Jira Structure
+# Written by the intake skill, read by Central API after reviews complete.
+# Overwritten on re-intake (review loopback). Central creates tasks fresh.
+
+epic:
+  summary: ""
+  description_source: "publishing-house/spec/design.md"
+
+tasks: []

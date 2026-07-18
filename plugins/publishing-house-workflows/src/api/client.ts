@@ -119,7 +119,6 @@ export function createPhWorkflowsClient(options: {
     const typeMap: Partial<Record<WorkflowStage, string>> = {
       content_review: 'ph.content-review.complete',
       infra_review: 'ph.infra-review.complete',
-      development_review: 'ph.development-review.complete',
       development: 'ph.development.complete',
     };
     const eventType = typeMap[stage];

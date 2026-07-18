@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     jira_api_token: str = ""
     jira_project_key: str = "RHDPCD"
 
+    # GitHub integration
+    github_token: str = ""
+
     # OIDC/Keycloak authentication (for portal endpoints)
     oidc_issuer_url: str = ""
     oidc_client_id: str = ""

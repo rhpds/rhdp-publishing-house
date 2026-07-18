@@ -192,13 +192,12 @@ orchestrator queries the API again for the new stage and continues the loop.
 
 ## Stage responses (non-intake)
 
-**review**
-> Spec submitted. Three parallel reviews are in progress:
+**review** (content_review or infra_review)
+> Spec submitted. Two reviews are in progress:
 > - **Content Review** — design spec and module outlines
 > - **Infra Review** — environment and automation requirements
-> - **Development Review** — development readiness and tooling
 >
-> All three must complete before advancing to Development. Reviewers approve from the RHDH Publishing House portal.
+> Both must complete before advancing to Development. Reviewers approve from the RHDH Publishing House portal.
 
 **development**
 > You're building. [show failures if any, otherwise: "All checks look good."]

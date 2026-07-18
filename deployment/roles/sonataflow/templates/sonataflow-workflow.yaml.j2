@@ -42,13 +42,6 @@ spec:
           - contextAttributeName: projectid
         dataOnly: false
         kind: consumed
-        name: DevelopmentReviewCompleteEvent
-        source: claude-skill
-        type: ph.development-review.complete
-      - correlation:
-          - contextAttributeName: projectid
-        dataOnly: false
-        kind: consumed
         name: DevelopmentCompleteEvent
         source: claude-skill
         type: ph.development.complete
@@ -65,6 +58,9 @@ spec:
         type: custom
       - name: createjiraepic
         operation: specs/central-api.yaml#createJiraEpic
+        type: rest
+      - name: syncjiratasks
+        operation: specs/central-api.yaml#syncJiraTasks
         type: rest
     start:
       stateName: Init
@@ -90,8 +86,7 @@ spec:
               tags: (.tags // []),
               reviews: {
                 content: false,
-                infra: false,
-                development: false
+                infra: false
               }
             }
         transition:
@@ -142,22 +137,6 @@ spec:
         timeouts:
           stateExecTimeout: PT168H
         transition:
-          nextState: DevelopmentReview
-      - name: DevelopmentReview
-        type: event
-        exclusive: true
-        onEvents:
-          - eventRefs:
-              - DevelopmentReviewCompleteEvent
-            actions:
-              - name: LogDevelopmentReviewComplete
-                functionRef:
-                  refName: printMessage
-                  arguments:
-                    message: "Development review completed"
-        timeouts:
-          stateExecTimeout: PT168H
-        transition:
           nextState: ContentReview
       - name: ContentReview
         type: event
@@ -189,6 +168,20 @@ spec:
                     message: "Infra review completed"
         timeouts:
           stateExecTimeout: PT168H
+        transition:
+          nextState: JiraSync
+      - name: JiraSync
+        type: operation
+        actions:
+          - name: SyncJiraTasks
+            condition: "${ .deploymentMode == \"rhdp_published\" }"
+            functionRef:
+              refName: syncjiratasks
+              arguments:
+                repo_url: .repoUrl
+                epic_key: .epic_key
+            actionDataFilter:
+              toStateData: .jiraSyncResponse
         transition:
           nextState: Development
       - name: Development

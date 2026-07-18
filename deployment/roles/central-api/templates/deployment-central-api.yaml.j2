@@ -63,6 +63,11 @@ spec:
               value: "https://keycloak-keycloak.{{ ocp_apps_domain }}/realms/publishing-house"
             - name: OIDC_CLIENT_ID
               value: "central-api"
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: publishing-house-credentials
+                  key: github-token
             - name: RCARS_URL
               valueFrom:
                 secretKeyRef:

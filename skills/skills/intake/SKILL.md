@@ -189,7 +189,65 @@ spec:
 
 Also update infra fields (Q12-Q18) and approval_checklist fields (Q22-Q24) gathered during intake.
 
-#### Step 3.5: Generate Draft Automation Manifest
+#### Step 3.5: Generate jira.yaml
+
+After spec.yaml is updated, generate `publishing-house/jira.yaml` from the spec data.
+This file is read by Central API after reviews complete to update the Jira epic and
+create child tasks. **Always overwrite the entire file** — on re-intake (review loopback),
+the previous contents are replaced.
+
+Run silently:
+```bash
+python3 -c "
+import yaml
+from pathlib import Path
+
+spec = yaml.safe_load(Path('publishing-house/spec.yaml').read_text()) or {}
+project = spec.get('project', {})
+spec_data = spec.get('spec', {})
+
+title = spec_data.get('title', '') or project.get('slug', '')
+content_type = project.get('content_type', 'lab')
+slug = project.get('slug', '')
+
+epic_summary = f'[PH] {title} — {content_type} ({slug})'
+
+tasks = [
+    {'key': 'intake', 'summary': '[PH] Intake', 'status': 'done'},
+]
+
+modules = spec_data.get('modules', [])
+for i, m in enumerate(modules, 1):
+    mod_title = m.get('title', f'Module {i}')
+    tasks.append({
+        'key': f'write-module-{i:02d}',
+        'summary': f'[PH] Write Module {i}: {mod_title}',
+        'status': 'open',
+    })
+
+tasks.append({'key': 'write-automation', 'summary': '[PH] Write Automation', 'status': 'open'})
+tasks.append({'key': 'write-health-check', 'summary': '[PH] Write Health Check', 'status': 'open'})
+tasks.append({'key': 'write-e2e-tests', 'summary': '[PH] Write E2E Tests', 'status': 'open'})
+
+jira = {
+    'epic': {
+        'summary': epic_summary,
+        'description_source': 'publishing-house/spec/design.md',
+    },
+    'tasks': tasks,
+}
+
+Path('publishing-house/jira.yaml').write_text(
+    '# Publishing House — Jira Structure\n'
+    '# Written by the intake skill, read by Central API after reviews complete.\n'
+    '# Overwritten on re-intake (review loopback). Central creates tasks fresh.\n\n'
+    + yaml.dump(jira, default_flow_style=False, sort_keys=False)
+)
+print('jira.yaml written')
+"
+```
+
+#### Step 3.6: Generate Draft Automation Manifest
 
 After spec.yaml is updated, generate a draft `publishing-house/spec/automation-manifest.yaml`
 from the spec data. This is a DRAFT — the automation agent will refine it in Phase 7a.
@@ -441,7 +499,7 @@ else:
 
 ```bash
 git add publishing-house/ mkdocs.yml catalog-info.yaml
-git commit -m "feat: intake complete — design spec and module outlines"
+git commit -m "feat: intake complete — design spec, module outlines, and jira structure"
 git push
 ```
 

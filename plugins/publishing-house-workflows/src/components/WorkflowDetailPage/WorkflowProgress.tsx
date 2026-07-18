@@ -14,11 +14,10 @@ import ErrorIcon from '@material-ui/icons/Error';
 import { WorkflowStage } from '../../api/types';
 import { STAGE_ORDER, STAGE_LABELS, stageIndex } from '../../utils/stageMapping';
 
-const APPROVE_STAGES: WorkflowStage[] = ['development_review', 'content_review', 'infra_review'];
+const APPROVE_STAGES: WorkflowStage[] = ['content_review', 'infra_review'];
 
 const STAGE_DESCRIPTIONS: Record<string, string> = {
   intake: 'The project intake questionnaire is being completed to gather requirements.',
-  development_review: 'Review development readiness, tooling, and integration points.',
   content_review: 'Review the design spec and module outlines for completeness and accuracy.',
   infra_review: 'Review the environment and automation requirements for feasibility.',
   development: 'The project is in active development.',

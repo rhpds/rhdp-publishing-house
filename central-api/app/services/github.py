@@ -44,6 +44,26 @@ class GitHubService:
 
         return parts[0], parts[1]
 
+    async def get_file_content(self, repo_url: str, path: str, branch: str = "main") -> Optional[str]:
+        """Fetch a file's raw content from a repository."""
+        try:
+            owner, repo = self.parse_repo_url(repo_url)
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{self.api_base}/repos/{owner}/{repo}/contents/{path}",
+                    headers=self.headers,
+                    params={"ref": branch}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    return base64.b64decode(data["content"]).decode("utf-8")
+                else:
+                    logger.warning(f"{path} not found in {owner}/{repo}")
+                    return None
+        except Exception as e:
+            logger.error(f"Error fetching {path}: {e}")
+            return None
+
     async def get_catalog_info(self, repo_url: str, branch: str = "main") -> Optional[Dict]:
         """
         Fetch catalog-info.yaml from a repository.

@@ -281,8 +281,12 @@ def get_workflow_state(workflow_id: str):
                 for node in inst.get("nodes", []):
                     if node.get("enter") and not node.get("exit"):
                         node_name = node.get("name", "").lower()
-                        if node_name == "reviews":
-                            stage = "review"
+                        if node_name == "contentreview":
+                            stage = "content_review"
+                        elif node_name == "infrareview":
+                            stage = "infra_review"
+                        elif node_name == "jirasync":
+                            stage = "jira_sync"
                         elif "createepic" in node_name:
                             stage = "setup"
                         elif "development" in node_name or "writing" in node_name:
@@ -345,31 +349,6 @@ def submit_intake(
         "intake: RCARS overlap for %s = %.1f%% (%d top matches)",
         slug, rcars_overlap_pct, len(rcars_top_matches)
     )
-
-    if answers.deployment_mode == "rhdp_published" and epic_key:
-        from .jira import update_epic, UpdateEpicRequest, close_intake_task
-        close_intake_task(epic_key, settings)
-        update_body = UpdateEpicRequest(
-            epic_key=epic_key,
-            name=answers.name,
-            slug=slug,
-            content_type=answers.content_type,
-            deployment_mode=answers.deployment_mode,
-            owner_email=answers.owner_email,
-            problem_statement=answers.problem_statement,
-            audience_role=answers.audience_role,
-            learning_objectives=answers.learning_objectives,
-            modules=answers.modules,
-            ocp_version=answers.ocp_version,
-            topology=answers.topology,
-            duration_hours=answers.duration_hours,
-            rcars_overlap_pct=rcars_overlap_pct,
-            rcars_top_matches=rcars_top_matches,
-        )
-        result = update_epic(epic_key, update_body, settings)
-        logger.info("intake: updated Epic %s for %s (%d tasks)", epic_key, slug, result.tasks_created)
-    else:
-        logger.info("intake: no epic to update for %s (mode=%s, epic_key=%s)", slug, answers.deployment_mode, epic_key)
 
     new_stage = _advance_workflow(workflow_id, epic_key, jira_url, settings)
     logger.info("intake: workflow advanced to %s for %s", new_stage, slug)
