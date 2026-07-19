@@ -234,7 +234,7 @@ def _close_task_by_summary(epic_key: str, summary: str, settings: Settings) -> b
     headers = _jira_headers(settings)
     jql = (
         f'project = {settings.jira_project_key} AND issuetype = Task '
-        f'AND parent = {epic_key} AND summary ~ "{summary}"'
+        f'AND parent = {epic_key} AND summary = "{summary}"'
     )
     search_url = f"{settings.jira_url}/rest/api/3/search?jql={urllib.parse.quote(jql)}&fields=key"
     req = urllib.request.Request(search_url, headers=headers)
