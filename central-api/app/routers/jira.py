@@ -232,12 +232,18 @@ def sync_jira_tasks(
 def _close_task_by_summary(epic_key: str, summary: str, settings: Settings) -> bool:
     """Find a task under an epic by summary and transition it to Done."""
     headers = _jira_headers(settings)
+    search_summary = summary.replace("[", "").replace("]", "")
     jql = (
         f'project = {settings.jira_project_key} AND issuetype = Task '
-        f'AND parent = {epic_key} AND summary = "{summary}"'
+        f'AND parent = {epic_key} AND summary ~ "{search_summary}"'
     )
-    search_url = f"{settings.jira_url}/rest/api/3/search?jql={urllib.parse.quote(jql)}&fields=key"
-    req = urllib.request.Request(search_url, headers=headers)
+    search_url = f"{settings.jira_url}/rest/api/3/search/jql"
+    req = urllib.request.Request(
+        search_url,
+        data=json.dumps({"jql": jql, "fields": ["key"]}).encode(),
+        headers=headers,
+        method="POST",
+    )
     try:
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
             issues = json.loads(r.read().decode()).get("issues", [])
