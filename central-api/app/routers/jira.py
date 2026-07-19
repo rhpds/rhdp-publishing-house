@@ -232,7 +232,7 @@ def sync_jira_tasks(
 def _close_task_by_summary(epic_key: str, summary: str, settings: Settings) -> bool:
     """Find a task under an epic by summary and transition it to Done."""
     headers = _jira_headers(settings)
-    search_summary = summary.replace("[", "").replace("]", "")
+    search_summary = summary.replace("[", "\\\\[").replace("]", "\\\\]")
     jql = (
         f'project = {settings.jira_project_key} AND issuetype = Task '
         f'AND parent = {epic_key} AND summary ~ "{search_summary}"'
