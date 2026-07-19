@@ -131,7 +131,7 @@ Then run the shared workflow script silently:
 python publishing-house/tools/ph-workflow.py
 ```
 
-Extract `stage`, `epic_key`, `jira_url`, and `workflow_id` from the output. The stage will be one of: `intake`, `review`, `development`, `ready`, or `published`.
+Extract `stage`, `epic_key`, and `workflow_id` from the output. The stage will be one of: `intake`, `review`, `development`, `ready`, or `published`.
 
 The script handles everything: resolves `workflow_id` (calling `/workflow-data` if missing), syncs `jira_ticket` to spec.yaml for `rhdp_published` projects, and queries `/workflow-state` for the current stage. If spec.yaml was updated, commit silently:
 ```bash

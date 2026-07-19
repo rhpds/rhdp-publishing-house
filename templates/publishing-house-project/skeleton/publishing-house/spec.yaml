@@ -13,7 +13,6 @@ project:
   content_reviewer_email: "psrivastav@redhat.com"
   infra_reviewer_email: "treddy@redhat.com"
   jira_ticket: ""
-  jira_url: ""
   workflow_id: ""
 
 spec:

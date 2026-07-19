@@ -8,7 +8,6 @@ Output: key:value pairs, one per line
   stage:intake
   workflow_id:abc-123
   epic_key:RHDPCD-456
-  jira_url:https://...
 """
 import json
 import os
@@ -125,7 +124,6 @@ def main():
     print(f"stage:{stage}")
     print(f"workflow_id:{wfid}")
     print(f"epic_key:{epic_key}")
-    print(f"jira_url:{jira_url}")
 
 
 if __name__ == "__main__":
