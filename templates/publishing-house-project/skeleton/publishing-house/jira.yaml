@@ -1,6 +1,12 @@
 # Publishing House — Jira Structure
 # Written by the intake skill, read by Central API after reviews complete.
 # Overwritten on re-intake (review loopback). Central creates tasks fresh.
+#
+# Task fields:
+#   key:         short identifier (e.g. write-module-01)
+#   summary:     Jira task title
+#   status:      open | done
+#   description: (optional) task body — populated from module Brief Overview
 
 epic:
   summary: ""

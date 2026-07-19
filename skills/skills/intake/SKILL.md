@@ -199,6 +199,7 @@ the previous contents are replaced.
 Run silently:
 ```bash
 python3 -c "
+import re
 import yaml
 from pathlib import Path
 
@@ -212,6 +213,17 @@ slug = project.get('slug', '')
 
 epic_summary = f'[PH] {title} — {content_type} ({slug})'
 
+def extract_brief_overview(module_dir, module_index):
+    pattern = f'module-{module_index:02d}-*.md'
+    matches = sorted(Path(module_dir).glob(pattern))
+    if not matches:
+        return ''
+    text = matches[0].read_text()
+    m = re.search(r'## Brief Overview\s*\n(.*?)(?=\n##|\Z)', text, re.DOTALL)
+    return m.group(1).strip() if m else ''
+
+modules_dir = 'publishing-house/spec/modules'
+
 tasks = [
     {'key': 'intake', 'summary': '[PH] Intake', 'status': 'done'},
 ]
@@ -219,11 +231,15 @@ tasks = [
 modules = spec_data.get('modules', [])
 for i, m in enumerate(modules, 1):
     mod_title = m.get('title', f'Module {i}')
-    tasks.append({
+    brief = extract_brief_overview(modules_dir, i)
+    task = {
         'key': f'write-module-{i:02d}',
         'summary': f'[PH] Write Module {i}: {mod_title}',
         'status': 'open',
-    })
+    }
+    if brief:
+        task['description'] = brief
+    tasks.append(task)
 
 tasks.append({'key': 'write-automation', 'summary': '[PH] Write Automation', 'status': 'open'})
 tasks.append({'key': 'write-health-check', 'summary': '[PH] Write Health Check', 'status': 'open'})

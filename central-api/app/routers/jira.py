@@ -206,16 +206,28 @@ def sync_jira_tasks(
             continue
 
         try:
+            fields: dict = {
+                "project": {"key": settings.jira_project_key},
+                "summary": summary,
+                "issuetype": {"name": "Task"},
+                "parent": {"key": body.epic_key},
+                "labels": ["publishing-house"],
+                "assignee": None,
+            }
+            desc_text = task.get("description", "")
+            if desc_text:
+                fields["description"] = {
+                    "type": "doc",
+                    "version": 1,
+                    "content": [
+                        {"type": "paragraph", "content": [
+                            {"type": "text", "text": desc_text[:30000]},
+                        ]},
+                    ],
+                }
             task_req = urllib.request.Request(
                 f"{settings.jira_url}/rest/api/3/issue",
-                data=json.dumps({"fields": {
-                    "project": {"key": settings.jira_project_key},
-                    "summary": summary,
-                    "issuetype": {"name": "Task"},
-                    "parent": {"key": body.epic_key},
-                    "labels": ["publishing-house"],
-                    "assignee": None,
-                }}).encode(),
+                data=json.dumps({"fields": fields}).encode(),
                 headers=headers,
                 method="POST",
             )
