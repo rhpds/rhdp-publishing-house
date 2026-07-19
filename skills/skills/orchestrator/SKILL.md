@@ -61,30 +61,7 @@ Extract `project_id` from the output. This is used for all subsequent API calls.
 
 If `project_id` is empty → show error: "`project.slug` is missing in `spec.yaml`." **STOP.**
 
-**Step 3 — Check git identity:**
-
-Run silently:
-```bash
-git config --global user.name || echo ""
-```
-
-If the output is empty (no user.name configured), ask the author:
-
-> **Git identity is not configured in this workspace.**
->
-> What is your Git username? (e.g. `githubuser1`)
-
-Wait for the author to respond. Once they provide a username, run:
-```bash
-git config --global user.name "USERNAME_HERE"
-```
-Replace USERNAME_HERE with the provided username.
-
-Confirm: > Git configured as **USERNAME_HERE**.
-
-If the output is non-empty → proceed silently to Step 4.
-
-**Step 4 — Check auth:**
+**Step 3 — Check auth:**
 
 Run silently:
 ```bash
@@ -142,7 +119,7 @@ print('saved')
 
   Confirm: > Got it — you're all set.
 
-**Step 5 — Read spec.yaml and check workflow state:**
+**Step 4 — Read spec.yaml and check workflow state:**
 
 Read `publishing-house/spec.yaml` using the Read tool. Note:
 - `project.deployment_mode` — `rhdp_published` or `self_published`
@@ -162,14 +139,14 @@ git add publishing-house/spec.yaml
 git diff --cached --quiet || git commit -m "feat: sync workflow data from Central API" 2>/dev/null || true
 ```
 
-**Step 6 — Stage loop:**
+**Step 5 — Stage loop:**
 
 This is a loop. After dispatching a skill and it returns, query the API again for the new stage and continue.
 
 ```
 Loop:
   If stage is intake → dispatch rhdp-publishing-house:intake, wait for return
-                        → query API again (same as Step 5), extract new stage, continue loop
+                        → query API again (same as Step 4), extract new stage, continue loop
   If stage is development → show development status (see below), stop
   If stage is review → show review status (see below), stop
   If stage is ready → show ready status (see below), stop

@@ -32,9 +32,16 @@ commands:
         USERNAME=$(echo "$NAMESPACE" | cut -d'-' -f1)
         SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token 2>/dev/null)
 
-        # Set git email from namespace username
+        # Set git identity from namespace username and GitHub credentials
         if [ -z "$(git config --global user.email)" ] && [ -n "$USERNAME" ]; then
           git config --global user.email "${USERNAME}@redhat.com"
+        fi
+
+        if [ -z "$(git config --global user.name)" ]; then
+          GITHUB_USER=$(echo "url=https://github.com" | git credential fill | awk -F= '/password/ {print $2}' | xargs -I {} curl -s -H "Authorization: token {}" https://api.github.com/user | awk -F'"' '/"login":/ {print $4}')
+          if [ -n "$GITHUB_USER" ]; then
+            git config --global user.name "$GITHUB_USER"
+          fi
         fi
 
         AUTH_FILE=/home/user/.config/publishing-house/auth.json
@@ -184,7 +191,6 @@ commands:
       group:
         kind: build
         isDefault: false
-
 
   - id: start-claude
     exec:
