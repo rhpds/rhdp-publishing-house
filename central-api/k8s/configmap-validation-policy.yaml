@@ -1,0 +1,172 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ph-validation-policy
+  namespace: publishing-house
+  labels:
+    app: central-api
+    component: policy
+data:
+  policy.yaml: |
+    ocp_version_minimum: "4.20"
+
+    valid_content_types:
+      - lab
+      - demo
+
+    valid_audiences:
+      - beginner
+      - intermediate
+      - advanced
+
+    valid_topologies:
+      - shared-cluster
+      - per-student
+      - cnv-pool
+
+    valid_showroom_types:
+      - showroom
+      - instructions
+
+    action_verbs_valid:
+      - configure
+      - deploy
+      - create
+      - implement
+      - troubleshoot
+      - monitor
+      - scale
+      - install
+      - build
+      - integrate
+      - automate
+      - manage
+      - observe
+      - migrate
+      - secure
+      - provision
+      - verify
+      - demonstrate
+      - explore
+      - analyze
+
+    action_verbs_rejected:
+      - understand
+      - learn
+      - know
+      - be familiar with
+      - appreciate
+      - become aware
+      - realize
+      - recognize
+
+    ai_keywords:
+      - ai
+      - rhoai
+      - openshift ai
+      - maas
+      - granite
+      - instructlab
+      - ollama
+      - llm
+      - inference
+      - model serving
+      - generative
+
+    vague_egress_terms:
+      - internet
+      - any public ip
+      - any ip
+      - anywhere
+      - cloud
+      - external
+
+    required_design_sections:
+      - problem statement
+      - target audience
+      - prerequisites
+      - learning objectives
+      - content type
+      - products & technologies
+      - module map
+      - difficulty level
+      - environment
+      - infrastructure requirements
+      - assessment strategy
+
+    required_outline_sections:
+      - brief overview
+      - audience and time
+      - see/learn/do
+      - lab structure
+      - key takeaways
+
+    products:
+      - name: Red Hat OpenShift Container Platform
+        aliases:
+          - OpenShift
+          - OCP
+      - name: Red Hat Ansible Automation Platform
+        aliases:
+          - AAP
+          - Ansible
+      - name: Red Hat OpenShift AI
+        aliases:
+          - RHOAI
+          - OpenShift AI
+      - name: Red Hat Advanced Cluster Security
+        aliases:
+          - RHACS
+          - ACS
+      - name: Red Hat Developer Hub
+        aliases:
+          - RHDH
+          - Developer Hub
+      - name: Red Hat Quay
+        aliases:
+          - Quay
+      - name: Red Hat OpenShift GitOps
+        aliases:
+          - GitOps
+          - ArgoCD
+      - name: Red Hat OpenShift Pipelines
+        aliases:
+          - Pipelines
+          - Tekton
+      - name: Red Hat OpenShift Virtualization
+        aliases:
+          - OpenShift Virtualization
+          - CNV
+      - name: Red Hat OpenShift Data Foundation
+        aliases:
+          - ODF
+      - name: Red Hat OpenShift Service Mesh
+        aliases:
+          - Service Mesh
+          - Istio
+      - name: Red Hat OpenShift Serverless
+        aliases:
+          - Serverless
+          - Knative
+      - name: Red Hat Enterprise Linux
+        aliases:
+          - RHEL
+      - name: Red Hat build of Keycloak
+        aliases:
+          - Keycloak
+          - RHSSO
+          - SSO
+      - name: Red Hat Trusted Profile Analyzer
+        aliases:
+          - TPA
+      - name: Red Hat Trusted Artifact Signer
+        aliases:
+          - TAS
+          - RHTAS
+
+    provisioning_time_estimates:
+      shared-cluster: 5
+      per-student: 25
+      cnv-pool: 20
+
+    cost_hourly_rate_per_vcpu: 0.05

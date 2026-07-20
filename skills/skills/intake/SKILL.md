@@ -369,65 +369,7 @@ notes: |
   The automation agent (Phase 7a) will complete and refine this manifest.
 ```
 
-#### Step 4: Self-Validate the Spec
-
-Before handing back to the orchestrator, run ALL of the following checks.
-**Do NOT signal completion until every check passes or is explicitly deferred with user acknowledgment.**
-
----
-
-**A. Design.md structural checks:**
-
-1. **Required sections present (11)** — case-insensitive, all must exist and be non-empty:
-   - Problem Statement, Target Audience, Prerequisites, Learning Objectives,
-     Content Type, Products & Technologies, Module Map, Difficulty Level,
-     Environment, Infrastructure Requirements, Assessment Strategy
-   - Also check that the document has a descriptive H1 title (not still `# [Project Title]`)
-2. **No unfilled placeholders** — no `[Project Title]`, `[XX min]`, `[Module title]`, `PLACEHOLDER`, `TODO`, or any bracket-enclosed template token
-3. **Module Map populated** — at least one module row with title and duration
-4. **Duration present** in Module Map or as a total
-5. **Learning objectives are actionable** — all start with action verbs (Configure, Deploy, Create, Implement, Troubleshoot, Monitor, Scale)
-   — fail on: Understand, Learn, Know, Be familiar with
-
-**B. Module outline checks:**
-
-6. **Outline exists for every module** listed in the Module Map table
-7. **Each outline has these required sections:** Brief Overview, Audience and Time, See/Learn/Do (or "What You Will See, Learn, and Do"), Lab Structure (with at least one table row), Key Takeaways
-8. **No orphan outlines** — every module-0N-*.md has a corresponding Module Map entry
-
-**C. Infrastructure field checks (Part 3 gates):**
-
-9. **Cluster sizing fields set** — if `spec.environment.worker_count` is set, then `worker_cpu`, `worker_ram_gb`, `worker_disk_gb` must also be set. Only re-ask Q12 if `worker_count` is non-null but siblings are null; if all are null, it is acceptable at intake.
-10. **Concurrent users** — if `spec.environment.topology` = `per-student` or `cnv-pool`, then `spec.environment.max_concurrent_users` must be non-null. If missing, ask Q14.
-11. **AI/MaaS requirement** — if any product mentions AI/LLM keywords (AI, RHOAI, OpenShift AI, MaaS, Granite, InstructLab, Ollama, LLM, inference, model serving), then `spec.environment.ai_requirement` must be set. If missing, ask Q15.
-    - If `ai_requirement = gpu` or `ai_model_tier = frontier`, then `ai_justification` must be non-empty. If missing, ask for justification.
-12. **AAP version** — if products include "Ansible Automation Platform" or "AAP", then `spec.environment.aap_version` must be set. If missing, ask Q16.
-13. **External services** — if `spec.environment.external_services` is a non-empty list, verify entries are named services (not "internet", "any public IP"). Reject vague entries.
-14. **Non-GA access plan** — if `spec.environment.non_ga_products` is non-empty, then `spec.environment.non_ga_access_plan` must be non-empty. If missing, ask Q18 follow-up.
-
-**D. Cross-validation checks (Part 4 — CV-1 to CV-5):**
-
-15. **CV-1 Module count** — count rows in Module Map table in design.md == count of `module-*.md` files in `publishing-house/spec/modules/`. Fix if mismatch.
-16. **CV-2 Module titles** — each Module Map title should correspond to an outline filename (slugified match). Report mismatches for author to fix.
-17. **CV-3 Learning objectives coverage** — each learning objective from design.md should appear (keyword match) in at least one module outline's See/Learn/Do section. Report any uncovered objectives as WARN (not FAIL — outlines may use synonyms).
-18. **CV-4 Duration consistency** — total duration in design.md should approximately match sum of module durations from outlines (±20% tolerance). Report mismatch as WARN.
-19. **CV-5 spec.yaml modules alignment** — `spec.modules[*].title` must match Module Map titles in design.md. Fix spec.yaml if mismatch found.
-
-**E. Approval checklist checks (Part 5):**
-
-20. **Prerequisites answered** — `approval_checklist.content_lead.prerequisites_verifiable` must be `true` or `false` (not null). If null, ask Q22.
-21. **Assessment strategy** — `approval_checklist.content_lead.assessment_strategy` must be non-empty. If empty, ask Q23.
-22. **Differentiation** — `approval_checklist.content_lead.differentiation` must be non-empty. If empty, ask Q24.
-
-**F. Automation manifest check:**
-
-23. **automation-manifest.yaml is not blank** — `publishing-house/spec/automation-manifest.yaml` must have at least one non-commented line. If still blank template, run Step 3.5 now.
-
----
-
-**If any A/B/C/E/F check fails:** fix directly or ask the author. Do NOT proceed until resolved.
-**If any D check (CV-1 to CV-5) fails:** report the inconsistency, fix CV-1/CV-5 directly, report CV-2/CV-3/CV-4 as warnings for author to review.
-**When all checks pass:** proceed to Step 5.
+#### Step 4: (Validation is handled server-side by Central API during Step 8)
 
 #### Step 5: Author Approval Checkpoint
 
@@ -504,7 +446,7 @@ git push
 
 **Run this immediately. Do NOT ask the author.**
 
-#### Step 8: Submit intake to Central API
+#### Step 8: Validate and submit intake to Central API
 
 ```bash
 python publishing-house/tools/ph-intake.py 2>&1
@@ -512,9 +454,19 @@ python publishing-house/tools/ph-intake.py 2>&1
 
 **Run this immediately. Do NOT ask the author. Do NOT wait for confirmation.**
 
-`ph-intake.py` calls `POST {central_url}/api/v1/projects/{project_id}/intake`. Parse the JSON output.
+`ph-intake.py` does two things in sequence:
+1. Calls `POST /projects/{slug}/validate?stage=intake` — server-side validation of spec.yaml, design.md, module outlines, and automation manifest
+2. If validation passes, calls `POST /projects/intake/{slug}` — advances the workflow
 
-If ph-intake.py fails with a 409 error, show the error message and **STOP**.
+Parse the JSON output:
+
+- **If `validation_errors` key is present** — validation failed. Show each failed check to the author:
+  - Check ID, message, and field path for each error
+  - Help the author fix the issues (update spec.yaml, design.md, or outlines as needed)
+  - After fixes, commit, push, and re-run `ph-intake.py`
+  - Loop until validation passes
+- **If `error` key with 409** — workflow is not in intake stage. Show the error and **STOP**.
+- **If `error` key (other)** — show the error message and **STOP**.
 
 #### Step 8b: Project structure cleanup
 

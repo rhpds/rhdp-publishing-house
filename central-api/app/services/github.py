@@ -1,7 +1,7 @@
 """GitHub integration service."""
 import httpx
 import yaml
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 import base64
 import logging
 
@@ -63,6 +63,25 @@ class GitHubService:
         except Exception as e:
             logger.error(f"Error fetching {path}: {e}")
             return None
+
+    async def list_directory(self, repo_url: str, path: str, branch: str = "main") -> List[str]:
+        """List filenames in a repository directory via the GitHub Contents API."""
+        try:
+            owner, repo = self.parse_repo_url(repo_url)
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{self.api_base}/repos/{owner}/{repo}/contents/{path}",
+                    headers=self.headers,
+                    params={"ref": branch}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    if isinstance(data, list):
+                        return [item["name"] for item in data]
+                return []
+        except Exception as e:
+            logger.error(f"Error listing {path}: {e}")
+            return []
 
     async def get_catalog_info(self, repo_url: str, branch: str = "main") -> Optional[Dict]:
         """

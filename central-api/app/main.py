@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings, Settings
 from .models import HealthResponse
-from .routers import litellm, projects, jira, workspace
+from .routers import litellm, projects, jira, workspace, validate
 from .services.rcars import rcars_overlap_check, rcars_health
 from .auth import init_oidc
 
@@ -100,6 +100,9 @@ def create_app() -> FastAPI:
     # Projects router (includes auth key management, intake, workflow-data)
     # IMPORTANT: Must be included BEFORE other routers to avoid path conflicts
     app.include_router(projects.router, prefix=settings.api_prefix)
+
+    # Validate router — spec validation endpoint
+    app.include_router(validate.router, prefix=settings.api_prefix)
 
     # Workspace setup — SA token auth, no static API key required
     app.include_router(workspace.router, prefix=settings.api_prefix)
