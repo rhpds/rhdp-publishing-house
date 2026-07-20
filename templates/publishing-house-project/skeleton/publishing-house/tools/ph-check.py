@@ -86,7 +86,7 @@ def main():
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
 
-    url = f"{central_url}/api/v1/projects/{project_id}/validate?stage={args.stage}"
+    url = f"{central_url}/api/v1/validate/{project_id}?stage={args.stage}"
     body = json.dumps({"repo_url": repo_url, "branch": "main"}).encode()
     req = urllib.request.Request(
         url, data=body,

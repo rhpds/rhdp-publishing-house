@@ -13,7 +13,7 @@ from ..services.validation.models import ValidationRequest, ValidationResponse
 from ..services.validation.runner import run_validation
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/projects", tags=["validate"])
+router = APIRouter(prefix="/validate", tags=["validate"])
 _bearer = HTTPBearer(auto_error=False)
 
 

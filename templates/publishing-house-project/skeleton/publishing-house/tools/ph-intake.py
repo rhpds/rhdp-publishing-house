@@ -86,7 +86,7 @@ def main():
     }
 
     # Step 1: Validate
-    validate_url = f"{central_url}/api/v1/projects/{project_id}/validate?stage=intake"
+    validate_url = f"{central_url}/api/v1/validate/{project_id}?stage=intake"
     validate_body = json.dumps({"repo_url": repo_url, "branch": "main"}).encode()
     req = urllib.request.Request(validate_url, data=validate_body, headers=headers, method="POST")
 

@@ -455,7 +455,7 @@ python publishing-house/tools/ph-intake.py 2>&1
 **Run this immediately. Do NOT ask the author. Do NOT wait for confirmation.**
 
 `ph-intake.py` does two things in sequence:
-1. Calls `POST /projects/{slug}/validate?stage=intake` — server-side validation of spec.yaml, design.md, module outlines, and automation manifest
+1. Calls `POST /validate/{slug}?stage=intake` — server-side validation of spec.yaml, design.md, module outlines, and automation manifest
 2. If validation passes, calls `POST /projects/intake/{slug}` — advances the workflow
 
 Parse the JSON output:
