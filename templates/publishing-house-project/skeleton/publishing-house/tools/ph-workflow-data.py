@@ -53,14 +53,6 @@ def main():
         print(json.dumps({"error": "project.slug missing in spec.yaml"}))
         sys.exit(1)
 
-    wfid = project.get("workflow_id", "")
-    epic_key = project.get("jira_ticket", "")
-
-    if wfid:
-        print(f"workflow_id:{wfid}")
-        print(f"epic_key:{epic_key}")
-        return
-
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
@@ -73,11 +65,7 @@ def main():
         with urllib.request.urlopen(req, context=ctx, timeout=10) as r:
             wd = json.loads(r.read().decode())
         wfid = wd.get("workflow_id", "")
-        wd_epic = wd.get("epic_key", "")
-
-        deployment_mode = project.get("deployment_mode", "self_published")
-        if deployment_mode == "rhdp_published" and not epic_key and wd_epic:
-            epic_key = wd_epic
+        epic_key = wd.get("epic_key", "")
     except Exception as e:
         print(json.dumps({"error": f"Failed to fetch workflow data: {e}"}))
         sys.exit(1)
