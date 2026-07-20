@@ -10,6 +10,7 @@ project:
   deployment_mode: "${{ values.deployment_mode }}"
   initiative_key: "${{ values.initiative_key }}"
   showroom_type: "${{ values.showroom_type }}"
+  description: "${{ values.project_description }}"
   content_reviewer_email: "psrivastav@redhat.com"
   infra_reviewer_email: "treddy@redhat.com"
   jira_ticket: ""

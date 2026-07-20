@@ -27,6 +27,7 @@ class CreateEpicRequest(BaseModel):
     project_name: str
     content_type: str = ""
     deployment_mode: str = ""
+    project_description: str = ""
 
 
 class CreateEpicResponse(BaseModel):
@@ -59,13 +60,23 @@ def create_epic(
     if body.content_type:
         labels.append(body.content_type)
 
-    fields = {
+    fields: dict = {
         "project": {"key": settings.jira_project_key},
         "summary": f"[PH] {body.project_name}",
         "issuetype": {"name": "Epic"},
         "labels": labels,
         "assignee": None,
     }
+    if body.project_description:
+        fields["description"] = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {"type": "paragraph", "content": [
+                    {"type": "text", "text": body.project_description},
+                ]},
+            ],
+        }
 
     req = urllib.request.Request(
         f"{settings.jira_url}/rest/api/3/issue",

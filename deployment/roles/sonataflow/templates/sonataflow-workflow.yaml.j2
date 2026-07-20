@@ -84,6 +84,7 @@ spec:
               contentType: .contentType,
               repoUrl: .repoUrl,
               tags: (.tags // []),
+              projectDescription: (.projectDescription // ""),
               reviews: {
                 content: false,
                 infra: false
@@ -102,6 +103,7 @@ spec:
                 deployment_mode: .deploymentMode
                 project_name: .projectId
                 content_type: .contentType
+                project_description: .projectDescription
             actionDataFilter:
               toStateData: .epicResponse
         stateDataFilter:

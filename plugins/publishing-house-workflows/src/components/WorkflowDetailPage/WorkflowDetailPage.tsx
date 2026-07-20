@@ -28,7 +28,7 @@ import BugReportIcon from '@material-ui/icons/BugReport';
 import RefreshIcon from '@material-ui/icons/Refresh';
 import { createPhWorkflowsClient } from '../../api/client';
 import { WorkflowStage } from '../../api/types';
-import { STAGE_LABELS } from '../../utils/stageMapping';
+import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
 import { WorkflowProgress } from './WorkflowProgress';
 
 const useStyles = makeStyles(theme => ({
@@ -232,6 +232,9 @@ export function WorkflowDetailPage() {
               />
               <DetailField label="Jira Ticket" value={summary.epicKey} />
               <DetailField label="Current Stage" value={stageLabel} />
+              {STAGE_DESCRIPTIONS[summary.stage] && (
+                <DetailField label="What's Happening" value={STAGE_DESCRIPTIONS[summary.stage]} />
+              )}
             </InfoCard>
           </Grid>
         </Grid>

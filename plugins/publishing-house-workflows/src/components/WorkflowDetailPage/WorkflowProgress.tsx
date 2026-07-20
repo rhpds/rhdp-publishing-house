@@ -110,10 +110,11 @@ export function WorkflowProgress({ stage, approvingStage, onApprove }: WorkflowP
       </div>
 
       {APPROVE_STAGES.includes(stage) && onApprove && (
-        <div style={{ marginTop: 24 }}>
+        <div style={{ marginTop: 24, paddingBottom: 8, display: 'flex', gap: 12 }}>
           <Button
             variant="contained"
-            style={{ backgroundColor: '#4caf50', color: '#fff' }}
+            style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
+            size="large"
             startIcon={
               approvingStage === stage ? (
                 <CircularProgress size={16} color="inherit" />
@@ -123,6 +124,14 @@ export function WorkflowProgress({ stage, approvingStage, onApprove }: WorkflowP
             disabled={approvingStage !== null}
           >
             {approvingStage === stage ? 'Approving...' : 'Approve'}
+          </Button>
+          <Button
+            variant="contained"
+            style={{ backgroundColor: '#e57373', color: '#fff', fontWeight: 600 }}
+            size="large"
+            disabled={approvingStage !== null}
+          >
+            Reject
           </Button>
         </div>
       )}

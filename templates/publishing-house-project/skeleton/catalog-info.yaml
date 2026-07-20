@@ -3,7 +3,7 @@ kind: Component
 metadata:
   name: ${{ values.project_name }}
   title: ${{ values.project_name }}
-  description: Publishing House ${{ values.content_type }}
+  description: ${{ values.project_description }}
   annotations:
     # Publishing House lifecycle annotations (workflow will update these)
     ph.rhdp.io/stage: intake

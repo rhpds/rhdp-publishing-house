@@ -59,6 +59,16 @@ export const STAGE_LABELS: Record<WorkflowStage, string> = {
   error: 'Error',
 };
 
+export const STAGE_DESCRIPTIONS: Record<string, string> = {
+  intake: 'The project spec, design document, and module outlines are being authored via the intake skill.',
+  content_review: 'The design spec and module outlines are being reviewed for completeness and accuracy. A reviewer must approve or reject before proceeding.',
+  infra_review: 'Infrastructure requirements (cluster type, sizing, workloads) are being reviewed. A reviewer must approve or reject before proceeding.',
+  development: 'Lab content is being developed. The author is writing the actual lab modules and showroom content.',
+  ready: 'Development is complete. The project is ready to be published to the RHDP catalog.',
+  published: 'The project has been published to the RHDP catalog and is available to users.',
+  error: 'The workflow encountered an error. Check the Orchestrator logs for details.',
+};
+
 export function stageIndex(stage: WorkflowStage): number {
   const idx = STAGE_ORDER.indexOf(stage);
   return idx >= 0 ? idx : 0;

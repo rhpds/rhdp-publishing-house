@@ -17,6 +17,7 @@ spec:
     - title: Project Details
       required:
         - project_name
+        - project_description
         - content_type
         - deployment_mode
       properties:
@@ -28,6 +29,15 @@ spec:
           ui:placeholder: "openshift-ai-workshop"
           pattern: '^[a-z0-9-]+$'
           ui:help: Use lowercase letters, numbers, and hyphens only
+
+        project_description:
+          title: Project Description
+          type: string
+          description: Brief overview of what this project will deliver
+          ui:widget: textarea
+          ui:options:
+            rows: 3
+          ui:placeholder: "A hands-on workshop teaching developers how to deploy and manage AI workloads on OpenShift using RHOAI"
 
         content_type:
           title: Content Type
@@ -127,6 +137,7 @@ spec:
         url: https://github.com/rhpds/rhdp-publishing-house-template/tree/rearchitecture
         values:
           project_name: ${{ parameters.project_name }}
+          project_description: ${{ parameters.project_description }}
           content_type: ${{ parameters.content_type }}
           deployment_mode: ${{ parameters.deployment_mode }}
           github_user: ${{ parameters.github_users[0].user }}
@@ -156,7 +167,7 @@ spec:
       action: publish:github
       input:
         repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
-        description: Publishing House ${{ parameters.content_type }} - ${{ parameters.project_name }}
+        description: ${{ parameters.project_description }}
         defaultBranch: main
         repoVisibility: public
         protectDefaultBranch: false
@@ -179,6 +190,7 @@ spec:
           deploymentMode: ${{ parameters.deployment_mode }}
           contentType: ${{ parameters.content_type }}
           tags: ${{ parameters.tags }}
+          projectDescription: ${{ parameters.project_description }}
 
     # Step 6: Register in catalog
     - id: register
