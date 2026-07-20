@@ -20,6 +20,7 @@ import {
   makeStyles,
   Button,
   Chip,
+  IconButton,
   Snackbar,
 } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
@@ -172,15 +173,13 @@ export function WorkflowDetailPage() {
               {summary.epicKey}
             </Button>
           )}
-          <Button
-            variant="outlined"
+          <IconButton
             size="small"
-            startIcon={<RefreshIcon />}
             onClick={() => setRefreshKey(k => k + 1)}
             disabled={loading}
           >
-            Refresh
-          </Button>
+            <RefreshIcon />
+          </IconButton>
         </div>
 
         <InfoCard title="Workflow Progress">
