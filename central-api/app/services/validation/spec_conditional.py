@@ -4,30 +4,37 @@ from .models import CheckResult, CheckStatus
 
 def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
     results = []
+    project = spec_data.get("project", {})
     spec = spec_data.get("spec", {})
     env = spec.get("environment", {})
-    all_text = str(spec_data).lower()
+    searchable_fields = [
+        str(spec.get("title", "")),
+        str(spec.get("learning_objectives", "")),
+        " ".join(str(m.get("title", "")) for m in spec.get("modules", [])),
+        str(project.get("content_type", "")),
+    ]
+    all_text = " ".join(searchable_fields).lower()
 
     ai_keywords = policy.get("ai_keywords", [])
     vague_egress = policy.get("vague_egress_terms", [])
 
-    # B-01: Sizing consistency — if any sizing field is set, all four must be
-    sizing_fields = ["worker_count", "worker_cpu", "worker_ram_gb", "worker_disk_gb"]
-    sizing_values = {f: env.get(f) for f in sizing_fields}
-    any_set = any(v is not None for v in sizing_values.values())
-    all_set = all(v is not None for v in sizing_values.values())
+    # B-01: Sizing consistency — if worker_count > 0, cpu/ram/disk must be set
+    worker_count = env.get("worker_count")
+    sizing_detail = ["worker_cpu", "worker_ram_gb", "worker_disk_gb"]
+    detail_values = {f: env.get(f) for f in sizing_detail}
+    details_set = all(v is not None and v != "" for v in detail_values.values())
 
-    if any_set and not all_set:
-        missing = [f for f, v in sizing_values.items() if v is None]
+    if worker_count is not None and int(worker_count) > 0 and not details_set:
+        missing = [f for f, v in detail_values.items() if v is None or v == ""]
         results.append(CheckResult(
             check_id="B-01", group="B", status=CheckStatus.FAIL,
-            message=f"Partial sizing — missing: {', '.join(missing)}. Set all four or none.",
+            message=f"worker_count={worker_count} but missing: {', '.join(missing)}",
             field="spec.environment.worker_*",
         ))
     else:
         results.append(CheckResult(
-            check_id="B-01", group="B", status=CheckStatus.PASS if any_set else CheckStatus.SKIP,
-            message="Sizing fields consistent" if any_set else "Cluster sizing not set yet",
+            check_id="B-01", group="B", status=CheckStatus.PASS,
+            message="Sizing fields consistent",
             field="spec.environment.worker_*",
         ))
 
@@ -162,7 +169,7 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
         ))
 
     # B-07: Content type must be from controlled vocabulary
-    content_type = spec.get("content_type", "")
+    content_type = project.get("content_type", "")
     valid_types = policy.get("valid_content_types", [])
     if content_type and valid_types:
         if content_type.lower() not in [t.lower() for t in valid_types]:

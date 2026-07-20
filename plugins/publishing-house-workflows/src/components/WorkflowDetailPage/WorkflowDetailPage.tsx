@@ -141,7 +141,7 @@ export function WorkflowDetailPage() {
     <Page themeId="tool">
       <Header
         title={summary.projectId}
-        subtitle={`${summary.projectType} — ${summary.deploymentMode}`}
+        subtitle={`${summary.contentType} — ${summary.deploymentMode}`}
       >
         <HeaderLabel label="Stage" value={stageLabel} />
         <HeaderLabel label="Owner" value={summary.owner} />
@@ -197,7 +197,7 @@ export function WorkflowDetailPage() {
               <DetailField label="Project ID" value={summary.projectId} />
               <DetailField label="Owner" value={summary.owner} />
               <DetailField label="SSO User" value={summary.ssoUser} />
-              <DetailField label="Type" value={summary.projectType} />
+              <DetailField label="Type" value={summary.contentType} />
               <DetailField label="Deployment Mode" value={summary.deploymentMode} />
               <DetailField label="State" value={summary.state} />
               <div>

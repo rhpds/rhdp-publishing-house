@@ -17,7 +17,7 @@ spec:
     - title: Project Details
       required:
         - project_name
-        - project_type
+        - content_type
         - deployment_mode
       properties:
         project_name:
@@ -29,8 +29,8 @@ spec:
           pattern: '^[a-z0-9-]+$'
           ui:help: Use lowercase letters, numbers, and hyphens only
 
-        project_type:
-          title: Project Type
+        content_type:
+          title: Content Type
           type: string
           enum: [workshop, lab, demo]
           default: workshop
@@ -127,7 +127,7 @@ spec:
         url: https://github.com/rhpds/rhdp-publishing-house-template/tree/rearchitecture
         values:
           project_name: ${{ parameters.project_name }}
-          project_type: ${{ parameters.project_type }}
+          content_type: ${{ parameters.content_type }}
           deployment_mode: ${{ parameters.deployment_mode }}
           github_user: ${{ parameters.github_users[0].user }}
           user_email: ${{ user.entity.spec.profile.email }}
@@ -140,7 +140,7 @@ spec:
         url: ./skeleton
         values:
           project_name: ${{ parameters.project_name }}
-          project_type: ${{ parameters.project_type }}
+          content_type: ${{ parameters.content_type }}
           deployment_mode: ${{ parameters.deployment_mode }}
           github_user: ${{ parameters.github_users[0].user }}
           user_email: ${{ user.entity.spec.profile.email }}
@@ -156,7 +156,7 @@ spec:
       action: publish:github
       input:
         repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
-        description: Publishing House ${{ parameters.project_type }} - ${{ parameters.project_name }}
+        description: Publishing House ${{ parameters.content_type }} - ${{ parameters.project_name }}
         defaultBranch: main
         repoVisibility: public
         protectDefaultBranch: false
@@ -177,7 +177,7 @@ spec:
           ssoUser: ${{ user.entity.metadata.name }}
           ssoEmail: ${{ user.entity.spec.profile.email }}
           deploymentMode: ${{ parameters.deployment_mode }}
-          projectType: ${{ parameters.project_type }}
+          contentType: ${{ parameters.content_type }}
           tags: ${{ parameters.tags }}
 
     # Step 6: Register in catalog

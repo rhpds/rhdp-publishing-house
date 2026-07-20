@@ -9,15 +9,14 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
     env = spec.get("environment", {})
 
     required = [
-        ("A-01", "project.title", project.get("title")),
+        ("A-01", "spec.title", spec.get("title")),
         ("A-02", "project.slug", project.get("slug")),
-        ("A-03", "spec.content_type", spec.get("content_type")),
+        ("A-03", "project.content_type", project.get("content_type")),
         ("A-04", "spec.audience", spec.get("audience")),
         ("A-05", "spec.modules", spec.get("modules")),
         ("A-06", "spec.learning_objectives", spec.get("learning_objectives")),
         ("A-07", "spec.environment.topology", env.get("topology")),
         ("A-08", "spec.environment.ocp_version", env.get("ocp_version")),
-        ("A-09", "spec.environment.cloud_provider", env.get("cloud_provider")),
     ]
 
     for check_id, field, value in required:

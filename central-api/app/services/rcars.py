@@ -78,6 +78,38 @@ def rcars_catalog_search(
         return {"items": [], "total": 0, "error": str(e)}
 
 
+def rcars_advisor_submit(query: str, stages: list[str] | None = None) -> dict:
+    """Submit an advisor query to RCARS. Returns {job_id} or {error}."""
+    try:
+        body = {"query": query}
+        if stages:
+            body["stages"] = stages
+        url = f"{_get_base_url()}/api/v1/advisor/query"
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode(),
+            headers=_get_headers(),
+            method="POST",
+        )
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=15) as r:
+            return json.loads(r.read().decode())
+    except Exception as e:
+        logger.warning("RCARS advisor submit failed: %s", e)
+        return {"error": str(e)}
+
+
+def rcars_advisor_result(job_id: str) -> dict:
+    """Poll for advisor query result. Returns {status, result, error}."""
+    try:
+        url = f"{_get_base_url()}/api/v1/advisor/query/{urllib.parse.quote(job_id)}/result"
+        req = urllib.request.Request(url, headers=_get_headers())
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=15) as r:
+            return json.loads(r.read().decode())
+    except Exception as e:
+        logger.warning("RCARS advisor result failed for %s: %s", job_id, e)
+        return {"status": "failed", "error": str(e)}
+
+
 def rcars_overlap_check(
     products: list[str],
     audience: str = "",

@@ -92,7 +92,7 @@ const columns: TableColumn<WorkflowSummary>[] = [
   },
   {
     title: 'Type',
-    field: 'projectType',
+    field: 'contentType',
   },
   {
     title: 'Stage',

@@ -1,8 +1,5 @@
 """Validate router — server-side spec validation endpoint."""
-import hashlib
 import logging
-from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -10,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from ..config import get_settings
 from ..services.github import GitHubService
 from ..services.validation.models import ValidationRequest, ValidationResponse
+from ..services.validation.policy import load_policy
 from ..services.validation.runner import run_validation
 
 logger = logging.getLogger(__name__)
@@ -33,15 +31,21 @@ def _require_auth(
     return rec.owner_email
 
 
+@router.get("/policy")
+async def get_policy(owner: str = Depends(_require_auth)):
+    """Return the current validation policy for skill consumption."""
+    return load_policy()
+
+
 @router.post(
-    "/{slug}/validate",
+    "/{slug}",
     response_model=ValidationResponse,
     responses={422: {"model": ValidationResponse}},
 )
 async def validate_spec(
     slug: str,
     body: ValidationRequest,
-    stage: str = Query("intake", description="Pipeline stage: intake, review"),
+    stage: str = Query(..., description="Pipeline stage: intake, review"),
     owner: str = Depends(_require_auth),
 ):
     """Validate a project spec against the configured policy.

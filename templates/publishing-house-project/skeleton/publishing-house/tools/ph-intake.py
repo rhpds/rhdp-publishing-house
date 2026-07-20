@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Validate spec then advance workflow past intake by calling Central API.
+"""Submit intake to Central API — single call that validates and advances workflow.
 
-1. POST /projects/{slug}/validate?stage=intake — server-side validation
-2. POST /projects/intake/{slug} — advance workflow (only if validation passes)
+POST /projects/intake/{slug} with {"repo_url": ..., "branch": ...}
 
-Returns JSON: {"stage": "..."} on success, {"validation_errors": [...]} or {"error": "..."} on failure.
+Central API validates the spec server-side, then advances the workflow if validation passes.
+
+Unified response shape for all outcomes:
+  {"status": <int>, "stage": <str|null>, "error": <str|null>, "validation": <dict|null>}
 """
 import json
 import os
@@ -85,41 +87,22 @@ def main():
         "Authorization": f"Bearer {api_key}",
     }
 
-    # Step 1: Validate
-    validate_url = f"{central_url}/api/v1/validate/{project_id}?stage=intake"
-    validate_body = json.dumps({"repo_url": repo_url, "branch": "main"}).encode()
-    req = urllib.request.Request(validate_url, data=validate_body, headers=headers, method="POST")
-
-    try:
-        with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
-            pass
-    except urllib.error.HTTPError as e:
-        body = json.loads(e.read().decode())
-        if e.code == 422:
-            print(json.dumps({"validation_errors": body.get("results", []), "passed": False}))
-        else:
-            print(json.dumps({"error": f"Validation failed ({e.code}): {json.dumps(body)[:300]}"}))
-        sys.exit(1)
-    except Exception as e:
-        print(json.dumps({"error": f"Validation request failed: {e}"}))
-        sys.exit(1)
-
-    # Step 2: Advance workflow
     intake_url = f"{central_url}/api/v1/projects/intake/{project_id}"
-    req = urllib.request.Request(intake_url, data=b"", headers=headers, method="POST")
+    intake_body = json.dumps({"repo_url": repo_url, "branch": "main"}).encode()
+    req = urllib.request.Request(intake_url, data=intake_body, headers=headers, method="POST")
 
     try:
-        with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
+        with urllib.request.urlopen(req, context=ctx, timeout=60) as resp:
             result = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
-        body = e.read().decode()[:300]
-        print(json.dumps({"error": f"Intake failed ({e.code}): {body}"}))
-        sys.exit(1)
+        result = json.loads(e.read().decode())
     except Exception as e:
-        print(json.dumps({"error": f"Intake request failed: {e}"}))
-        sys.exit(1)
+        result = {"status": 500, "error": f"Request failed: {e}"}
 
     print(json.dumps(result))
+
+    if result.get("status", 500) >= 400:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

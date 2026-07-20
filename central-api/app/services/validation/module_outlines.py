@@ -82,6 +82,96 @@ def run_checks(
             field="publishing-house/spec/modules/",
         ))
 
+    # E-04: Lab Structure section has at least one table row per outline
+    if outline_files:
+        no_table = []
+        for fname, content in sorted(outline_files.items()):
+            in_lab = False
+            has_row = False
+            for line in content.splitlines():
+                if re.match(r"^#{2,3}\s+lab\s+structure", line, re.IGNORECASE):
+                    in_lab = True
+                    continue
+                if in_lab:
+                    if re.match(r"^#{2,3}\s+", line):
+                        break
+                    if line.startswith("|") and "---" not in line:
+                        cells = [c.strip() for c in line.strip("|").split("|")]
+                        if len(cells) >= 2 and cells[0].strip().isdigit():
+                            has_row = True
+            if in_lab and not has_row:
+                no_table.append(fname)
+        if no_table:
+            results.append(CheckResult(
+                check_id="E-04", group="E", status=CheckStatus.FAIL,
+                message=f"Lab Structure has no table rows: {', '.join(no_table[:3])}",
+                field="publishing-house/spec/modules/",
+            ))
+        else:
+            results.append(CheckResult(
+                check_id="E-04", group="E", status=CheckStatus.PASS,
+                message="All outlines have Lab Structure table rows",
+                field="publishing-house/spec/modules/",
+            ))
+
+    # E-05: Duration specified in Audience and Time section
+    if outline_files:
+        no_duration = []
+        duration_re = re.compile(r"\d+\s*(min|hour|hr|minute)", re.IGNORECASE)
+        for fname, content in sorted(outline_files.items()):
+            in_aud = False
+            found = False
+            for line in content.splitlines():
+                if re.match(r"^#{2,3}\s+audience\s+and\s+time", line, re.IGNORECASE):
+                    in_aud = True
+                    continue
+                if in_aud:
+                    if re.match(r"^#{2,3}\s+", line):
+                        break
+                    if duration_re.search(line):
+                        found = True
+            if in_aud and not found:
+                no_duration.append(fname)
+        if no_duration:
+            results.append(CheckResult(
+                check_id="E-05", group="E", status=CheckStatus.FAIL,
+                message=f"No duration in Audience and Time: {', '.join(no_duration[:3])}",
+                field="publishing-house/spec/modules/",
+            ))
+        else:
+            results.append(CheckResult(
+                check_id="E-05", group="E", status=CheckStatus.PASS,
+                message="All outlines specify duration in Audience and Time",
+                field="publishing-house/spec/modules/",
+            ))
+
+    # E-06: No unfilled template placeholders in outlines
+    if outline_files:
+        ph_pattern = re.compile(
+            r"\[(?:Title|Name|X\s*min|XX\s*min|Objective\s+\d|action verb|"
+            r"PLACEHOLDER|TODO|REPLACE_ME|TBD|"
+            r"specific,?\s*measurable|e\.g\.,)[^\]]*\]",
+            re.IGNORECASE,
+        )
+        files_with_ph = []
+        for fname, content in sorted(outline_files.items()):
+            clean = re.sub(r"<!--.*?-->", "", content, flags=re.DOTALL)
+            found = ph_pattern.findall(clean)
+            if found:
+                files_with_ph.append(f"{fname}: {', '.join(found[:2])}")
+        if files_with_ph:
+            results.append(CheckResult(
+                check_id="E-06", group="E", status=CheckStatus.FAIL,
+                message=f"Unfilled placeholders in outlines: {'; '.join(files_with_ph[:3])}",
+                field="publishing-house/spec/modules/",
+            ))
+        else:
+            results.append(CheckResult(
+                check_id="E-06", group="E", status=CheckStatus.PASS,
+                message="No unfilled placeholders in outlines",
+                field="publishing-house/spec/modules/",
+            ))
+
     # E-03: No orphan outline files (files not matching any spec module)
     if outline_files and modules_in_spec:
         spec_ids = {m.get("id", "") for m in modules_in_spec if m.get("id")}

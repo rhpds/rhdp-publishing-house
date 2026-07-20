@@ -64,8 +64,16 @@ class KeyCreatedResponse(BaseModel):
 
 # ── Project Schemas ───────────────────────────────────────────────────────────
 
+class IntakeRequest(BaseModel):
+    repo_url: str
+    branch: str = "main"
+
+
 class IntakeResponse(BaseModel):
-    stage: str
+    status: int
+    stage: Optional[str] = None
+    error: Optional[str] = None
+    validation: Optional[dict] = None
 
 
 # ── Auth Helpers ──────────────────────────────────────────────────────────────
@@ -313,23 +321,85 @@ def _require_stage(workflow_id: str, allowed: list[str]) -> str:
     return current
 
 
-@router.post("/intake/{project_slug}", response_model=IntakeResponse, status_code=201)
-def submit_intake(
+@router.post("/intake/{project_slug}", response_model=IntakeResponse)
+async def submit_intake(
     project_slug: str,
+    body: IntakeRequest,
     owner: str = Depends(_require_auth),
 ):
-    """Advance workflow past intake stage.
-    Sends CloudEvent and polls to confirm SonataFlow processed it."""
-    wd = get_workflow_data(project_slug)
-    wf_uuid = wd.get("workflow_id", "")
-    if not wf_uuid:
-        raise HTTPException(status_code=404, detail=f"No workflow found for {project_slug}")
-    _require_stage(wf_uuid, ["intake"])
-    settings = get_settings()
-    epic_key = wd.get("epic_key", "")
-    jira_url = f"https://redhat.atlassian.net/browse/{epic_key}" if epic_key else ""
+    """Validate spec, then advance workflow past intake.
 
-    new_stage = _advance_workflow(project_slug, wf_uuid, epic_key, jira_url, settings)
-    logger.info("intake: workflow advanced to %s for %s", new_stage, project_slug)
+    Returns a unified response shape for all outcomes:
+    201 — validation passed, workflow advanced
+    422 — validation failed, stage included
+    409 — workflow not in intake stage
+    404 — no workflow found
+    500 — unexpected server error
+    """
+    from fastapi.responses import JSONResponse
+    from ..services.github import GitHubService
+    from ..services.validation.runner import run_validation
 
-    return IntakeResponse(stage=new_stage)
+    stage = None
+
+    try:
+        # Look up workflow
+        try:
+            wd = get_workflow_data(project_slug)
+        except HTTPException as e:
+            if e.status_code == 404:
+                return JSONResponse(status_code=404, content=IntakeResponse(
+                    status=404, error=f"No workflow found for {project_slug}",
+                ).model_dump())
+            raise
+
+        wf_uuid = wd.get("workflow_id", "")
+        if not wf_uuid:
+            return JSONResponse(status_code=404, content=IntakeResponse(
+                status=404, error=f"No workflow found for {project_slug}",
+            ).model_dump())
+
+        # Check stage
+        current = get_workflow_state(wf_uuid).get("stage", "unknown")
+        stage = current
+        if current != "intake":
+            return JSONResponse(status_code=409, content=IntakeResponse(
+                status=409, stage=current,
+                error=f"Workflow is in '{current}' stage. Intake requires 'intake'.",
+            ).model_dump())
+
+        # Validate
+        settings = get_settings()
+        if not settings.github_token:
+            return JSONResponse(status_code=500, content=IntakeResponse(
+                status=500, stage=stage, error="GITHUB_TOKEN not configured on Central API",
+            ).model_dump())
+
+        github = GitHubService(token=settings.github_token)
+        result = await run_validation(github, body.repo_url, body.branch, "intake")
+
+        if not result.passed:
+            return JSONResponse(status_code=422, content=IntakeResponse(
+                status=422, stage=stage, error="Validation failed",
+                validation=result.model_dump(),
+            ).model_dump())
+
+        # Advance workflow
+        epic_key = wd.get("epic_key", "")
+        jira_url = f"https://redhat.atlassian.net/browse/{epic_key}" if epic_key else ""
+        new_stage = _advance_workflow(project_slug, wf_uuid, epic_key, jira_url, settings)
+        logger.info("intake: workflow advanced to %s for %s", new_stage, project_slug)
+
+        return JSONResponse(status_code=201, content=IntakeResponse(
+            status=201, stage=new_stage,
+        ).model_dump())
+
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code, content=IntakeResponse(
+            status=e.status_code, stage=stage, error=e.detail,
+        ).model_dump())
+    except Exception as e:
+        logger.exception("intake: unexpected error for %s", project_slug)
+        return JSONResponse(status_code=500, content=IntakeResponse(
+            status=500, stage=stage, error=f"Internal server error: {e}",
+        ).model_dump())

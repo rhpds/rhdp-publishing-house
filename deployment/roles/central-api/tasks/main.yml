@@ -9,6 +9,11 @@
     state: present
     definition: "{{ lookup('template', 'crb-central-api-tokenreview.yaml.j2') | from_yaml }}"
 
+- name: Create validation policy ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'configmap-validation-policy.yaml.j2') | from_yaml }}"
+
 - name: Deploy central-api
   kubernetes.core.k8s:
     state: present

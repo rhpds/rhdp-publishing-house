@@ -37,10 +37,28 @@ You handle the intake phase of the Publishing House lifecycle:
 
    **STOP — do not proceed.**
 
-2. **Read spec.yaml** at `publishing-house/spec.yaml` to understand project state and pre-populated fields
-3. **Read design template** at `@rhdp-publishing-house/skills/intake/references/design-template.md`
-4. **Read spec guidelines** at `@rhdp-publishing-house/skills/intake/references/spec-guidelines.md`
-5. **Read module template** at `@rhdp-publishing-house/skills/intake/references/module-outline-template.md`
+2. **Fetch validation policy** — run silently:
+   ```bash
+   python publishing-house/tools/ph-policy.py
+   ```
+   This downloads the current validation policy (valid content types, audiences, products
+   with aliases, action verbs) from Central API to `~/.config/publishing-house/policy.json`.
+   It overwrites any previous copy so the skill always has fresh data.
+
+   If it fails, show the error and **STOP** — the skill cannot validate without the policy.
+
+3. **Read the policy file** at `~/.config/publishing-house/policy.json`. Use these lists
+   throughout intake instead of hardcoded values:
+   - `valid_content_types` — accept only these when the author states a content type
+   - `valid_audiences` — accept only these for difficulty/audience
+   - `products` (with `aliases`) — validate product names against this list; accept any name or alias
+   - `action_verbs_valid` — learning objectives must start with one of these
+   - `action_verbs_rejected` — reject objectives starting with these (too vague)
+
+4. **Read spec.yaml** at `publishing-house/spec.yaml` to understand project state and pre-populated fields
+5. **Read design template** at `@rhdp-publishing-house/skills/intake/references/design-template.md`
+6. **Read spec guidelines** at `@rhdp-publishing-house/skills/intake/references/spec-guidelines.md`
+7. **Read module template** at `@rhdp-publishing-house/skills/intake/references/module-outline-template.md`
 
 ### Pre-populated Fields
 
@@ -446,7 +464,7 @@ git push
 
 **Run this immediately. Do NOT ask the author.**
 
-#### Step 8: Validate and submit intake to Central API
+#### Step 8: Submit intake to Central API
 
 ```bash
 python publishing-house/tools/ph-intake.py 2>&1
@@ -454,19 +472,25 @@ python publishing-house/tools/ph-intake.py 2>&1
 
 **Run this immediately. Do NOT ask the author. Do NOT wait for confirmation.**
 
-`ph-intake.py` does two things in sequence:
-1. Calls `POST /validate/{slug}?stage=intake` — server-side validation of spec.yaml, design.md, module outlines, and automation manifest
-2. If validation passes, calls `POST /projects/intake/{slug}` — advances the workflow
+`ph-intake.py` makes a single call: `POST /projects/intake/{slug}` with the repo URL.
+Central API validates the spec server-side, then advances the workflow if validation passes.
 
-Parse the JSON output:
+The response is always the same shape:
+```json
+{"status": <int>, "stage": "<stage or null>", "error": "<msg or null>", "validation": <object or null>}
+```
 
-- **If `validation_errors` key is present** — validation failed. Show each failed check to the author:
-  - Check ID, message, and field path for each error
+Parse the JSON output by `status`:
+
+- **201** — Success. Workflow advanced. Show: "Intake submitted. Stage is now **{stage}**."
+- **422** — Validation failed. `validation.results` contains the failed checks.
+  - Show each failed check to the author: check ID, message, and field path
   - Help the author fix the issues (update spec.yaml, design.md, or outlines as needed)
   - After fixes, commit, push, and re-run `ph-intake.py`
   - Loop until validation passes
-- **If `error` key with 409** — workflow is not in intake stage. Show the error and **STOP**.
-- **If `error` key (other)** — show the error message and **STOP**.
+- **409** — Workflow is not in intake stage. Show `error` and **STOP**.
+- **404** — No workflow found. Show `error` and **STOP**.
+- **Any other status** — Show the `error` message and **STOP**.
 
 #### Step 8b: Project structure cleanup
 

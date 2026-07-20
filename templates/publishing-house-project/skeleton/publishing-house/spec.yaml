@@ -6,7 +6,7 @@
 project:
   slug: "${{ values.project_name }}"
   owner_email: "${{ values.user_email }}"
-  content_type: "${{ values.project_type }}"
+  content_type: "${{ values.content_type }}"
   deployment_mode: "${{ values.deployment_mode }}"
   initiative_key: "${{ values.initiative_key }}"
   showroom_type: "${{ values.showroom_type }}"

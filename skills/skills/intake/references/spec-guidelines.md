@@ -71,8 +71,8 @@ The following are authored during intake and stored in `approval_checklist` in s
 | `differentiation` | `approval_checklist.content_lead` | Author's narrative: how this differs from existing content |
 
 Auto-computed by Central (not authored):
-- `rcars_overlap_pct` — computed from products + audience query against RCARS catalog
-- `rcars_top_matches` — top 3 RCARS matches
+- `rcars_overlap_pct` — highest relevance_score from RCARS advisor candidates (or null)
+- `rcars_top_matches` — top 3 RCARS advisor matches with title, ci_name, url, relevance_score, why_it_fits
 - `peak_environments` — max_concurrent_users × topology factor
 - `cost_per_run_est` — indicative cost from sizing
 

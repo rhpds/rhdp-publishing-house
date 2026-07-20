@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: ph-validation-policy
-  namespace: publishing-house
+  namespace: "{{ app_namespace }}"
   labels:
     app: central-api
     component: policy

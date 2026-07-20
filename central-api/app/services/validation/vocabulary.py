@@ -12,7 +12,7 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
     products_list = policy.get("products", [])
 
     # H-01: Content type in vocabulary
-    content_type = spec.get("content_type", "")
+    content_type = project.get("content_type", "")
     if content_type:
         if content_type.lower() in valid_types:
             results.append(CheckResult(

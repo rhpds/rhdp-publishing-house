@@ -25,7 +25,7 @@ _SSL_CTX.verify_mode = ssl.CERT_NONE
 
 class CreateEpicRequest(BaseModel):
     project_name: str
-    project_type: str = ""
+    content_type: str = ""
     deployment_mode: str = ""
 
 
@@ -56,8 +56,8 @@ def create_epic(
         raise HTTPException(status_code=503, detail="Jira not configured")
 
     labels = ["publishing-house"]
-    if body.project_type:
-        labels.append(body.project_type)
+    if body.content_type:
+        labels.append(body.content_type)
 
     fields = {
         "project": {"key": settings.jira_project_key},

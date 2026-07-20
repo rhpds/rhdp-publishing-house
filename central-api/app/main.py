@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import get_settings, Settings
 from .models import HealthResponse
 from .routers import litellm, projects, jira, workspace, validate
-from .services.rcars import rcars_overlap_check, rcars_health
+from .services.rcars import rcars_overlap_check, rcars_health, rcars_advisor_submit, rcars_advisor_result
 from .auth import init_oidc
 
 logging.basicConfig(
@@ -91,6 +91,18 @@ def create_app() -> FastAPI:
             audience=audience or "",
             limit=limit,
         )
+
+    @app.post(f"{settings.api_prefix}/rcars/advisor")
+    async def submit_advisor_query(
+        query: str = Query(..., description="Natural-language query describing the lab content"),
+    ):
+        """Submit an advisor query to RCARS. Returns {job_id} to poll for results."""
+        return rcars_advisor_submit(query)
+
+    @app.get(f"{settings.api_prefix}/rcars/advisor/{{job_id}}")
+    async def get_advisor_result(job_id: str):
+        """Poll for advisor query result. Returns {status, result, error}."""
+        return rcars_advisor_result(job_id)
 
     @app.get(f"{settings.api_prefix}/rcars/health")
     async def get_rcars_health():

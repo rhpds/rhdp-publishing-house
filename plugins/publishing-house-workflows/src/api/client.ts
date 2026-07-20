@@ -25,7 +25,7 @@ function toSummary(inst: ProcessInstance): WorkflowSummary {
     owner: wd.ssoEmail || wd.githubUser || '',
     ssoUser: wd.ssoUser || '',
     ssoEmail: wd.ssoEmail || '',
-    projectType: wd.projectType || '',
+    contentType: wd.contentType || '',
     deploymentMode: wd.deploymentMode || '',
     stage: deriveStage(inst.nodes || [], inst.state),
     state: inst.state,

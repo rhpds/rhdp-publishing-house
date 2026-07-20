@@ -81,7 +81,7 @@ spec:
               ssoUser: .ssoUser,
               ssoEmail: .ssoEmail,
               projectid: .projectId,
-              projectType: .projectType,
+              contentType: .contentType,
               repoUrl: .repoUrl,
               tags: (.tags // []),
               reviews: {
@@ -101,7 +101,7 @@ spec:
               arguments:
                 deployment_mode: .deploymentMode
                 project_name: .projectId
-                project_type: .projectType
+                content_type: .contentType
             actionDataFilter:
               toStateData: .epicResponse
         stateDataFilter:

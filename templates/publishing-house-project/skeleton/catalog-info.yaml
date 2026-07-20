@@ -3,11 +3,11 @@ kind: Component
 metadata:
   name: ${{ values.project_name }}
   title: ${{ values.project_name }}
-  description: Publishing House ${{ values.project_type }}
+  description: Publishing House ${{ values.content_type }}
   annotations:
     # Publishing House lifecycle annotations (workflow will update these)
     ph.rhdp.io/stage: intake
-    ph.rhdp.io/content-type: ${{ values.project_type }}
+    ph.rhdp.io/content-type: ${{ values.content_type }}
     ph.rhdp.io/deployment-mode: ${{ values.deployment_mode }}
     ph.rhdp.io/github-user: ${{ values.github_user }}
 
@@ -18,7 +18,7 @@ metadata:
     github.com/project-slug: ${{ values.repo_url | replace('https://github.com/', '') }}
   tags:
     - publishing-house
-    - ${{ values.project_type }}
+    - ${{ values.content_type }}
     - ${{ values.deployment_mode | replace('_', '-') }}
   links:
     - url: ${{ values.repo_url }}

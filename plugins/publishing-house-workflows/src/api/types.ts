@@ -14,7 +14,7 @@ export interface WorkflowVariables {
     ssoEmail?: string;
     repoUrl: string;
     deploymentMode: string;
-    projectType: string;
+    contentType: string;
     createdAt: number;
     epic_key?: string;
     jira_url?: string;
@@ -52,7 +52,7 @@ export interface WorkflowSummary {
   owner: string;
   ssoUser: string;
   ssoEmail: string;
-  projectType: string;
+  contentType: string;
   deploymentMode: string;
   stage: WorkflowStage;
   state: string;

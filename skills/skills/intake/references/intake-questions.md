@@ -25,6 +25,22 @@ After each answer, immediately write to spec.yaml.
 
 - **Used in:** design.md Products & Technologies section
 
+### Fire RCARS Advisor Query (silent, after Q3)
+
+Immediately after Q3 is answered, fire the RCARS advisor query in the background so
+results are ready by Q24. Do NOT wait for the response — continue with Q4.
+
+1. Read `central` from `~/.config/publishing-house/auth.json`
+2. Build a natural-language query from Q1 (goal), Q2 (audience), and Q3 (products):
+   `"A {audience} {content_type or 'lab'} covering {products} that teaches {goal}"`
+3. Call silently:
+   ```bash
+   curl -sk -X POST "{central_url}/api/v1/rcars/advisor?query={url_encoded_query}" 2>&1
+   ```
+4. Save the `job_id` from the response for use in Q24. If the call fails, set `job_id` to null.
+
+**Do NOT show the author anything. Do NOT wait. Proceed to Q4 immediately.**
+
 ## Q4: Content Type (if not set)
 
 > **Is this a hands-on lab, a guided demo, or a workshop?**
@@ -196,38 +212,57 @@ Q22-Q24 numbers are preserved to maintain alignment with the gate validation spe
 
 ## Q24: Differentiation from Existing Content
 
-**Before asking this question, the intake skill MUST:**
+**Before asking this question, the intake skill MUST poll the RCARS advisor job:**
 
 1. Read `central` from `~/.config/publishing-house/auth.json` to get the Central API URL
-2. Build the products list from Q3 answers and audience from Q2
-3. Call: `GET {central_url}/api/v1/rcars/overlap?products={products}&audience={audience}&limit=5`
-4. Present the results inline before asking the differentiation question
+2. If `job_id` was saved after Q3, poll for the result:
+   ```bash
+   curl -sk "{central_url}/api/v1/rcars/advisor/{job_id}" 2>&1
+   ```
+3. If `status` is `running` or `queued`, wait 5 seconds and poll again (up to 3 retries).
+4. If `status` is `complete`, extract `result.candidates` (top 3).
+5. If `job_id` is null (submit failed), skip the lookup and fall back to the blind question.
 
-**If RCARS returns matches**, present them to the author:
+**If advisor returns candidates** (status=complete, candidates non-empty), present them:
 
-> I checked the RHDP catalog for similar content. Here's what already exists:
+> I checked the RHDP catalog for similar content. Here's what the advisor found:
 >
-> **Top matches:**
-> 1. **[display_name]** — [url]
-> 2. **[display_name]** — [url]
-> 3. **[display_name]** — [url]
+> 1. **[display_name]** (relevance: [relevance_score]%)
+>    *Why it's similar:* [why_it_fits — first sentence only]
+>    *Caveat:* [caveats — first sentence only]
+>
+> 2. **[display_name]** (relevance: [relevance_score]%)
+>    *Why it's similar:* [why_it_fits — first sentence only]
+>
+> 3. **[display_name]** (relevance: [relevance_score]%)
+>    *Why it's similar:* [why_it_fits — first sentence only]
 >
 > **How does your lab specifically differ from these?** What does it cover that these labs don't? What's the unique value for a learner who has already seen one of these?
 
-**If RCARS returns no matches** (empty or overlap_pct < 5%), present:
+**If advisor returns no candidates** (empty list or all relevance_score < 50), present:
 
-> I checked the RHDP catalog — no close matches found for your products and audience combination. This looks like genuinely new territory.
+> I checked the RHDP catalog — no close matches found for your topic and audience. This looks like genuinely new territory.
 >
 > **Still, how would you describe what makes this lab unique?** (This helps reviewers understand the positioning.)
 
-**If Central is unreachable** (network error, timeout), fall back gracefully:
+**If advisor failed or was unreachable** (job_id null, status=failed, or poll timed out), fall back:
 
 > **In your own words: how does this differ from existing content on similar topics?**
 > Reference specific existing labs you're aware of, and explain what this adds.
 
-- **spec.yaml field:** `approval_checklist.content_lead.differentiation`
-- **spec.yaml field:** `approval_checklist.content_lead.rcars_overlap_pct` — write from RCARS response (or null if unreachable)
-- **spec.yaml field:** `approval_checklist.content_lead.rcars_top_matches` — write from RCARS response (or [] if unreachable)
+**spec.yaml fields:**
+
+- `approval_checklist.content_lead.differentiation` — author's response (required, non-empty)
+- `approval_checklist.content_lead.rcars_overlap_pct` — highest `relevance_score` from candidates (or null)
+- `approval_checklist.content_lead.rcars_top_matches` — list from candidates, mapped as:
+  ```yaml
+  rcars_top_matches:
+    - title: "[display_name]"
+      ci_name: "[ci_name]"
+      url: "https://catalog.demo.redhat.com/catalog?item=[ci_name]"
+      relevance_score: [relevance_score]
+      why_it_fits: "[why_it_fits]"
+  ```
 - **Validation:** `differentiation` must be non-empty before intake completes.
 
 ---
@@ -240,4 +275,4 @@ Q22-Q24 numbers are preserved to maintain alignment with the gate validation spe
 - After each answer, immediately update `publishing-house/spec.yaml` with the captured value.
 - If an answer is vague, ask a single follow-up to clarify before moving on.
 - Q14–Q18 are infrastructure gates: if any required field is blank, intake is NOT complete. Do not signal completion to the orchestrator until all required fields are set.
-- **Q24 RCARS lookup is mandatory** — always attempt the lookup before asking the differentiation question. Only fall back to the blind question if Central is unreachable.
+- **RCARS advisor is mandatory** — always fire the advisor query after Q3 and poll before Q24. Only fall back to the blind question if the submit failed or the job didn't complete after retries.

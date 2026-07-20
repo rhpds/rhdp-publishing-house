@@ -83,6 +83,10 @@ spec:
                 secretKeyRef:
                   name: publishing-house-credentials
                   key: rcars-api-key
+          volumeMounts:
+            - name: validation-policy
+              mountPath: /etc/ph-policy
+              readOnly: true
           resources:
             requests:
               memory: 256Mi
@@ -102,3 +106,7 @@ spec:
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 5
+      volumes:
+        - name: validation-policy
+          configMap:
+            name: ph-validation-policy
