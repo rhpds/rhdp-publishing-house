@@ -181,9 +181,7 @@ commands:
         SKILL_DIR=/home/user/.claude/skills/publishing-house
         mkdir -p /home/user/.claude/skills
         if [ ! -d "$SKILL_DIR" ]; then
-          git clone --depth 1 -b main https://github.com/rhpds/rhdp-publishing-house.git /tmp/ph-repo >/dev/null 2>&1 \
-            && cp -r /tmp/ph-repo/skills "$SKILL_DIR" \
-            && rm -rf /tmp/ph-repo \
+          git clone -b main https://github.com/rhpds/rhdp-publishing-house-skills.git "$SKILL_DIR" >/dev/null 2>&1 \
             || echo "WARNING: could not install skills"
         fi
       workingDir: /home/user

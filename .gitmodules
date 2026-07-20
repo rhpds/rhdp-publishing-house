@@ -1,0 +1,3 @@
+[submodule "skills"]
+	path = skills
+	url = https://github.com/rhpds/rhdp-publishing-house-skills.git
