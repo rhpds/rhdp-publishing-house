@@ -33,6 +33,7 @@ function toSummary(inst: ProcessInstance): WorkflowSummary {
     jiraUrl: wd.jira_url || (wd.epic_key ? `https://redhat.atlassian.net/browse/${wd.epic_key}` : ''),
     repoUrl: wd.repoUrl || '',
     tags: Array.isArray(wd.tags) ? wd.tags : [],
+    projectDescription: wd.projectDescription || '',
     startedAt: inst.start,
     lastUpdate: inst.lastUpdate,
   };

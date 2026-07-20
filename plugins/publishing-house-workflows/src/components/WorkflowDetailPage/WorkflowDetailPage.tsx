@@ -195,6 +195,7 @@ export function WorkflowDetailPage() {
           <Grid item xs={12} md={6}>
             <InfoCard title="Project Details">
               <DetailField label="Project ID" value={summary.projectId} />
+              <DetailField label="Description" value={summary.projectDescription} />
               <DetailField label="Owner" value={summary.owner} />
               <DetailField label="SSO User" value={summary.ssoUser} />
               <DetailField label="Type" value={summary.contentType} />

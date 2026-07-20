@@ -19,6 +19,7 @@ export interface WorkflowVariables {
     epic_key?: string;
     jira_url?: string;
     tags?: string[];
+    projectDescription?: string;
   };
 }
 
@@ -60,6 +61,7 @@ export interface WorkflowSummary {
   jiraUrl: string;
   repoUrl: string;
   tags: string[];
+  projectDescription: string;
   startedAt: string;
   lastUpdate: string;
 }
