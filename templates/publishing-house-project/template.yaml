@@ -232,6 +232,16 @@ spec:
           - Update catalog-info.yaml with Jira ticket
           - Continue through Review → Development → Ready → Published
 
-          **Next:**
-          - Click "View Workflow Instances" above to find and monitor your workflow
-          - Open DevSpaces to start your content work
+          **Getting Started:**
+
+          **Option A — DevSpaces (recommended):**
+          1. Click the **Open in DevSpaces** link above
+          2. Once the workspace loads, open a new terminal
+          3. Start Claude CLI: `claude`
+          4. Run: `/rhdp-publishing-house`
+
+          **Option B — Local machine:**
+          1. Clone the repo: `git clone ${{ steps.publish.output.remoteUrl }}`
+          2. `cd ${{ parameters.project_name }}`
+          3. Start Claude CLI: `claude`
+          4. Run: `/rhdp-publishing-house`
