@@ -17,6 +17,8 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
         ("A-06", "spec.learning_objectives", spec.get("learning_objectives")),
         ("A-07", "spec.environment.topology", env.get("topology")),
         ("A-08", "spec.environment.ocp_version", env.get("ocp_version")),
+        ("A-09", "spec.environment.cloud_provider", env.get("cloud_provider")),
+        ("A-10", "spec.environment.cluster_type", env.get("cluster_type")),
     ]
 
     for check_id, field, value in required:

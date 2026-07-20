@@ -25,7 +25,7 @@ Capture what you know now — guesstimates are fine during intake. Spec refineme
 
 ### Base Infrastructure
 - Which base CI type: `ocp4-cluster`, `ocp-workloads`, `cloud-vms-base`, or existing CI name
-- Cloud provider: CNV (default), AWS, GCP, Azure. CNV unless exception granted.
+- `cloud_provider`: `cnv` (default) or `aws`. CNV unless exception granted. Stored in `spec.environment.cloud_provider`.
 - Automation approach: Ansible, GitOps (Helm + ArgoCD), or combo
 
 ### Cluster Sizing

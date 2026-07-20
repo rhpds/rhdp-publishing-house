@@ -97,13 +97,21 @@ results are ready by Q24. Do NOT wait for the response — continue with Q4.
 
 > **Let me confirm the infrastructure needs.** Based on what you described:
 > - **Base infrastructure:** [propose: ocp4-cluster, ocp-workloads, or cloud-vms-base]
-> - **Sizing:** [propose based on complexity — e.g. 6 workers, 8 vCPU, 32GB RAM, 100GB disk]
-> - **Cloud provider:** CNV (default) or exception?
+> - **Sizing:** [propose worker count and resources — e.g. 6 workers, 8 vCPU, 32GB RAM, 100GB disk]
+> - **Cloud provider:** CNV (default) or AWS?
 > - **Automation approach:** Ansible, GitOps (Helm + ArgoCD), or combo?
 >
 > **Does this sound right, or should I adjust anything?**
 
-- **spec.yaml fields:** `spec.environment.worker_count`, `worker_cpu`, `worker_ram_gb`, `worker_disk_gb`
+**After the user confirms**, if `worker_count` is 0, ask this follow-up:
+
+> **With zero worker nodes, is this a Single Node OpenShift (SNO) deployment?** SNO runs everything on one control-plane node. If you need separate workers later, we can switch to multinode.
+
+- If yes (or user confirmed 0 workers without objecting): set `cluster_type: sno`
+- If no (user says they want workers): ask for the worker count and set `cluster_type: multinode`
+- If `worker_count` > 0: set `cluster_type: multinode` automatically (no follow-up needed)
+
+- **spec.yaml fields:** `spec.environment.cloud_provider` (cnv | aws), `spec.environment.cluster_type` (sno | multinode), `worker_count`, `worker_cpu`, `worker_ram_gb`, `worker_disk_gb`
 - **Used in:** design.md Infrastructure Requirements section
 
 ## Q13: Reference Material

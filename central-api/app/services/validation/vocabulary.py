@@ -55,6 +55,52 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
             field="spec.audience",
         ))
 
+    # H-04: Cloud provider in vocabulary
+    valid_cloud_providers = [c.lower() for c in policy.get("valid_cloud_providers", ["cnv", "aws"])]
+    cloud_provider = spec.get("environment", {}).get("cloud_provider", "")
+    if cloud_provider:
+        if cloud_provider.lower() in valid_cloud_providers:
+            results.append(CheckResult(
+                check_id="H-04", group="H", status=CheckStatus.PASS,
+                message=f"cloud_provider '{cloud_provider}' is valid",
+                field="spec.environment.cloud_provider",
+            ))
+        else:
+            results.append(CheckResult(
+                check_id="H-04", group="H", status=CheckStatus.FAIL,
+                message=f"cloud_provider '{cloud_provider}' not in: {', '.join(valid_cloud_providers)}",
+                field="spec.environment.cloud_provider",
+            ))
+    else:
+        results.append(CheckResult(
+            check_id="H-04", group="H", status=CheckStatus.SKIP,
+            message="cloud_provider not set",
+            field="spec.environment.cloud_provider",
+        ))
+
+    # H-05: Cluster type in vocabulary
+    valid_cluster_types = [c.lower() for c in policy.get("valid_cluster_types", ["sno", "multinode"])]
+    cluster_type = spec.get("environment", {}).get("cluster_type", "")
+    if cluster_type:
+        if cluster_type.lower() in valid_cluster_types:
+            results.append(CheckResult(
+                check_id="H-05", group="H", status=CheckStatus.PASS,
+                message=f"cluster_type '{cluster_type}' is valid",
+                field="spec.environment.cluster_type",
+            ))
+        else:
+            results.append(CheckResult(
+                check_id="H-05", group="H", status=CheckStatus.FAIL,
+                message=f"cluster_type '{cluster_type}' not in: {', '.join(valid_cluster_types)}",
+                field="spec.environment.cluster_type",
+            ))
+    else:
+        results.append(CheckResult(
+            check_id="H-05", group="H", status=CheckStatus.SKIP,
+            message="cluster_type not set",
+            field="spec.environment.cluster_type",
+        ))
+
     # H-03: Product names against known list (if policy has products)
     if products_list:
         spec_products = project.get("products", [])
