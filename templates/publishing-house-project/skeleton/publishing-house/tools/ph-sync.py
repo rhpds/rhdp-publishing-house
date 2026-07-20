@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Shared workflow state script for all Publishing House skills.
+"""Sync workflow data to local files. Used by intake/development skills.
 
-Reads auth credentials, resolves workflow_id (calling /workflow-data if needed),
-queries /workflow-state, and syncs jira_ticket to spec.yaml.
+Calls /workflow-data and /workflow-state, then writes workflow_id, epic_key,
+and jira link back to spec.yaml and catalog-info.yaml.
 
 Output: key:value pairs, one per line
   stage:intake
   workflow_id:abc-123
   epic_key:RHDPCD-456
+  synced:true|false
 """
 import json
 import os
+import re
 import ssl
 import sys
 import urllib.request
@@ -26,6 +28,40 @@ def find_repo_root():
             return p
         p = p.parent
     return None
+
+
+def set_yaml_value(filepath, dotted_key, value):
+    """Update a single value in a YAML file without rewriting the entire file."""
+    text = filepath.read_text()
+    keys = dotted_key.split(".")
+    if len(keys) == 2:
+        section, field = keys
+        pattern = re.compile(
+            rf'^(\s*){re.escape(field)}:\s*"?.*"?\s*$', re.MULTILINE
+        )
+        in_section = False
+        lines = text.split("\n")
+        new_lines = []
+        replaced = False
+        for line in lines:
+            if re.match(rf'^{re.escape(section)}:\s*$', line):
+                in_section = True
+                new_lines.append(line)
+                continue
+            if in_section and not replaced:
+                m = pattern.match(line)
+                if m:
+                    indent = m.group(1)
+                    new_lines.append(f'{indent}{field}: "{value}"')
+                    replaced = True
+                    continue
+                if line and not line[0].isspace() and line[0] != "#":
+                    in_section = False
+            new_lines.append(line)
+        if replaced:
+            filepath.write_text("\n".join(new_lines))
+            return True
+    return False
 
 
 def main():
@@ -62,7 +98,7 @@ def main():
     ctx.verify_mode = ssl.CERT_NONE
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    spec_changed = False
+    synced = False
 
     if not wfid:
         try:
@@ -76,36 +112,34 @@ def main():
             wd_epic = wd.get("epic_key", "")
 
             if wfid:
-                spec.setdefault("project", {})["workflow_id"] = wfid
-                spec_changed = True
+                set_yaml_value(spec_path, "project.workflow_id", wfid)
+                synced = True
 
             deployment_mode = project.get("deployment_mode", "self_published")
             if deployment_mode == "rhdp_published" and not epic_key and wd_epic:
                 epic_key = wd_epic
-                spec.setdefault("project", {})["jira_ticket"] = epic_key
-                spec_changed = True
+                set_yaml_value(spec_path, "project.jira_ticket", epic_key)
+                synced = True
         except Exception as e:
             print(json.dumps({"error": f"Failed to fetch workflow data: {e}"}))
             sys.exit(1)
 
-    jira_url = ""
     if epic_key:
         jira_url = f"https://redhat.atlassian.net/browse/{epic_key}"
         deployment_mode = project.get("deployment_mode", "self_published")
         if deployment_mode == "rhdp_published":
             ci_path = root / "catalog-info.yaml"
-            ci = yaml.safe_load(ci_path.read_text())
-            links = ci.get("metadata", {}).get("links", [])
-            if not any(l.get("url") == jira_url for l in links):
-                ci.setdefault("metadata", {}).setdefault("links", []).append(
+            ci_text = ci_path.read_text()
+            if jira_url not in ci_text:
+                ci = yaml.safe_load(ci_text)
+                links = ci.get("metadata", {}).get("links", [])
+                links.append(
                     {"url": jira_url, "title": "Jira Epic", "icon": "dashboard"}
                 )
+                ci.setdefault("metadata", {})["links"] = links
                 with open(ci_path, "w") as f:
                     yaml.dump(ci, f, default_flow_style=False, sort_keys=False)
-
-    if spec_changed:
-        with open(spec_path, "w") as f:
-            yaml.dump(spec, f, default_flow_style=False, sort_keys=False)
+                synced = True
 
     stage = "intake"
     if wfid:
@@ -124,6 +158,7 @@ def main():
     print(f"stage:{stage}")
     print(f"workflow_id:{wfid}")
     print(f"epic_key:{epic_key}")
+    print(f"synced:{str(synced).lower()}")
 
 
 if __name__ == "__main__":
