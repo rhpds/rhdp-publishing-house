@@ -7,7 +7,7 @@ export function Router() {
   return (
     <Routes>
       <Route path="/" element={<WorkflowListPage />} />
-      <Route path="/:projectId" element={<WorkflowDetailPage />} />
+      <Route path="/:workflowId" element={<WorkflowDetailPage />} />
     </Routes>
   );
 }

@@ -7,5 +7,5 @@ export const rootRouteRef = createRouteRef({
 export const detailRouteRef = createSubRouteRef({
   id: 'ph-workflows-detail',
   parent: rootRouteRef,
-  path: '/:projectId',
+  path: '/:workflowId',
 });

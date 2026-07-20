@@ -66,7 +66,7 @@ function DetailField({ label, value }: { label: string; value: string }) {
 
 export function WorkflowDetailPage() {
   const classes = useStyles();
-  const { projectId } = useParams<{ projectId: string }>();
+  const { workflowId } = useParams<{ workflowId: string }>();
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
 
@@ -77,7 +77,7 @@ export function WorkflowDetailPage() {
     value: result,
     loading,
     error,
-  } = useAsync(() => client.getWorkflow(projectId!), [projectId, refreshKey]);
+  } = useAsync(() => client.getWorkflowById(workflowId!), [workflowId, refreshKey]);
 
   const [approvingStage, setApprovingStage] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{
@@ -128,7 +128,7 @@ export function WorkflowDetailPage() {
           <Typography>
             {error
               ? `Error: ${error.message}`
-              : `No workflow found for project "${projectId}"`}
+              : `No workflow found for ID "${workflowId}"`}
           </Typography>
         </Content>
       </Page>

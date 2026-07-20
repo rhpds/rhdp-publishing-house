@@ -287,7 +287,7 @@ export function WorkflowListPage() {
           }
           onRowClick={(_event, rowData) => {
             if (rowData) {
-              navigate(`/publishing-house-workflows/${rowData.projectId}`);
+              navigate(`/publishing-house-workflows/${rowData.id}`);
             }
           }}
         />

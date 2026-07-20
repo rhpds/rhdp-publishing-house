@@ -113,6 +113,50 @@ export function createPhWorkflowsClient(options: {
     return { summary: toSummary(inst), instance: inst };
   }
 
+  async function getWorkflowById(workflowId: string): Promise<{
+    summary: WorkflowSummary;
+    instance: ProcessInstance;
+  } | undefined> {
+    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
+    const query = `
+      query GetWorkflowById($id: String!) {
+        ProcessInstances(where: { id: { equal: $id } }) {
+          id
+          businessKey
+          processId
+          state
+          start
+          lastUpdate
+          nodes { name enter exit type }
+          variables
+        }
+      }
+    `;
+    const response = await fetchApi.fetch(
+      `${proxyUrl}/sonataflow/graphql`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, variables: { id: workflowId } }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Workflow query failed: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    const json = await response.json();
+    const instances: ProcessInstance[] =
+      json?.data?.ProcessInstances ?? [];
+
+    if (instances.length === 0) return undefined;
+
+    const inst = instances[0];
+    return { summary: toSummary(inst), instance: inst };
+  }
+
   async function sendApprovalEvent(
     workflowId: string,
     stage: WorkflowStage,
@@ -151,5 +195,5 @@ export function createPhWorkflowsClient(options: {
     }
   }
 
-  return { getWorkflows, getWorkflow, sendApprovalEvent };
+  return { getWorkflows, getWorkflow, getWorkflowById, sendApprovalEvent };
 }
