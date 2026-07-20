@@ -151,6 +151,7 @@ spec:
         url: ./skeleton
         values:
           project_name: ${{ parameters.project_name }}
+          project_description: ${{ parameters.project_description }}
           content_type: ${{ parameters.content_type }}
           deployment_mode: ${{ parameters.deployment_mode }}
           github_user: ${{ parameters.github_users[0].user }}
