@@ -37,7 +37,7 @@ class LiteLLMService:
                             "created_by": "publishing-house-central",
                             "user": user_email
                         },
-                        "models": ["claude-opus-4-6"],
+                        "models": ["claude-sonnet-4-6", "claude-opus-4-6"],
                         "spend": 0.0
                     }
                 )

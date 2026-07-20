@@ -27,7 +27,7 @@ async def generate_litellm_key(
     if not litellm_key:
         raise HTTPException(status_code=503, detail="Failed to generate LiteLLM key")
 
-    model = "claude-opus-4-6"
+    model = "claude-sonnet-4-6"
 
     return GenerateKeyResponse(
         project_id=request.project_id,
