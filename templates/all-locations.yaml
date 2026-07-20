@@ -5,4 +5,5 @@ metadata:
   description: Publishing House templates and components for RHDP content creation
 spec:
   targets:
+    - ./org-entities.yaml
     - ./template-locations.yaml
