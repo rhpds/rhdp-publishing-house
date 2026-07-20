@@ -241,7 +241,8 @@ spec:
           4. Run: `/rhdp-publishing-house`
 
           **Option B — Local machine:**
-          1. Clone the repo: `git clone ${{ steps.publish.output.remoteUrl }}`
-          2. `cd ${{ parameters.project_name }}`
-          3. Start Claude CLI: `claude`
-          4. Run: `/rhdp-publishing-house`
+          1. Install the skills: `git clone https://github.com/rhpds/rhdp-publishing-house-skills.git ~/.claude/skills/publishing-house`
+          2. Clone the repo: `git clone ${{ steps.publish.output.remoteUrl }}`
+          3. `cd ${{ parameters.project_name }}`
+          4. Start Claude CLI: `claude`
+          5. Run: `/rhdp-publishing-house`
