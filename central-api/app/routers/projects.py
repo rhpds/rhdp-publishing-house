@@ -249,7 +249,6 @@ def get_workflow_data(project_id: str):
         raise HTTPException(status_code=502, detail=f"Failed to query workflow: {e}")
 
 
-@router.get("/workflow-state/{workflow_id}")
 _STATE_MAP = {
     "intake": "intake",
     "contentreview": "content_review",
@@ -263,6 +262,7 @@ _STATE_MAP = {
 }
 
 
+@router.get("/workflow-state/{workflow_id}")
 def get_workflow_state(workflow_id: str):
     """Return semantic workflow stage by process instance UUID."""
     settings = get_settings()
