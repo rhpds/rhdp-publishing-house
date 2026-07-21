@@ -42,15 +42,7 @@ plugins:
       dynamicPlugins:
         frontend:
           red-hat-developer-hub.backstage-plugin-orchestrator:
-            appIcons:
-              - importName: OrchestratorIcon
-                name: orchestratorIcon
-            dynamicRoutes:
-              - importName: OrchestratorPage
-                menuItem:
-                  icon: orchestratorIcon
-                  text: Orchestrator
-                path: /orchestrator
+            dynamicRoutes: []
   - disabled: false
     package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{ '{{inherit}}' }}
     pluginConfig:
