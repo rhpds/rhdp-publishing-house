@@ -54,11 +54,24 @@ Policy is loaded from a ConfigMap-mounted YAML (`/etc/ph-policy/policy.yaml`) ra
 
 ### What's Not Built
 
-Seven features from the original spec are missing or need to be added. They fall into three categories: **spec locking** (protecting what was approved), **reviewer tooling** (helping humans make better decisions), and **lifecycle monitoring** (catching stalled or drifting projects proactively).
+Eight features from the original spec are missing or need to be added. They fall into three categories: **spec locking** (protecting what was approved), **reviewer tooling** (helping humans make better decisions), and **lifecycle monitoring** (catching stalled or drifting projects proactively).
+
+| # | Feature | Blocked By | Priority |
+|---|---------|-----------|----------|
+| 1 | Spec contract snapshot | Nothing — git-native | High — everything depends on it |
+| 2 | Gate enforcement (intake→review) | Nothing — validation runner exists | High — enables reviewer-informed approvals |
+| 3 | Reviewer sees report in RHDH | #2 Gate enforcement | High — the point of the gate report |
+| 4 | Audit trail | Nothing | Medium |
+| 5 | Reviewer access control (ACL) | Nothing | Medium — needs team decision on where lists live |
+| 6 | Drift detection (Gates 2, 3) | #1 Spec contract snapshot | Medium |
+| 7 | Inactivity detection | Nothing | Medium — needs team decision on mechanism |
+| 8 | Advisory (soft) check | Nothing | Nice to have — not blocking |
 
 > **Note:** The "pragmatic path forward" suggestions below are starting points, not prescriptions. The team should evaluate these against the current architecture and propose alternatives where a better solution exists. The goal is to solve each problem; the specific mechanism is open.
 >
 > **Known structural concern:** `spec.yaml` is accumulating a lot of responsibility — discovery fields, infrastructure details, RCARS results, approval checklist, rejection history, workflow metadata. It works for now, but it's becoming unwieldy and may not be the right long-term storage model. Any solution proposed here that adds more data to spec.yaml should be considered provisional. If a better data model emerges (separate files, a lightweight database, structured workflow variables), these decisions should be revisited.
+
+---
 
 #### 1. Spec Contract Snapshot + Drift Detection
 
@@ -128,7 +141,7 @@ The gate doesn't need to be a separate service. A single endpoint — `POST /api
 **What's needed:** When a project enters `content_review`, the automated validation report from Gate 1 should be visible in the RHDH plugin. The reviewer sees:
 
 - All deterministic checks: passed/failed/warned
-- The advisory (soft) check results (see #6 below)
+- The advisory (soft) check results (see #8 — nice to have)
 - Direct links to the spec files in the GitHub repo
 - The approval checklist answers the author provided
 
@@ -150,7 +163,7 @@ The team should evaluate which approach fits best given the current RHDH plugin 
 
 **Current state:** Nothing. If someone asks "who approved this spec and what did they see," there's no answer.
 
-**Pragmatic path forward:** Two options, both git-native:
+**Pragmatic path forward:** Two options:
 
 **Option A — SonataFlow workflow variables.** Gate results and approval decisions are stored in the workflow's `workflowdata`. SonataFlow's Data Index already persists these in PostgreSQL (the workflow DB, not a Central DB). The RHDH plugin already reads workflow variables via GraphQL. This is the lowest-effort path — no new infrastructure, just richer data in the existing workflow.
 
@@ -174,19 +187,11 @@ The approval model needs:
 
 **Pragmatic path forward:** Where the reviewer lists live is an open question — Keycloak groups, a ConfigMap, or hardcoded in the RHDH plugin config are all options. The team should decide based on how often the reviewer list changes and who manages it. The key requirement is that the enforcement happens in both the frontend (UX) and the backend (defense-in-depth).
 
-#### 6. Advisory (Soft) Check — Nice to Have
+#### 6. Drift Detection (Gates 2, 3)
 
-> **This is a nice-to-have.** It does not block any other feature and is not on the critical path. The deterministic checks (features #1-5) are the priority. This can be added later when the gate enforcement foundation is solid.
+Drift detection at downstream gates depends on the spec contract snapshot (#1). At each gate boundary after approval, Central re-extracts the contract fields from the current spec and diffs them against `.spec-contract.json`. If any contract field changed (module count, titles, products, learning objectives), the gate blocks with a specific message identifying what drifted.
 
-**What was planned:** A lightweight LLM check comparing spec content against structural expectations. Advisory only — never blocks the gate, but flags potential issues for the reviewer.
-
-**Current state:** Not implemented. All validation is deterministic.
-
-**What it would do:** "Here's what the spec says each module should cover. Here's the module outline. For each module, does the outline appear to address the spec's learning objectives? One sentence per module."
-
-**Pragmatic path forward (when prioritized):** Add a new check group (e.g., Group J) to the validation runner. Unlike groups A-I, this group calls an LLM via LiteLLM (already integrated into Central for key generation). Results are tagged as `status: ADVISORY` rather than `PASS`/`FAIL`, so they never block the gate but appear in the validation report.
-
-Model choice: Use a lightweight/open-source model via LiteLLM (Granite, Llama, or similar). Not a frontier model — this is a basic alignment check. Good visibility for showing Publishing House uses appropriate model tiers.
+This uses the same validation runner pattern as #2. Add `"development"` and `"release"` stages to `STAGE_GROUPS` in `runner.py`, mapping to a new drift-detection check group that compares against the contract file.
 
 #### 7. Inactivity Detection + Proactive Drift Flagging
 
@@ -211,22 +216,19 @@ Model choice: Use a lightweight/open-source model via LiteLLM (Granite, Llama, o
 
 The team should decide which approach fits. The key requirement: if a project goes quiet or its spec drifts, someone gets told about it before the next gate request.
 
----
+#### 8. Advisory (Soft) Check — Nice to Have
 
-### Gate Enforcement — Summary
+> **This is a nice-to-have.** It does not block any other feature and is not on the critical path. The deterministic checks (#1-#7) are the priority. This can be added later when the gate enforcement foundation is solid.
 
-| # | Feature | Blocked By | Priority |
-|---|---------|-----------|----------|
-| 1 | Spec contract snapshot | Nothing — git-native | High — everything depends on it |
-| 2 | Gate 1 report (intake→review) | Nothing — validation runner exists | High — enables reviewer-informed approvals |
-| 3 | Reviewer sees report in RHDH | Gate 1 report | High — the point of Gate 1 |
-| 4 | Audit trail | Nothing | Medium |
-| 5 | Reviewer access control (ACL) | Nothing | Medium — needs team decision on where lists live |
-| 6 | Drift detection (Gates 2, 3) | Spec contract snapshot | Medium |
-| 7 | Inactivity detection | Nothing | Medium — needs team decision on mechanism |
-| 8 | Advisory (soft) check | Nothing | Nice to have — not blocking |
+**What was planned:** A lightweight LLM check comparing spec content against structural expectations. Advisory only — never blocks the gate, but flags potential issues for the reviewer.
 
-Recommended order: Spec contract snapshot (#1) → Gate 1 report + reviewer UI (#2, #3) → Audit trail (#4) → Reviewer ACL (#5) → Drift detection (#6) → Inactivity detection (#7) → Advisory check (#8, when prioritized).
+**Current state:** Not implemented. All validation is deterministic.
+
+**What it would do:** "Here's what the spec says each module should cover. Here's the module outline. For each module, does the outline appear to address the spec's learning objectives? One sentence per module."
+
+**Pragmatic path forward (when prioritized):** Add a new check group (e.g., Group J) to the validation runner. Unlike groups A-I, this group calls an LLM via LiteLLM (already integrated into Central for key generation). Results are tagged as `status: ADVISORY` rather than `PASS`/`FAIL`, so they never block the gate but appear in the validation report.
+
+Model choice: Use a lightweight/open-source model via LiteLLM (Granite, Llama, or similar). Not a frontier model — this is a basic alignment check. Good visibility for showing Publishing House uses appropriate model tiers.
 
 ---
 
