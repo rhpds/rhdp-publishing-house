@@ -118,7 +118,7 @@ def rcars_overlap_check(
     """Check overlap with existing RCARS content by products + audience.
 
     Used by the intake endpoint to auto-compute rcars_overlap_pct and
-    rcars_top_matches for the approval_checklist.content_lead section.
+    rcars_top_matches for the approval_checklist.content section.
 
     Returns:
         {

@@ -1,5 +1,5 @@
 import { DiscoveryApi, FetchApi } from '@backstage/core-plugin-api';
-import { ProcessInstance, WorkflowSummary, WorkflowStage } from './types';
+import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData } from './types';
 import { deriveStage } from '../utils/stageMapping';
 
 const GRAPHQL_QUERY = `
@@ -195,5 +195,49 @@ export function createPhWorkflowsClient(options: {
     }
   }
 
-  return { getWorkflows, getWorkflow, getWorkflowById, sendApprovalEvent };
+  async function sendRejectionEvent(
+    workflowId: string,
+    stage: WorkflowStage,
+    rejectionData: RejectionData,
+    projectId?: string,
+  ): Promise<void> {
+    const typeMap: Partial<Record<WorkflowStage, string>> = {
+      content_review: 'ph.content-review.rejected',
+      infra_review: 'ph.infra-review.rejected',
+    };
+    const eventType = typeMap[stage];
+    if (!eventType) {
+      throw new Error(`Cannot reject stage: ${stage}`);
+    }
+
+    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
+    const response = await fetchApi.fetch(`${proxyUrl}/sonataflow/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/cloudevents+json' },
+      body: JSON.stringify({
+        specversion: '1.0',
+        type: eventType,
+        source: 'publishing-house',
+        id: crypto.randomUUID(),
+        kogitobusinesskey: projectId ?? workflowId,
+        projectid: projectId ?? workflowId,
+        datacontenttype: 'application/json',
+        data: {
+          rejectionId: rejectionData.rejectionId,
+          reviewerName: rejectionData.reviewerName,
+          reviewerStage: rejectionData.reviewerStage,
+          timestamp: rejectionData.timestamp,
+          reasons: rejectionData.reasons,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Rejection failed: ${response.status} ${response.statusText}`,
+      );
+    }
+  }
+
+  return { getWorkflows, getWorkflow, getWorkflowById, sendApprovalEvent, sendRejectionEvent };
 }

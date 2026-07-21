@@ -9,6 +9,7 @@ import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
 import FiberManualRecordIcon from '@material-ui/icons/FiberManualRecord';
 import ErrorIcon from '@material-ui/icons/Error';
+import ReplayIcon from '@material-ui/icons/Replay';
 import { WorkflowStage } from '../../api/types';
 import { STAGE_ORDER, STAGE_LABELS, stageIndex } from '../../utils/stageMapping';
 
@@ -29,6 +30,7 @@ const useStyles = makeStyles(theme => ({
     flexDirection: 'column' as const,
     alignItems: 'center',
     minWidth: 80,
+    position: 'relative' as const,
   },
   nodeLabel: {
     marginTop: 6,
@@ -42,12 +44,32 @@ const useStyles = makeStyles(theme => ({
     minWidth: 30,
     backgroundColor: theme.palette.divider,
   },
-  lineCompleted: { backgroundColor: '#4caf50' },
-  lineActive: { backgroundColor: theme.palette.primary.main },
   completed: { color: '#4caf50' },
-  active: { color: theme.palette.primary.main },
+  active: { color: '#4caf50' },
   error: { color: '#f44336' },
   iconLarge: { fontSize: '1.3rem' },
+  loopbackContainer: {
+    position: 'relative' as const,
+    width: '100%',
+    marginTop: theme.spacing(1),
+  },
+  loopbackArrow: {
+    position: 'absolute' as const,
+    top: 8,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    color: '#e57373',
+    fontSize: '0.7rem',
+    whiteSpace: 'nowrap' as const,
+  },
+  loopbackLine: {
+    height: 2,
+    backgroundColor: '#e57373',
+    borderRadius: 1,
+    position: 'absolute' as const,
+    top: 16,
+  },
 }));
 
 type NodeState = 'completed' | 'active' | 'pending' | 'error';
@@ -81,16 +103,16 @@ interface WorkflowProgressProps {
   stage: WorkflowStage;
   approvingStage?: string | null;
   onApprove?: (stage: WorkflowStage) => void;
+  onReject?: (stage: WorkflowStage) => void;
+  rejectedFrom?: WorkflowStage | null;
 }
 
-export function WorkflowProgress({ stage, approvingStage, onApprove }: WorkflowProgressProps) {
+export function WorkflowProgress({ stage, approvingStage, onApprove, onReject, rejectedFrom }: WorkflowProgressProps) {
   const classes = useStyles();
 
-  const lineCls = (state: NodeState) => {
-    if (state === 'completed') return `${classes.line} ${classes.lineCompleted}`;
-    if (state === 'active') return `${classes.line} ${classes.lineActive}`;
-    return classes.line;
-  };
+  const lineCls = () => classes.line;
+
+  const showLoopback = stage === 'intake' && rejectedFrom && APPROVE_STAGES.includes(rejectedFrom);
 
   return (
     <div className={classes.root}>
@@ -103,11 +125,20 @@ export function WorkflowProgress({ stage, approvingStage, onApprove }: WorkflowP
                 <NodeIcon state={st} />
                 <Typography className={classes.nodeLabel}>{STAGE_LABELS[s]}</Typography>
               </div>
-              {i < STAGE_ORDER.length - 1 && <div className={lineCls(st)} />}
+              {i < STAGE_ORDER.length - 1 && <div className={lineCls()} />}
             </React.Fragment>
           );
         })}
       </div>
+
+      {showLoopback && (
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6, color: '#e57373' }}>
+          <ReplayIcon style={{ fontSize: '1rem' }} />
+          <Typography variant="body2" style={{ color: '#e57373', fontWeight: 600 }}>
+            Rejected at {STAGE_LABELS[rejectedFrom!]} — returned to Intake for revisions
+          </Typography>
+        </div>
+      )}
 
       {APPROVE_STAGES.includes(stage) && onApprove && (
         <div style={{ marginTop: 24, paddingBottom: 8, display: 'flex', gap: 12 }}>
@@ -130,6 +161,7 @@ export function WorkflowProgress({ stage, approvingStage, onApprove }: WorkflowP
             style={{ backgroundColor: '#e57373', color: '#fff', fontWeight: 600 }}
             size="large"
             disabled={approvingStage !== null}
+            onClick={() => onReject?.(stage)}
           >
             Reject
           </Button>

@@ -42,6 +42,20 @@ spec:
           - contextAttributeName: projectid
         dataOnly: false
         kind: consumed
+        name: ContentReviewRejectedEvent
+        source: publishing-house
+        type: ph.content-review.rejected
+      - correlation:
+          - contextAttributeName: projectid
+        dataOnly: false
+        kind: consumed
+        name: InfraReviewRejectedEvent
+        source: publishing-house
+        type: ph.infra-review.rejected
+      - correlation:
+          - contextAttributeName: projectid
+        dataOnly: false
+        kind: consumed
         name: DevelopmentCompleteEvent
         source: publishing-house
         type: ph.development.complete
@@ -139,6 +153,12 @@ spec:
         timeouts:
           stateExecTimeout: PT168H
         transition:
+          nextState: ClearRejection
+      - name: ClearRejection
+        type: inject
+        data:
+          rejection: null
+        transition:
           nextState: ContentReview
       - name: ContentReview
         type: event
@@ -147,15 +167,34 @@ spec:
           - eventRefs:
               - ContentReviewCompleteEvent
             actions:
-              - name: LogContentReviewComplete
+              - name: LogContentReviewApproved
                 functionRef:
                   refName: printMessage
                   arguments:
-                    message: "Content review completed"
+                    message: "Content review approved"
+          - eventRefs:
+              - ContentReviewRejectedEvent
+            actions:
+              - name: LogContentReviewRejected
+                functionRef:
+                  refName: printMessage
+                  arguments:
+                    message: "Content review rejected — returning to intake"
+            eventDataFilter:
+              toStateData: ".rejection"
         timeouts:
           stateExecTimeout: PT168H
         transition:
-          nextState: InfraReview
+          nextState: ContentReviewDecision
+      - name: ContentReviewDecision
+        type: switch
+        dataConditions:
+          - condition: "${ .rejection != null }"
+            transition:
+              nextState: Intake
+        defaultCondition:
+          transition:
+            nextState: InfraReview
       - name: InfraReview
         type: event
         exclusive: true
@@ -163,15 +202,34 @@ spec:
           - eventRefs:
               - InfraReviewCompleteEvent
             actions:
-              - name: LogInfraReviewComplete
+              - name: LogInfraReviewApproved
                 functionRef:
                   refName: printMessage
                   arguments:
-                    message: "Infra review completed"
+                    message: "Infra review approved"
+          - eventRefs:
+              - InfraReviewRejectedEvent
+            actions:
+              - name: LogInfraReviewRejected
+                functionRef:
+                  refName: printMessage
+                  arguments:
+                    message: "Infra review rejected — returning to intake"
+            eventDataFilter:
+              toStateData: ".rejection"
         timeouts:
           stateExecTimeout: PT168H
         transition:
-          nextState: JiraSync
+          nextState: InfraReviewDecision
+      - name: InfraReviewDecision
+        type: switch
+        dataConditions:
+          - condition: "${ .rejection != null }"
+            transition:
+              nextState: Intake
+        defaultCondition:
+          transition:
+            nextState: JiraSync
       - name: JiraSync
         type: operation
         actions:

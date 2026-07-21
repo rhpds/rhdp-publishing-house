@@ -27,6 +27,9 @@ metadata:
     - url: ${{ values.devspaces_url }}#${{ values.repo_url }}
       title: Open in DevSpaces
       icon: catalog
+    - url: ${{ values.central_api_url }}
+      title: Central
+      icon: dashboard
 spec:
   type: content
   lifecycle: experimental

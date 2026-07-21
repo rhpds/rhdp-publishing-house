@@ -47,6 +47,19 @@ export type WorkflowStage =
   | 'published'
   | 'error';
 
+export interface RejectionReason {
+  id: number;
+  text: string;
+}
+
+export interface RejectionData {
+  rejectionId: string;
+  reviewerName: string;
+  reviewerStage: WorkflowStage;
+  timestamp: string;
+  reasons: RejectionReason[];
+}
+
 export interface WorkflowSummary {
   id: string;
   projectId: string;

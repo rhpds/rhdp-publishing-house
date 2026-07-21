@@ -233,11 +233,15 @@ def get_workflow_data(project_id: str):
         inst = instances[0]
         variables = inst.get("variables", {})
         wd = variables.get("workflowdata", {}) if isinstance(variables, dict) else {}
-        return {
+        rejection = wd.get("rejection") or variables.get("rejection")
+        result = {
             "project_id": project_id,
             "workflow_id": inst.get("id", ""),
             "epic_key": wd.get("epic_key", ""),
         }
+        if rejection:
+            result["rejection"] = rejection
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -283,9 +287,9 @@ def get_workflow_state(workflow_id: str):
                 for node in inst.get("nodes", []):
                     if node.get("enter") and not node.get("exit"):
                         node_name = node.get("name", "").lower()
-                        if node_name == "contentreview":
+                        if node_name in ("contentreview", "contentreviewdecision"):
                             stage = "content_review"
-                        elif node_name == "infrareview":
+                        elif node_name in ("infrareview", "infrareviewdecision"):
                             stage = "infra_review"
                         elif node_name == "jirasync":
                             stage = "jira_sync"

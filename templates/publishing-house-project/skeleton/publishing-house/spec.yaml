@@ -63,8 +63,8 @@ approval_checklist:
     decision: null                 # approved | denied | needs_info
     decision_notes: ""
 
-  # Content Dev Lead (Nate) — three authored fields + auto-computed RCARS overlap
-  content_lead:
+  # Content review — three authored fields + auto-computed RCARS overlap
+  content:
     prerequisites_verifiable: null # true | false — Q22: can lab validate prereqs automatically?
     assessment_strategy: ""        # Q23: how success is measured per module
     differentiation: ""            # Q24: author explains how this differs from existing content
@@ -72,8 +72,9 @@ approval_checklist:
     rcars_top_matches: []          # AUTO-COMPUTED: [{ci_name, display_name, url}]
     decision: null                 # approved | denied | needs_info
     decision_notes: ""
+    rejections: []                 # list of {rejection_id, reviewer, timestamp, reasons: [{id, text, resolved}]}
 
-  # Infra Team — auto-computed fields + infra fills base CI and provisioning time for non-standard
+  # Infra review — auto-computed fields + infra fills base CI and provisioning time for non-standard
   infra:
     peak_environments: null        # AUTO-COMPUTED: max_concurrent_users x topology factor
     cost_per_run_est: ""           # AUTO-COMPUTED: indicative cost from sizing
@@ -82,3 +83,4 @@ approval_checklist:
     decision: null                 # approved | denied | needs_info
     decision_notes: ""
     approved_by: ""                # GitHub ID of infra approver
+    rejections: []                 # list of {rejection_id, reviewer, timestamp, reasons: [{id, text, resolved}]}

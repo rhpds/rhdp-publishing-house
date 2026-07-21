@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Sync workflow data to local files. Used by intake/development skills.
 
-Calls /workflow-data and /workflow-state, then writes workflow_id, epic_key,
-and jira link back to spec.yaml and catalog-info.yaml.
+Always calls /workflow-data and /workflow-state. Only writes fields to
+spec.yaml and catalog-info.yaml if they are not already set locally.
+Rejections are always synced, matched by rejection_id and reason index.
 
 Output: key:value pairs, one per line
   stage:intake
   workflow_id:abc-123
   epic_key:RHDPCD-456
-  synced:true|false
 """
 import json
 import os
@@ -64,6 +64,42 @@ def set_yaml_value(filepath, dotted_key, value):
     return False
 
 
+def sync_rejection(spec_path, rejection):
+    """Append rejection to spec.yaml if its rejection_id is new. Never overwrites existing entries."""
+    if not rejection:
+        return
+
+    rejection_id = rejection.get("rejectionId", "")
+    if not rejection_id:
+        return
+
+    reviewer_stage = rejection.get("reviewerStage", "")
+    section = "content" if reviewer_stage == "content_review" else "infra"
+
+    spec_data = yaml.safe_load(spec_path.read_text()) or {}
+    checklist = spec_data.setdefault("approval_checklist", {})
+    section_data = checklist.setdefault(section, {})
+    rejections = section_data.setdefault("rejections", [])
+
+    known_ids = {r.get("rejection_id") for r in rejections}
+    if rejection_id in known_ids:
+        return
+
+    reasons = []
+    for r in rejection.get("reasons", []):
+        reasons.append({"id": r.get("id"), "text": r.get("text"), "resolved": False})
+
+    rejections.append({
+        "rejection_id": rejection_id,
+        "reviewer": rejection.get("reviewerName", ""),
+        "timestamp": rejection.get("timestamp", ""),
+        "reasons": reasons,
+    })
+
+    with open(spec_path, "w") as f:
+        yaml.dump(spec_data, f, default_flow_style=False, sort_keys=False)
+
+
 def main():
     root = find_repo_root()
     if not root:
@@ -98,48 +134,43 @@ def main():
     ctx.verify_mode = ssl.CERT_NONE
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    synced = False
+    try:
+        req = urllib.request.Request(
+            f"{central}/api/v1/projects/{project_id}/workflow-data",
+            headers=headers,
+        )
+        with urllib.request.urlopen(req, context=ctx, timeout=10) as r:
+            wd = json.loads(r.read().decode())
+    except Exception as e:
+        print(json.dumps({"error": f"Failed to fetch workflow data: {e}"}))
+        sys.exit(1)
 
-    if not wfid:
-        try:
-            req = urllib.request.Request(
-                f"{central}/api/v1/projects/{project_id}/workflow-data",
-                headers=headers,
-            )
-            with urllib.request.urlopen(req, context=ctx, timeout=10) as r:
-                wd = json.loads(r.read().decode())
-            wfid = wd.get("workflow_id", "")
-            wd_epic = wd.get("epic_key", "")
+    wd_wfid = wd.get("workflow_id", "")
+    wd_epic = wd.get("epic_key", "")
+    rejection = wd.get("rejection")
 
-            if wfid:
-                set_yaml_value(spec_path, "project.workflow_id", wfid)
-                synced = True
+    if not wfid and wd_wfid:
+        wfid = wd_wfid
+        set_yaml_value(spec_path, "project.workflow_id", wfid)
 
-            deployment_mode = project.get("deployment_mode", "self_published")
-            if deployment_mode == "rhdp_published" and not epic_key and wd_epic:
-                epic_key = wd_epic
-                set_yaml_value(spec_path, "project.jira_ticket", epic_key)
-                synced = True
-        except Exception as e:
-            print(json.dumps({"error": f"Failed to fetch workflow data: {e}"}))
-            sys.exit(1)
+    deployment_mode = project.get("deployment_mode", "self_published")
+    if deployment_mode == "rhdp_published" and not epic_key and wd_epic:
+        epic_key = wd_epic
+        set_yaml_value(spec_path, "project.jira_ticket", epic_key)
 
-    if epic_key:
+    if epic_key and deployment_mode == "rhdp_published":
         jira_url = f"https://redhat.atlassian.net/browse/{epic_key}"
-        deployment_mode = project.get("deployment_mode", "self_published")
-        if deployment_mode == "rhdp_published":
-            ci_path = root / "catalog-info.yaml"
-            ci_text = ci_path.read_text()
-            if jira_url not in ci_text:
-                ci = yaml.safe_load(ci_text)
-                links = ci.get("metadata", {}).get("links", [])
-                links.append(
-                    {"url": jira_url, "title": "Jira Epic", "icon": "dashboard"}
-                )
-                ci.setdefault("metadata", {})["links"] = links
-                with open(ci_path, "w") as f:
-                    yaml.dump(ci, f, default_flow_style=False, sort_keys=False)
-                synced = True
+        ci_path = root / "catalog-info.yaml"
+        ci_text = ci_path.read_text()
+        if jira_url not in ci_text:
+            ci = yaml.safe_load(ci_text)
+            links = ci.get("metadata", {}).get("links", [])
+            links.append(
+                {"url": jira_url, "title": "Jira Epic", "icon": "dashboard"}
+            )
+            ci.setdefault("metadata", {})["links"] = links
+            with open(ci_path, "w") as f:
+                yaml.dump(ci, f, default_flow_style=False, sort_keys=False)
 
     stage = "intake"
     if wfid:
@@ -155,10 +186,20 @@ def main():
             print(json.dumps({"error": f"Failed to fetch workflow state: {e}"}))
             sys.exit(1)
 
+    sync_rejection(spec_path, rejection)
+
+    unresolved = 0
+    refreshed_spec = yaml.safe_load(spec_path.read_text()) or {}
+    for section in ("content", "infra"):
+        for rej in refreshed_spec.get("approval_checklist", {}).get(section, {}).get("rejections", []):
+            for reason in rej.get("reasons", []):
+                if not reason.get("resolved", False):
+                    unresolved += 1
+
     print(f"stage:{stage}")
     print(f"workflow_id:{wfid}")
     print(f"epic_key:{epic_key}")
-    print(f"synced:{str(synced).lower()}")
+    print(f"unresolved_rejections:{unresolved}")
 
 
 if __name__ == "__main__":

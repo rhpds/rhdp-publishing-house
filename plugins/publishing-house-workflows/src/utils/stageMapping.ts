@@ -14,8 +14,8 @@ export function deriveStage(
     if (node.enter && !node.exit) {
       const name = node.name.toLowerCase();
       let candidate: WorkflowStage | undefined;
-      if (name === 'contentreview') candidate = 'content_review';
-      else if (name === 'infrareview') candidate = 'infra_review';
+      if (name === 'contentreview' || name === 'contentreviewdecision') candidate = 'content_review';
+      else if (name === 'infrareview' || name === 'infrareviewdecision') candidate = 'infra_review';
       else if (name === 'jirasync') candidate = 'jira_sync';
       else if (name.includes('createepic')) candidate = 'setup';
       else if (name.includes('development') || name.includes('writing'))

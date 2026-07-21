@@ -27,10 +27,12 @@ import { Alert } from '@material-ui/lab';
 import GitHubIcon from '@material-ui/icons/GitHub';
 import BugReportIcon from '@material-ui/icons/BugReport';
 import RefreshIcon from '@material-ui/icons/Refresh';
+import ReplayIcon from '@material-ui/icons/Replay';
 import { createPhWorkflowsClient } from '../../api/client';
-import { WorkflowStage } from '../../api/types';
+import { WorkflowStage, RejectionData } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
 import { WorkflowProgress } from './WorkflowProgress';
+import { RejectionDialog } from './RejectionDialog';
 
 const useStyles = makeStyles(theme => ({
   linkButtons: {
@@ -80,6 +82,9 @@ export function WorkflowDetailPage() {
   } = useAsync(() => client.getWorkflowById(workflowId!), [workflowId, refreshKey]);
 
   const [approvingStage, setApprovingStage] = useState<string | null>(null);
+  const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
+  const [rejectingStage, setRejectingStage] = useState<WorkflowStage | null>(null);
+  const [submittingRejection, setSubmittingRejection] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     severity: 'success' | 'error';
@@ -109,6 +114,40 @@ export function WorkflowDetailPage() {
     }
   };
 
+  const handleReject = (stage: WorkflowStage) => {
+    setRejectingStage(stage);
+    setRejectionDialogOpen(true);
+  };
+
+  const handleRejectionConfirm = async (data: RejectionData) => {
+    if (!result || !rejectingStage) return;
+    setSubmittingRejection(true);
+    try {
+      await client.sendRejectionEvent(result.summary.id, rejectingStage, data, result.summary.projectId);
+      setRejectionDialogOpen(false);
+      setSnackbar({
+        open: true,
+        severity: 'success',
+        message: `${STAGE_LABELS[rejectingStage]} rejected — workflow returning to Intake...`,
+      });
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      setRefreshKey(k => k + 1);
+    } catch (err: any) {
+      setSnackbar({
+        open: true,
+        severity: 'error',
+        message: `Rejection failed: ${err.message}`,
+      });
+    } finally {
+      setSubmittingRejection(false);
+    }
+  };
+
+  const handleRejectionCancel = () => {
+    setRejectionDialogOpen(false);
+    setRejectingStage(null);
+  };
+
   if (loading) {
     return (
       <Page themeId="tool">
@@ -135,8 +174,13 @@ export function WorkflowDetailPage() {
     );
   }
 
-  const { summary } = result;
+  const { summary, instance } = result;
   const stageLabel = STAGE_LABELS[summary.stage] || summary.stage;
+  const rejection = instance?.variables?.workflowdata
+    ? (instance.variables as any).workflowdata?.rejection ?? (instance.variables as any).rejection
+    : null;
+  const rejectedFrom = rejection?.reviewerStage as WorkflowStage | null;
+  const rejectionReasons = rejection?.reasons ?? [];
 
   return (
     <Page themeId="tool">
@@ -187,8 +231,29 @@ export function WorkflowDetailPage() {
             stage={summary.stage}
             approvingStage={approvingStage}
             onApprove={handleApprove}
+            onReject={handleReject}
+            rejectedFrom={rejectedFrom}
           />
         </InfoCard>
+
+        {rejectionReasons.length > 0 && (
+          <InfoCard title={`Rejected at ${STAGE_LABELS[rejectedFrom!] || 'Review'}`}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <ReplayIcon style={{ fontSize: '1rem', color: '#e57373' }} />
+              <Typography variant="body2" style={{ color: '#e57373', fontWeight: 600 }}>
+                Reviewer: {rejection?.reviewerName || '—'}
+                {rejection?.timestamp ? ` — ${new Date(rejection.timestamp).toLocaleString()}` : ''}
+              </Typography>
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 24 }}>
+              {rejectionReasons.map((r: any) => (
+                <li key={r.id}>
+                  <Typography variant="body2">{r.text}</Typography>
+                </li>
+              ))}
+            </ul>
+          </InfoCard>
+        )}
 
         <Grid container spacing={3} className={classes.detailGrid}>
           <Grid item xs={12} md={6}>
@@ -238,6 +303,15 @@ export function WorkflowDetailPage() {
             </InfoCard>
           </Grid>
         </Grid>
+
+        <RejectionDialog
+          open={rejectionDialogOpen}
+          stage={rejectingStage || 'content_review'}
+          reviewerName={summary.ssoEmail || summary.owner}
+          submitting={submittingRejection}
+          onConfirm={handleRejectionConfirm}
+          onCancel={handleRejectionCancel}
+        />
 
         <Snackbar
           open={snackbar.open}
