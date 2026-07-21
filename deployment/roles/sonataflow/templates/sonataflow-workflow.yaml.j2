@@ -19,49 +19,49 @@ spec:
     events:
       - correlation:
           - contextAttributeName: projectid
-        dataOnly: false
+        dataOnly: true
         kind: consumed
         name: IntakeCompleteEvent
         source: publishing-house
         type: ph.intake.complete
       - correlation:
           - contextAttributeName: projectid
-        dataOnly: false
+        dataOnly: true
         kind: consumed
         name: ContentReviewCompleteEvent
         source: publishing-house
         type: ph.content-review.complete
       - correlation:
           - contextAttributeName: projectid
-        dataOnly: false
+        dataOnly: true
         kind: consumed
         name: InfraReviewCompleteEvent
         source: publishing-house
         type: ph.infra-review.complete
       - correlation:
           - contextAttributeName: projectid
-        dataOnly: false
+        dataOnly: true
         kind: consumed
         name: ContentReviewRejectedEvent
         source: publishing-house
         type: ph.content-review.rejected
       - correlation:
           - contextAttributeName: projectid
-        dataOnly: false
+        dataOnly: true
         kind: consumed
         name: InfraReviewRejectedEvent
         source: publishing-house
         type: ph.infra-review.rejected
       - correlation:
           - contextAttributeName: projectid
-        dataOnly: false
+        dataOnly: true
         kind: consumed
         name: DevelopmentCompleteEvent
         source: publishing-house
         type: ph.development.complete
       - correlation:
           - contextAttributeName: projectid
-        dataOnly: false
+        dataOnly: true
         kind: consumed
         name: ReadyCompleteEvent
         source: publishing-house
@@ -102,6 +102,9 @@ spec:
               reviews: {
                 content: false,
                 infra: false
+              },
+              rejection: {
+                isRejected: false
               }
             }
         transition:
@@ -150,14 +153,11 @@ spec:
                   refName: printMessage
                   arguments:
                     message: "Intake completed, starting reviews"
+            eventDataFilter:
+              data: "{isRejected: false}"
+              toStateData: ".rejection"
         timeouts:
           stateExecTimeout: PT168H
-        transition:
-          nextState: ClearRejection
-      - name: ClearRejection
-        type: inject
-        data:
-          rejection: null
         transition:
           nextState: ContentReview
       - name: ContentReview
@@ -189,7 +189,7 @@ spec:
       - name: ContentReviewDecision
         type: switch
         dataConditions:
-          - condition: "${ .rejection != null }"
+          - condition: "${ .rejection.isRejected == true }"
             transition:
               nextState: Intake
         defaultCondition:
@@ -224,7 +224,7 @@ spec:
       - name: InfraReviewDecision
         type: switch
         dataConditions:
-          - condition: "${ .rejection != null }"
+          - condition: "${ .rejection.isRejected == true }"
             transition:
               nextState: Intake
         defaultCondition:

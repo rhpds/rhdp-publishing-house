@@ -236,7 +236,7 @@ export function WorkflowDetailPage() {
           />
         </InfoCard>
 
-        {rejectionReasons.length > 0 && (
+        {rejection?.isRejected && rejectionReasons.length > 0 && (
           <InfoCard title={`Rejected at ${STAGE_LABELS[rejectedFrom!] || 'Review'}`}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
               <ReplayIcon style={{ fontSize: '1rem', color: '#e57373' }} />

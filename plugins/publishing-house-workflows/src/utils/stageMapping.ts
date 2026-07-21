@@ -1,5 +1,17 @@
 import { WorkflowNode, WorkflowStage } from '../api/types';
 
+const STATE_MAP: Record<string, WorkflowStage> = {
+  intake: 'intake',
+  contentreview: 'content_review',
+  contentreviewdecision: 'content_review',
+  infrareview: 'infra_review',
+  infrareviewdecision: 'infra_review',
+  jirasync: 'jira_sync',
+  development: 'development',
+  ready: 'ready',
+  published: 'published',
+};
+
 export function deriveStage(
   nodes: WorkflowNode[],
   processState: string,
@@ -8,29 +20,15 @@ export function deriveStage(
   if (processState === 'ERROR') return 'error';
 
   let best: WorkflowStage = 'intake';
-  let bestIdx = -1;
+  let latestEnter = '';
 
   for (const node of nodes) {
-    if (node.enter && !node.exit) {
-      const name = node.name.toLowerCase();
-      let candidate: WorkflowStage | undefined;
-      if (name === 'contentreview' || name === 'contentreviewdecision') candidate = 'content_review';
-      else if (name === 'infrareview' || name === 'infrareviewdecision') candidate = 'infra_review';
-      else if (name === 'jirasync') candidate = 'jira_sync';
-      else if (name.includes('createepic')) candidate = 'setup';
-      else if (name.includes('development') || name.includes('writing'))
-        candidate = 'development';
-      else if (name.includes('ready') || name.includes('final'))
-        candidate = 'ready';
-      else if (name.includes('publish')) candidate = 'published';
-
-      if (candidate) {
-        const idx = STAGE_ORDER.indexOf(candidate);
-        if (idx > bestIdx) {
-          best = candidate;
-          bestIdx = idx;
-        }
-      }
+    if (node.type !== 'CompositeContextNode') continue;
+    if (!node.enter || node.exit) continue;
+    const candidate = STATE_MAP[node.name.toLowerCase()];
+    if (candidate && node.enter > latestEnter) {
+      best = candidate;
+      latestEnter = node.enter;
     }
   }
   return best;

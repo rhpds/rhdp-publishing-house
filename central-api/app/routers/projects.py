@@ -250,6 +250,19 @@ def get_workflow_data(project_id: str):
 
 
 @router.get("/workflow-state/{workflow_id}")
+_STATE_MAP = {
+    "intake": "intake",
+    "contentreview": "content_review",
+    "contentreviewdecision": "content_review",
+    "infrareview": "infra_review",
+    "infrareviewdecision": "infra_review",
+    "jirasync": "jira_sync",
+    "development": "development",
+    "ready": "ready",
+    "published": "published",
+}
+
+
 def get_workflow_state(workflow_id: str):
     """Return semantic workflow stage by process instance UUID."""
     settings = get_settings()
@@ -260,7 +273,7 @@ def get_workflow_state(workflow_id: str):
                     ProcessInstances(where: { id: { equal: $id } }) {
                         id
                         state
-                        nodes { name enter exit }
+                        nodes { name type enter exit }
                     }
                 }
             """,
@@ -284,24 +297,16 @@ def get_workflow_state(workflow_id: str):
                 stage = "error"
             else:
                 stage = "intake"
+                latest_enter = ""
                 for node in inst.get("nodes", []):
-                    if node.get("enter") and not node.get("exit"):
-                        node_name = node.get("name", "").lower()
-                        if node_name in ("contentreview", "contentreviewdecision"):
-                            stage = "content_review"
-                        elif node_name in ("infrareview", "infrareviewdecision"):
-                            stage = "infra_review"
-                        elif node_name == "jirasync":
-                            stage = "jira_sync"
-                        elif "createepic" in node_name:
-                            stage = "setup"
-                        elif "development" in node_name or "writing" in node_name:
-                            stage = "development"
-                        elif "ready" in node_name or "final" in node_name:
-                            stage = "ready"
-                        elif "publish" in node_name:
-                            stage = "published"
-                        break
+                    if node.get("type") != "CompositeContextNode":
+                        continue
+                    if not node.get("enter") or node.get("exit"):
+                        continue
+                    candidate = _STATE_MAP.get(node.get("name", "").lower())
+                    if candidate and node["enter"] > latest_enter:
+                        stage = candidate
+                        latest_enter = node["enter"]
 
             return {
                 "stage": stage,

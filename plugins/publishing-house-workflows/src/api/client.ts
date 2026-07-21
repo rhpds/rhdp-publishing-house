@@ -223,6 +223,7 @@ export function createPhWorkflowsClient(options: {
         projectid: projectId ?? workflowId,
         datacontenttype: 'application/json',
         data: {
+          isRejected: true,
           rejectionId: rejectionData.rejectionId,
           reviewerName: rejectionData.reviewerName,
           reviewerStage: rejectionData.reviewerStage,
