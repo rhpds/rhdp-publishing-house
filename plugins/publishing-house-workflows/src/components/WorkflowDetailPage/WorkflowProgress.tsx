@@ -9,7 +9,6 @@ import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
 import FiberManualRecordIcon from '@material-ui/icons/FiberManualRecord';
 import ErrorIcon from '@material-ui/icons/Error';
-import ReplayIcon from '@material-ui/icons/Replay';
 import { WorkflowStage } from '../../api/types';
 import { STAGE_ORDER, STAGE_LABELS, stageIndex } from '../../utils/stageMapping';
 
@@ -48,28 +47,6 @@ const useStyles = makeStyles(theme => ({
   active: { color: '#4caf50' },
   error: { color: '#f44336' },
   iconLarge: { fontSize: '1.3rem' },
-  loopbackContainer: {
-    position: 'relative' as const,
-    width: '100%',
-    marginTop: theme.spacing(1),
-  },
-  loopbackArrow: {
-    position: 'absolute' as const,
-    top: 8,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-    color: '#e57373',
-    fontSize: '0.7rem',
-    whiteSpace: 'nowrap' as const,
-  },
-  loopbackLine: {
-    height: 2,
-    backgroundColor: '#e57373',
-    borderRadius: 1,
-    position: 'absolute' as const,
-    top: 16,
-  },
 }));
 
 type NodeState = 'completed' | 'active' | 'pending' | 'error';
@@ -112,8 +89,6 @@ export function WorkflowProgress({ stage, approvingStage, onApprove, onReject, r
 
   const lineCls = () => classes.line;
 
-  const showLoopback = stage === 'intake' && rejectedFrom && APPROVE_STAGES.includes(rejectedFrom);
-
   return (
     <div className={classes.root}>
       <div className={classes.pipeline}>
@@ -130,15 +105,6 @@ export function WorkflowProgress({ stage, approvingStage, onApprove, onReject, r
           );
         })}
       </div>
-
-      {showLoopback && (
-        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6, color: '#e57373' }}>
-          <ReplayIcon style={{ fontSize: '1rem' }} />
-          <Typography variant="body2" style={{ color: '#e57373', fontWeight: 600 }}>
-            Rejected at {STAGE_LABELS[rejectedFrom!]} — returned to Intake for revisions
-          </Typography>
-        </div>
-      )}
 
       {APPROVE_STAGES.includes(stage) && onApprove && (
         <div style={{ marginTop: 24, paddingBottom: 8, display: 'flex', gap: 12 }}>
