@@ -25,7 +25,7 @@ spec:
     topology: ""           # shared-cluster | per-student | cnv-pool — Q6
     cloud_provider: cnv    # cnv | aws — Q12; cnv is default
     cluster_type: sno      # sno | multinode — Q12; derived from worker count
-    control_plane_instance_count: 3  # always 3 (1 if sno is handled by pool)
+    control_plane_instance_count: 1  # 1 if sno, 3 if multinode
     control_plane_cpu: 32            # 32 if sno, 16 if multinode
     control_plane_ram_gb: 128        # 128 if sno, 64 if multinode
     # --- Infrastructure fields (Parts 3 of gate validation spec RHDPCD-170) ---
