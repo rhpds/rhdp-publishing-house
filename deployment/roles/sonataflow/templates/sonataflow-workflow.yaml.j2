@@ -107,7 +107,7 @@ spec:
                 isRejected: false
               },
               reviewHistory: [],
-              activeCommitSha: ""
+              activeCommitSha: (.activeCommitSha // "")
             }
         transition:
           nextState: CreateEpic

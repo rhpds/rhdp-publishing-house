@@ -501,6 +501,8 @@ export function WorkflowDetailPage() {
                           <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
                             <th style={{ padding: '6px 8px' }}>Catalog Item</th>
                             <th style={{ padding: '6px 8px' }}>Display Name</th>
+                            <th style={{ padding: '6px 8px' }}>Relevance</th>
+                            <th style={{ padding: '6px 8px' }}>Why It Fits</th>
                             <th style={{ padding: '6px 8px' }}>Link</th>
                           </tr>
                         </thead>
@@ -508,7 +510,9 @@ export function WorkflowDetailPage() {
                           {validationReport.approval_checklist.content.rcars_top_matches!.map((m, i) => (
                             <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                               <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{m.ci_name}</td>
-                              <td style={{ padding: '6px 8px' }}>{m.display_name}</td>
+                              <td style={{ padding: '6px 8px' }}>{m.display_name || m.title || '—'}</td>
+                              <td style={{ padding: '6px 8px' }}>{m.relevance_score != null ? `${m.relevance_score}%` : '—'}</td>
+                              <td style={{ padding: '6px 8px', maxWidth: 300 }}>{m.why_it_fits || '—'}</td>
                               <td style={{ padding: '6px 8px' }}>
                                 {m.url ? <a href={m.url} target="_blank" rel="noopener noreferrer">View</a> : '—'}
                               </td>
