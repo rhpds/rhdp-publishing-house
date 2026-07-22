@@ -153,7 +153,7 @@ def _advance_workflow(
 
     for attempt in range(3):
         time.sleep(5)
-        stage = get_workflow_state(wf_uuid).get("stage", "intake")
+        stage = _get_workflow_state(wf_uuid).get("stage", "intake")
         if stage != "intake":
             logger.info("workflow %s advanced to %s after %d poll(s)", project_slug, stage, attempt + 1)
             return stage
@@ -207,10 +207,8 @@ def refresh_key(key_id: str, email: str = Depends(require_oidc_auth)):
 
 # ── Project Endpoints ─────────────────────────────────────────────────────────
 
-@router.get("/{project_id}/workflow-data")
-def get_workflow_data(project_id: str):
-    """Return workflow data subset (epic_key, jira_url).
-    Stage is NOT returned here — use /workflow-state for stage."""
+def _get_workflow_data(project_id: str):
+    """Internal: query workflow data — no auth check."""
     settings = get_settings()
     try:
         graphql_query = {
@@ -253,6 +251,12 @@ def get_workflow_data(project_id: str):
         raise HTTPException(status_code=502, detail=f"Failed to query workflow: {e}")
 
 
+@router.get("/{project_id}/workflow-data")
+def get_workflow_data(project_id: str, _caller: str = Depends(_require_auth)):
+    """Return workflow data subset (epic_key, jira_url)."""
+    return _get_workflow_data(project_id)
+
+
 _STATE_MAP = {
     "intake": "intake",
     "contentreview": "content_review",
@@ -266,9 +270,8 @@ _STATE_MAP = {
 }
 
 
-@router.get("/workflow-state/{workflow_id}")
-def get_workflow_state(workflow_id: str):
-    """Return semantic workflow stage by process instance UUID."""
+def _get_workflow_state(workflow_id: str):
+    """Internal: query workflow state — no auth check."""
     settings = get_settings()
     try:
         graphql_query = {
@@ -322,9 +325,15 @@ def get_workflow_state(workflow_id: str):
     return {"stage": "intake", "workflow_id": workflow_id, "source": "fallback"}
 
 
+@router.get("/workflow-state/{workflow_id}")
+def get_workflow_state(workflow_id: str, _caller: str = Depends(_require_auth)):
+    """Return semantic workflow stage by process instance UUID."""
+    return _get_workflow_state(workflow_id)
+
+
 def _require_stage(workflow_id: str, allowed: list[str]) -> str:
     """Check the workflow stage and raise 409 if not in allowed list."""
-    current = get_workflow_state(workflow_id).get("stage", "unknown")
+    current = _get_workflow_state(workflow_id).get("stage", "unknown")
     if current not in allowed:
         raise HTTPException(
             status_code=409,
@@ -358,7 +367,7 @@ async def submit_intake(
     try:
         # Look up workflow
         try:
-            wd = get_workflow_data(project_slug)
+            wd = _get_workflow_data(project_slug)
         except HTTPException as e:
             if e.status_code == 404:
                 return JSONResponse(status_code=404, content=IntakeResponse(
@@ -373,7 +382,7 @@ async def submit_intake(
             ).model_dump())
 
         # Check stage
-        current = get_workflow_state(wf_uuid).get("stage", "unknown")
+        current = _get_workflow_state(wf_uuid).get("stage", "unknown")
         stage = current
         if current != "intake":
             return JSONResponse(status_code=409, content=IntakeResponse(

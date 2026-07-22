@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..models import GenerateKeyRequest, GenerateKeyResponse
 from ..services.litellm import LiteLLMService
 from ..config import get_settings, Settings
+from .projects import _require_auth
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ def get_litellm_service(settings: Settings = Depends(get_settings)) -> LiteLLMSe
 @router.post("/keys/generate", response_model=GenerateKeyResponse)
 async def generate_litellm_key(
     request: GenerateKeyRequest,
+    _caller: str = Depends(_require_auth),
     litellm: LiteLLMService = Depends(get_litellm_service),
     settings: Settings = Depends(get_settings)
 ):

@@ -14,6 +14,7 @@ from typing import Optional
 
 from ..config import get_settings, Settings
 from ..services.github import GitHubService
+from .projects import _require_auth
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/jira", tags=["Jira"])
@@ -48,6 +49,7 @@ def _jira_headers(settings: Settings) -> dict:
 @router.post("/epic", response_model=CreateEpicResponse, status_code=201)
 def create_epic(
     body: CreateEpicRequest,
+    _caller: str = Depends(_require_auth),
     settings: Settings = Depends(get_settings),
 ):
     """Create a minimal Jira epic for a new publishing house project.
@@ -141,6 +143,7 @@ class SyncResponse(BaseModel):
 @router.post("/sync", response_model=SyncResponse)
 def sync_jira_tasks(
     body: SyncRequest,
+    _caller: str = Depends(_require_auth),
     settings: Settings = Depends(get_settings),
 ):
     """Read jira.yaml from project repo, update epic, close intake, create tasks.
