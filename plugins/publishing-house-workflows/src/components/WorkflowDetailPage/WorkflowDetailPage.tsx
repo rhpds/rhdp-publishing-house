@@ -616,7 +616,7 @@ export function WorkflowDetailPage() {
                     {[...reviewHistory].reverse().map((entry, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
                         <td style={{ padding: '6px 8px' }}>
-                          {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '—'}
+                          {entry.timestamp ? new Date(Number(entry.timestamp) > 1e9 && Number(entry.timestamp) < 1e13 ? Number(entry.timestamp) * 1000 : entry.timestamp).toLocaleString() : '—'}
                         </td>
                         <td style={{ padding: '6px 8px' }}>{entry.user || '—'}</td>
                         <td style={{ padding: '6px 8px' }}>{STAGE_LABELS[entry.stage as WorkflowStage] || entry.stage}</td>
