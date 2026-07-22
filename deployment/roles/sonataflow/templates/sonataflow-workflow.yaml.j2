@@ -158,6 +158,10 @@ spec:
             eventDataFilter:
               toStateData: ".latestAudit"
         stateDataFilter:
+          input: |
+            . + {
+              reviewHistory: (((.reviewHistory // []) + [{stage: "intake", action: "started", timestamp: (now | todate), user: (.ssoEmail // "system")}]) | unique_by(.timestamp + .stage + .action))
+            }
           output: |
             . + {
               reviewHistory: (((.reviewHistory // []) + [.latestAudit]) | unique_by(.timestamp + .stage + .action)),
@@ -193,6 +197,10 @@ spec:
             eventDataFilter:
               toStateData: ".latestAudit"
         stateDataFilter:
+          input: |
+            . + {
+              reviewHistory: (((.reviewHistory // []) + [{stage: "content_review", action: "started", timestamp: (now | todate), user: "system"}]) | unique_by(.timestamp + .stage + .action))
+            }
           output: |
             . + {
               reviewHistory: (((.reviewHistory // []) + [.latestAudit]) | unique_by(.timestamp + .stage + .action)),
@@ -237,6 +245,10 @@ spec:
             eventDataFilter:
               toStateData: ".latestAudit"
         stateDataFilter:
+          input: |
+            . + {
+              reviewHistory: (((.reviewHistory // []) + [{stage: "infra_review", action: "started", timestamp: (now | todate), user: "system"}]) | unique_by(.timestamp + .stage + .action))
+            }
           output: |
             . + {
               reviewHistory: (((.reviewHistory // []) + [.latestAudit]) | unique_by(.timestamp + .stage + .action)),
@@ -281,10 +293,14 @@ spec:
                 functionRef:
                   refName: printMessage
                   arguments:
-                    message: "Development completed, transitioning to Ready"
+                    message: "Development completed, transitioning to Testing"
             eventDataFilter:
               toStateData: ".latestAudit"
         stateDataFilter:
+          input: |
+            . + {
+              reviewHistory: (((.reviewHistory // []) + [{stage: "development", action: "started", timestamp: (now | todate), user: "system"}]) | unique_by(.timestamp + .stage + .action))
+            }
           output: |
             . + {
               reviewHistory: (((.reviewHistory // []) + [.latestAudit]) | unique_by(.timestamp + .stage + .action))
@@ -308,6 +324,10 @@ spec:
             eventDataFilter:
               toStateData: ".latestAudit"
         stateDataFilter:
+          input: |
+            . + {
+              reviewHistory: (((.reviewHistory // []) + [{stage: "testing", action: "started", timestamp: (now | todate), user: "system"}]) | unique_by(.timestamp + .stage + .action))
+            }
           output: |
             . + {
               reviewHistory: (((.reviewHistory // []) + [.latestAudit]) | unique_by(.timestamp + .stage + .action))
@@ -321,6 +341,11 @@ spec:
         data:
           stage: published
           completedAt: "${ now() }"
+        stateDataFilter:
+          output: |
+            . + {
+              reviewHistory: (((.reviewHistory // []) + [{stage: "published", action: "started", timestamp: (now | todate), user: "system"}, {stage: "published", action: "complete", timestamp: (now | todate), user: "system"}]) | unique_by(.timestamp + .stage + .action))
+            }
         end:
           terminate: true
   persistence:

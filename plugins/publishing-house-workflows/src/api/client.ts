@@ -189,7 +189,7 @@ export function createPhWorkflowsClient(options: {
         data: {
           user: auditData?.user ?? '',
           stage,
-          action: 'approved',
+          action: stage === 'development' || stage === 'testing' ? 'completed' : 'approved',
           timestamp: new Date().toISOString(),
           commitSha: auditData?.commitSha ?? '',
         },
