@@ -160,7 +160,7 @@ spec:
         stateDataFilter:
           input: |
             . + {
-              reviewHistory: (((.reviewHistory // []) + [{stage: "intake", action: "started", timestamp: (now | todate), user: (.ssoEmail // "system")}]) | unique_by(.timestamp + .stage + .action))
+              reviewHistory: (((.reviewHistory // []) + [{stage: "intake", action: "started", timestamp: (now | tostring), user: (.ssoEmail // "system")}]) | unique_by(.timestamp + .stage + .action))
             }
           output: |
             . + {
@@ -199,7 +199,7 @@ spec:
         stateDataFilter:
           input: |
             . + {
-              reviewHistory: (((.reviewHistory // []) + [{stage: "content_review", action: "started", timestamp: (now | todate), user: "system"}]) | unique_by(.timestamp + .stage + .action))
+              reviewHistory: (((.reviewHistory // []) + [{stage: "content_review", action: "started", timestamp: (now | tostring), user: "system"}]) | unique_by(.timestamp + .stage + .action))
             }
           output: |
             . + {
@@ -247,7 +247,7 @@ spec:
         stateDataFilter:
           input: |
             . + {
-              reviewHistory: (((.reviewHistory // []) + [{stage: "infra_review", action: "started", timestamp: (now | todate), user: "system"}]) | unique_by(.timestamp + .stage + .action))
+              reviewHistory: (((.reviewHistory // []) + [{stage: "infra_review", action: "started", timestamp: (now | tostring), user: "system"}]) | unique_by(.timestamp + .stage + .action))
             }
           output: |
             . + {
@@ -299,7 +299,7 @@ spec:
         stateDataFilter:
           input: |
             . + {
-              reviewHistory: (((.reviewHistory // []) + [{stage: "development", action: "started", timestamp: (now | todate), user: "system"}]) | unique_by(.timestamp + .stage + .action))
+              reviewHistory: (((.reviewHistory // []) + [{stage: "development", action: "started", timestamp: (now | tostring), user: "system"}]) | unique_by(.timestamp + .stage + .action))
             }
           output: |
             . + {
@@ -326,7 +326,7 @@ spec:
         stateDataFilter:
           input: |
             . + {
-              reviewHistory: (((.reviewHistory // []) + [{stage: "testing", action: "started", timestamp: (now | todate), user: "system"}]) | unique_by(.timestamp + .stage + .action))
+              reviewHistory: (((.reviewHistory // []) + [{stage: "testing", action: "started", timestamp: (now | tostring), user: "system"}]) | unique_by(.timestamp + .stage + .action))
             }
           output: |
             . + {
@@ -344,7 +344,7 @@ spec:
         stateDataFilter:
           output: |
             . + {
-              reviewHistory: (((.reviewHistory // []) + [{stage: "published", action: "started", timestamp: (now | todate), user: "system"}, {stage: "published", action: "complete", timestamp: (now | todate), user: "system"}]) | unique_by(.timestamp + .stage + .action))
+              reviewHistory: (((.reviewHistory // []) + [{stage: "published", action: "started", timestamp: (now | tostring), user: "system"}, {stage: "published", action: "complete", timestamp: (now | tostring), user: "system"}]) | unique_by(.timestamp + .stage + .action))
             }
         end:
           terminate: true

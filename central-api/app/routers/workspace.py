@@ -6,6 +6,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 
 from ..config import get_settings
+from .projects import _create_key
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,10 @@ async def workspace_setup(
 
     logger.info("Workspace setup for user=%s", user_email)
 
+    rec, raw_key = _create_key(user_email, label="DevSpaces Key")
+    logger.info("Created per-user key for %s (id=%s)", user_email, rec.id)
+
     return WorkspaceSetupResponse(
-        api_key=settings.ph_api_key,
+        api_key=raw_key,
         user_email=user_email,
     )
