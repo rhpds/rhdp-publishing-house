@@ -475,20 +475,20 @@ export function WorkflowDetailPage() {
                   </Grid>
                   <Grid item xs={12}>
                     <Typography className={classes.label}>Assessment Strategy (Q23)</Typography>
-                    <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', backgroundColor: '#f5f5f5', padding: 12, borderRadius: 4 }}>
+                    <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 4 }}>
                       {validationReport.approval_checklist.content.assessment_strategy || '— not set —'}
                     </Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography className={classes.label}>Differentiation (Q24)</Typography>
-                    <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', backgroundColor: '#f5f5f5', padding: 12, borderRadius: 4 }}>
+                    <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 4 }}>
                       {validationReport.approval_checklist.content.differentiation || '— not set —'}
                     </Typography>
                   </Grid>
                   {validationReport.approval_checklist.content.rcars_overlap_pct != null && (
                     <Grid item xs={12}>
                       <Typography className={classes.label}>RCARS Overlap</Typography>
-                      <Typography variant="body2" style={{ fontWeight: 600, color: (validationReport.approval_checklist.content.rcars_overlap_pct ?? 0) > 60 ? '#c62828' : '#2e7d32' }}>
+                      <Typography variant="body2" style={{ fontWeight: 600, color: (validationReport.approval_checklist.content.rcars_overlap_pct ?? 0) > 60 ? '#ef5350' : '#66bb6a' }}>
                         {validationReport.approval_checklist.content.rcars_overlap_pct}%
                       </Typography>
                     </Grid>
@@ -498,7 +498,7 @@ export function WorkflowDetailPage() {
                       <Typography className={classes.label}>RCARS Top Matches</Typography>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', marginTop: 4 }}>
                         <thead>
-                          <tr style={{ borderBottom: '2px solid #e0e0e0', textAlign: 'left' }}>
+                          <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
                             <th style={{ padding: '6px 8px' }}>Catalog Item</th>
                             <th style={{ padding: '6px 8px' }}>Display Name</th>
                             <th style={{ padding: '6px 8px' }}>Link</th>
@@ -506,7 +506,7 @@ export function WorkflowDetailPage() {
                         </thead>
                         <tbody>
                           {validationReport.approval_checklist.content.rcars_top_matches!.map((m, i) => (
-                            <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                               <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{m.ci_name}</td>
                               <td style={{ padding: '6px 8px' }}>{m.display_name}</td>
                               <td style={{ padding: '6px 8px' }}>
@@ -616,7 +616,14 @@ export function WorkflowDetailPage() {
                     {[...reviewHistory].reverse().map((entry, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
                         <td style={{ padding: '6px 8px' }}>
-                          {entry.timestamp ? new Date(Number(entry.timestamp) > 1e9 && Number(entry.timestamp) < 1e13 ? Number(entry.timestamp) * 1000 : entry.timestamp).toLocaleString() : '—'}
+                          {(() => {
+                            if (!entry.timestamp) return '—';
+                            const n = Number(entry.timestamp);
+                            if (!isNaN(n) && n > 1_000_000_000 && n < 10_000_000_000_000) {
+                              return new Date(n < 10_000_000_000 ? n * 1000 : n).toLocaleString();
+                            }
+                            return new Date(entry.timestamp).toLocaleString();
+                          })()}
                         </td>
                         <td style={{ padding: '6px 8px' }}>{entry.user || '—'}</td>
                         <td style={{ padding: '6px 8px' }}>{STAGE_LABELS[entry.stage as WorkflowStage] || entry.stage}</td>

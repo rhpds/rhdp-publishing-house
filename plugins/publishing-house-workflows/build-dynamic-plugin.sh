@@ -32,7 +32,7 @@ ANNOTATION=$(node -e "
 
 # Build the image with the annotation
 echo "==> Building OCI image: ${IMAGE}"
-podman build --platform linux/amd64 \
+podman build --platform linux/amd64 --no-cache \
   --annotation "io.backstage.dynamic-packages=${ANNOTATION}" \
   -t "${IMAGE}" -f Containerfile .
 
