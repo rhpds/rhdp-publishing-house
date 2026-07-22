@@ -236,40 +236,64 @@ spec:
       - title: View Repository
         icon: github
         url: ${{ steps.publish.output.remoteUrl }}
+        if: ${{ steps['check-catalog'].output.entity == null }}
 
       - title: View in Catalog
         icon: catalog
         url: /catalog/default/component/${{ parameters.project_name }}
+        if: ${{ steps['check-catalog'].output.entity == null }}
 
       - title: Open in DevSpaces
         icon: launch
         url: https://devspaces.${{ environment.parameters.baseDomain }}#https://github.com/rhpds/${{ parameters.project_name }}
+        if: ${{ steps['check-catalog'].output.entity == null }}
+
+      - title: View Existing Project in Catalog
+        icon: catalog
+        url: /catalog/default/component/${{ parameters.project_name }}
+        if: ${{ steps['check-catalog'].output.entity != null }}
 
     text:
-      - title: Next Steps
-        content: |
-          🎉 **Your Publishing House project is live!** You're ready to start building.
+      - title: Status
+        content: >-
+          ${{ steps['check-catalog'].output.entity == null
+            ? '🎉 **Your Publishing House project is live!** You are ready to start building.
 
-          **Here's what we set up for you:**
-          1. ✅ Repository created at ${{ steps.publish.output.remoteUrl }}
+
+          **Here is what we set up for you:**
+
+          1. ✅ Repository created at ' + steps.publish.output.remoteUrl + '
+
           2. ✅ catalog-info.yaml added to repository
+
           3. ✅ Registered in Backstage catalog
+
           4. ✅ Orchestrator workflow started — your AI-guided content pipeline is running!
 
-          **What happens next:**
-          Claude will walk you through the entire content lifecycle — from intake and spec creation, through Jira tracking and reviews, all the way to a published lab on RHDP. Just follow the prompts!
 
           **🚀 Getting Started:**
 
+
           **Option A — DevSpaces (recommended, fastest way to start!):**
+
           1. Click the **Open in DevSpaces** link above
+
           2. Once the workspace loads, open a new terminal
+
           3. Start Claude CLI: `claude`
-          4. Run: `/rhdp-publishing-house` — and you're off!
+
+          4. Run: `/rhdp-publishing-house` — and you are off!
+
 
           **Option B — Local machine:**
+
           1. Install the skills: `git clone https://github.com/rhpds/rhdp-publishing-house-skills.git ~/.claude/skills/publishing-house`
-          2. Clone the repo: `git clone ${{ steps.publish.output.remoteUrl }}`
-          3. `cd ${{ parameters.project_name }}`
+
+          2. Clone the repo: `git clone ' + steps.publish.output.remoteUrl + '`
+
+          3. `cd ' + parameters.project_name + '`
+
           4. Start Claude CLI: `claude`
-          5. Run: `/rhdp-publishing-house` — and you're off!
+
+          5. Run: `/rhdp-publishing-house` — and you are off!'
+            : '⚠️ **Scaffolding skipped!** A project named "' + parameters.project_name + '" already exists in the catalog. No repository was created and no workflow was started. Click **Start Over** below to choose a different project name.' }}
