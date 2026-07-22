@@ -220,63 +220,18 @@ spec:
       - title: Open Repository
         icon: github
         url: https://github.com/rhpds/${{ parameters.project_name }}
-        if: ${{ steps['check-catalog'].output.entity == null }}
 
       - title: View in Catalog
         icon: catalog
         url: /catalog/default/component/${{ parameters.project_name }}
-        if: ${{ steps['check-catalog'].output.entity == null }}
 
       - title: Open in DevSpaces
         icon: launch
         url: https://devspaces.${{ environment.parameters.baseDomain }}#https://github.com/rhpds/${{ parameters.project_name }}
-        if: ${{ steps['check-catalog'].output.entity == null }}
-
-      - title: View Existing Project in Catalog
-        icon: catalog
-        entityRef: component:default/${{ parameters.project_name }}
-        if: ${{ steps['check-catalog'].output.entity != null }}
 
     text:
-      - title: Your Publishing House project is live!
-        if: ${{ steps['check-catalog'].output.entity == null }}
-        content: |
-          You are ready to start building. Here is what we set up for you:
-
-          * **Repository created:** https://github.com/rhpds/${{ parameters.project_name }}
-          * **catalog-info.yaml** added to repository
-          * **Registered** in Backstage catalog
-          * **Orchestrator workflow started** — your AI-guided content pipeline is running!
-
-          ---
-
-          ### Getting Started
-
-          #### Option A — DevSpaces (recommended, fastest way to start!)
-          1. Click the **Open in DevSpaces** link above.
-          2. Once the workspace loads, open a new terminal.
-          3. Start Claude CLI: `claude`
-          4. Run: `/rhdp-publishing-house` — and you are off!
-
-          #### Option B — Local machine
-          1. Install the skills:
-             ```bash
-             git clone https://github.com/rhpds/rhdp-publishing-house-skills.git ~/.claude/skills/publishing-house
-             ```
-          2. Clone the repo:
-             ```bash
-             git clone https://github.com/rhpds/${{ parameters.project_name }}.git
-             cd ${{ parameters.project_name }}
-             ```
-          3. Start Claude CLI: `claude`
-          4. Run: `/rhdp-publishing-house` — and you are off!
-
-      - title: Scaffolding skipped!
-        if: ${{ steps['check-catalog'].output.entity != null }}
-        content: |
-          A project named **"${{ parameters.project_name }}"** already exists in the catalog.
-
-          * No repository was created.
-          * No workflow was started.
-
-          Please click **Start Over** below or adjust your input to choose a different project name.
+      - title: Result
+        content: >-
+          ${{ steps['check-catalog'].output.entity == null
+          ? 'Your project has been created successfully. Click **Open in DevSpaces** above to get started, then run `/rhdp-publishing-house` in the Claude CLI.'
+          : 'A project named **"' + parameters.project_name + '"** already exists in the catalog. All steps were skipped — no repository was created and no workflow was started. Click **Start Over** to choose a different project name.' }}
