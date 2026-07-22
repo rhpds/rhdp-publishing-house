@@ -1,5 +1,5 @@
 import { DiscoveryApi, FetchApi } from '@backstage/core-plugin-api';
-import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData } from './types';
+import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport } from './types';
 import { deriveStage } from '../utils/stageMapping';
 
 const GRAPHQL_QUERY = `
@@ -161,6 +161,7 @@ export function createPhWorkflowsClient(options: {
     workflowId: string,
     stage: WorkflowStage,
     projectId?: string,
+    auditData?: { user: string; commitSha?: string },
   ): Promise<void> {
     const typeMap: Partial<Record<WorkflowStage, string>> = {
       content_review: 'ph.content-review.complete',
@@ -184,7 +185,13 @@ export function createPhWorkflowsClient(options: {
         kogitobusinesskey: projectId ?? workflowId,
         projectid: projectId ?? workflowId,
         datacontenttype: 'application/json',
-        data: {},
+        data: {
+          user: auditData?.user ?? '',
+          stage,
+          action: 'approved',
+          timestamp: new Date().toISOString(),
+          commitSha: auditData?.commitSha ?? '',
+        },
       }),
     });
 
@@ -200,6 +207,7 @@ export function createPhWorkflowsClient(options: {
     stage: WorkflowStage,
     rejectionData: RejectionData,
     projectId?: string,
+    commitSha?: string,
   ): Promise<void> {
     const typeMap: Partial<Record<WorkflowStage, string>> = {
       content_review: 'ph.content-review.rejected',
@@ -223,11 +231,12 @@ export function createPhWorkflowsClient(options: {
         projectid: projectId ?? workflowId,
         datacontenttype: 'application/json',
         data: {
-          isRejected: true,
-          rejectionId: rejectionData.rejectionId,
-          reviewerName: rejectionData.reviewerName,
-          reviewerStage: rejectionData.reviewerStage,
+          user: rejectionData.reviewerName,
+          stage,
+          action: 'rejected',
           timestamp: rejectionData.timestamp,
+          commitSha: commitSha ?? '',
+          rejectionId: rejectionData.rejectionId,
           reasons: rejectionData.reasons,
         },
       }),
@@ -240,5 +249,55 @@ export function createPhWorkflowsClient(options: {
     }
   }
 
-  return { getWorkflows, getWorkflow, getWorkflowById, sendApprovalEvent, sendRejectionEvent };
+  async function fetchValidationReport(
+    slug: string,
+    repoUrl: string,
+    branch: string = 'main',
+    activeCommitSha?: string,
+  ): Promise<ValidationReport> {
+    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
+    const params = new URLSearchParams({ stage: 'review' });
+    if (activeCommitSha) {
+      params.set('active_commit_sha', activeCommitSha);
+    }
+    const response = await fetchApi.fetch(
+      `${proxyUrl}/central-api/validate/${slug}?${params}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo_url: repoUrl, branch }),
+      },
+    );
+
+    const json = await response.json();
+    return json as ValidationReport;
+  }
+
+  async function fetchHeadCommitSha(
+    repoUrl: string,
+    branch: string = 'main',
+  ): Promise<string | undefined> {
+    const match = repoUrl.replace(/\.git$/, '').match(/github\.com\/([^/]+)\/([^/]+)/);
+    if (!match) return undefined;
+    const [, owner, repo] = match;
+
+    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
+    const response = await fetchApi.fetch(
+      `${proxyUrl}/github/api/repos/${owner}/${repo}/commits/${branch}`,
+      { headers: { Accept: 'application/vnd.github.sha' } },
+    );
+
+    if (!response.ok) return undefined;
+    return (await response.text()).trim();
+  }
+
+  return {
+    getWorkflows,
+    getWorkflow,
+    getWorkflowById,
+    sendApprovalEvent,
+    sendRejectionEvent,
+    fetchValidationReport,
+    fetchHeadCommitSha,
+  };
 }

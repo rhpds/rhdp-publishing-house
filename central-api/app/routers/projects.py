@@ -112,7 +112,9 @@ def _require_auth(
     return rec.owner_email
 
 
-def _advance_workflow(project_slug: str, wf_uuid: str, epic_key: str, jira_url: str, settings=None) -> str:
+def _advance_workflow(
+    project_slug: str, wf_uuid: str, owner: str, commit_sha: str | None = None, settings=None,
+) -> str:
     """Send IntakeCompleteEvent CloudEvent to SonataFlow and verify advancement.
     project_slug is the business key for event correlation.
     wf_uuid is the process instance UUID for state polling.
@@ -130,9 +132,11 @@ def _advance_workflow(project_slug: str, wf_uuid: str, epic_key: str, jira_url: 
             "projectid": project_slug,
             "datacontenttype": "application/json",
             "data": {
-                "projectid": project_slug,
-                "epic_key": epic_key,
-                "jira_url": jira_url
+                "user": owner,
+                "stage": "intake",
+                "action": "submitted",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "commitSha": commit_sha,
             }
         }
         req = urllib.request.Request(
@@ -394,9 +398,9 @@ async def submit_intake(
             ).model_dump())
 
         # Advance workflow
-        epic_key = wd.get("epic_key", "")
-        jira_url = f"https://redhat.atlassian.net/browse/{epic_key}" if epic_key else ""
-        new_stage = _advance_workflow(project_slug, wf_uuid, epic_key, jira_url, settings)
+        new_stage = _advance_workflow(
+            project_slug, wf_uuid, owner, commit_sha=result.commit_sha, settings=settings,
+        )
         logger.info("intake: workflow advanced to %s for %s", new_stage, project_slug)
 
         return JSONResponse(status_code=201, content=IntakeResponse(

@@ -28,6 +28,12 @@ spec:
           spec:
             containers:
               - name: backstage-backend
+                env:
+                  - name: PH_API_KEY
+                    valueFrom:
+                      secretKeyRef:
+                        name: publishing-house-credentials
+                        key: api-key
                 resources:
                   limits:
                     cpu: "4"

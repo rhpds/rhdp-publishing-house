@@ -20,6 +20,8 @@ export interface WorkflowVariables {
     jira_url?: string;
     tags?: string[];
     projectDescription?: string;
+    activeCommitSha?: string;
+    reviewHistory?: AuditEntry[];
   };
 }
 
@@ -58,6 +60,37 @@ export interface RejectionData {
   reviewerStage: WorkflowStage;
   timestamp: string;
   reasons: RejectionReason[];
+}
+
+export type CheckStatus = 'pass' | 'fail' | 'skip' | 'warn';
+
+export interface ValidationCheck {
+  check_id: string;
+  group: string;
+  status: CheckStatus;
+  message: string;
+  field?: string;
+}
+
+export interface AutoComputedFields {
+  peak_environments?: number;
+  cost_per_run_est?: number;
+  provisioning_time_min?: number;
+}
+
+export interface ValidationReport {
+  passed: boolean;
+  results: ValidationCheck[];
+  auto_computed?: AutoComputedFields;
+  commit_sha?: string;
+}
+
+export interface AuditEntry {
+  user: string;
+  stage: string;
+  action: string;
+  timestamp: string;
+  commitSha?: string;
 }
 
 export interface WorkflowSummary {

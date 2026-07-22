@@ -34,3 +34,4 @@ class ValidationResponse(BaseModel):
     passed: bool
     results: list[CheckResult]
     auto_computed: Optional[AutoComputedFields] = None
+    commit_sha: Optional[str] = None

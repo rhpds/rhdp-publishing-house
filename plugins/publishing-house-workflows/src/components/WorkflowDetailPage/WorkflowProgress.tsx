@@ -1,8 +1,6 @@
 import React from 'react';
 import {
   makeStyles,
-  Button,
-  CircularProgress,
   Typography,
 } from '@material-ui/core';
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
@@ -11,8 +9,6 @@ import FiberManualRecordIcon from '@material-ui/icons/FiberManualRecord';
 import ErrorIcon from '@material-ui/icons/Error';
 import { WorkflowStage } from '../../api/types';
 import { STAGE_ORDER, STAGE_LABELS, stageIndex } from '../../utils/stageMapping';
-
-const APPROVE_STAGES: WorkflowStage[] = ['content_review', 'infra_review'];
 
 const useStyles = makeStyles(theme => ({
   root: {
@@ -78,13 +74,10 @@ function getNodeState(s: WorkflowStage, currentStage: WorkflowStage): NodeState 
 
 interface WorkflowProgressProps {
   stage: WorkflowStage;
-  approvingStage?: string | null;
-  onApprove?: (stage: WorkflowStage) => void;
-  onReject?: (stage: WorkflowStage) => void;
   rejectedFrom?: WorkflowStage | null;
 }
 
-export function WorkflowProgress({ stage, approvingStage, onApprove, onReject, rejectedFrom }: WorkflowProgressProps) {
+export function WorkflowProgress({ stage }: WorkflowProgressProps) {
   const classes = useStyles();
 
   const lineCls = () => classes.line;
@@ -106,33 +99,6 @@ export function WorkflowProgress({ stage, approvingStage, onApprove, onReject, r
         })}
       </div>
 
-      {APPROVE_STAGES.includes(stage) && onApprove && (
-        <div style={{ marginTop: 24, paddingBottom: 8, display: 'flex', gap: 12 }}>
-          <Button
-            variant="contained"
-            style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
-            size="large"
-            startIcon={
-              approvingStage === stage ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : undefined
-            }
-            onClick={() => onApprove(stage)}
-            disabled={approvingStage !== null}
-          >
-            {approvingStage === stage ? 'Approving...' : 'Approve'}
-          </Button>
-          <Button
-            variant="contained"
-            style={{ backgroundColor: '#e57373', color: '#fff', fontWeight: 600 }}
-            size="large"
-            disabled={approvingStage !== null}
-            onClick={() => onReject?.(stage)}
-          >
-            Reject
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

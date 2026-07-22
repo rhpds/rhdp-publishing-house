@@ -1,11 +1,38 @@
 """GitHub integration service."""
+import asyncio
 import httpx
+import shutil
+import tempfile
 import yaml
+from pathlib import Path
 from typing import Optional, Dict, List
 import base64
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class ClonedRepo:
+    """Handle to a shallow-cloned repo on disk."""
+
+    def __init__(self, path: Path, head_sha: str):
+        self.path = path
+        self.head_sha = head_sha
+
+    def read_file(self, relative_path: str) -> Optional[str]:
+        f = self.path / relative_path
+        if f.is_file():
+            return f.read_text()
+        return None
+
+    def list_dir(self, relative_path: str) -> List[str]:
+        d = self.path / relative_path
+        if d.is_dir():
+            return [p.name for p in d.iterdir()]
+        return []
+
+    def cleanup(self):
+        shutil.rmtree(self.path, ignore_errors=True)
 
 
 class GitHubService:
@@ -43,6 +70,36 @@ class GitHubService:
             parts = repo_url.split("/")
 
         return parts[0], parts[1]
+
+    async def clone_repo(self, repo_url: str, branch: str = "main") -> "ClonedRepo":
+        """Shallow-clone a repo and return a ClonedRepo context manager."""
+        owner, repo = self.parse_repo_url(repo_url)
+        clone_url = f"https://x-access-token:{self.token}@github.com/{owner}/{repo}.git"
+        tmp_dir = tempfile.mkdtemp(prefix="ph-validate-")
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "git", "clone", "--depth", "1", "--branch", branch,
+                "--single-branch", clone_url, tmp_dir,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+            if proc.returncode != 0:
+                raise RuntimeError(f"git clone failed: {stderr.decode().strip()}")
+
+            proc = await asyncio.create_subprocess_exec(
+                "git", "rev-parse", "HEAD",
+                cwd=tmp_dir,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            stdout, _ = await proc.communicate()
+            head_sha = stdout.decode().strip()
+
+            return ClonedRepo(path=Path(tmp_dir), head_sha=head_sha)
+        except Exception:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            raise
 
     async def get_file_content(self, repo_url: str, path: str, branch: str = "main") -> Optional[str]:
         """Fetch a file's raw content from a repository."""

@@ -81,6 +81,12 @@ proxy:
       target: http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local
       changeOrigin: true
       secure: false
+    /central-api:
+      target: http://central-api.{{ app_namespace }}.svc.cluster.local:8000/api/v1
+      changeOrigin: true
+      secure: false
+      headers:
+        Authorization: Bearer ${PH_API_KEY}
 
 scaffolder:
   defaultEnvironment:

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAsync } from 'react-use';
 import {
@@ -20,8 +20,11 @@ import {
   makeStyles,
   Button,
   Chip,
+  CircularProgress,
   IconButton,
   Snackbar,
+  Tabs,
+  Tab,
 } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
 import GitHubIcon from '@material-ui/icons/GitHub';
@@ -29,8 +32,38 @@ import BugReportIcon from '@material-ui/icons/BugReport';
 import RefreshIcon from '@material-ui/icons/Refresh';
 import ReplayIcon from '@material-ui/icons/Replay';
 import { createPhWorkflowsClient } from '../../api/client';
-import { WorkflowStage, RejectionData } from '../../api/types';
+import { WorkflowStage, RejectionData, ValidationReport, CheckStatus } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
+
+const REVIEW_STAGES: WorkflowStage[] = ['content_review', 'infra_review'];
+
+const CHECK_GROUP_LABELS: Record<string, string> = {
+  A: 'Spec Fields',
+  B: 'Conditional Fields',
+  C: 'Approval Checklist',
+  D: 'Design Structure',
+  E: 'Module Outlines',
+  F: 'Cross-Validation',
+  G: 'Automation Manifest',
+  H: 'Vocabulary',
+  I: 'Auto-Computed',
+  J: 'Spec Drift',
+  SYS: 'System',
+};
+
+const STATUS_COLORS: Record<CheckStatus, string> = {
+  pass: '#4caf50',
+  fail: '#f44336',
+  warn: '#ff9800',
+  skip: '#9e9e9e',
+};
+
+const STATUS_ICONS: Record<CheckStatus, string> = {
+  pass: '✓',
+  fail: '✗',
+  warn: '⚠',
+  skip: '—',
+};
 import { WorkflowProgress } from './WorkflowProgress';
 import { RejectionDialog } from './RejectionDialog';
 
@@ -72,14 +105,46 @@ export function WorkflowDetailPage() {
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
 
-  const client = createPhWorkflowsClient({ discoveryApi, fetchApi });
+  const client = useMemo(() => createPhWorkflowsClient({ discoveryApi, fetchApi }), [discoveryApi, fetchApi]);
 
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activeTab, setActiveTab] = useState(0);
   const {
     value: result,
     loading,
     error,
   } = useAsync(() => client.getWorkflowById(workflowId!), [workflowId, refreshKey]);
+
+  const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
+  const [validationLoading, setValidationLoading] = useState(false);
+
+  const fetchReport = useCallback(async () => {
+    if (!result) return;
+    const stage = result.summary.stage;
+    if (!REVIEW_STAGES.includes(stage)) return;
+
+    const repoUrl = result.summary.repoUrl;
+    const wd = result.instance?.variables?.workflowdata as any;
+    const activeCommitSha = wd?.activeCommitSha;
+    if (!repoUrl) return;
+
+    setValidationLoading(true);
+    try {
+      const slug = result.summary.projectId;
+      const report = await client.fetchValidationReport(slug, repoUrl, 'main', activeCommitSha);
+      setValidationReport(report);
+    } catch (err: any) {
+      setSnackbar({ open: true, severity: 'error', message: `Validation report failed: ${err.message}` });
+    } finally {
+      setValidationLoading(false);
+    }
+  }, [result, client]);
+
+  React.useEffect(() => {
+    if (result && REVIEW_STAGES.includes(result.summary.stage)) {
+      fetchReport();
+    }
+  }, [result, fetchReport]);
 
   const [approvingStage, setApprovingStage] = useState<string | null>(null);
   const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
@@ -95,7 +160,23 @@ export function WorkflowDetailPage() {
     if (!result) return;
     setApprovingStage(stage);
     try {
-      await client.sendApprovalEvent(result.summary.id, stage, result.summary.projectId);
+      if (REVIEW_STAGES.includes(stage) && validationReport?.commit_sha && result.summary.repoUrl) {
+        const latestSha = await client.fetchHeadCommitSha(result.summary.repoUrl);
+        if (latestSha && latestSha !== validationReport.commit_sha) {
+          setSnackbar({
+            open: true,
+            severity: 'error',
+            message: 'The repo has been updated since the last check. Refreshing validation report...',
+          });
+          await fetchReport();
+          setApprovingStage(null);
+          return;
+        }
+      }
+
+      const user = result.summary.ssoEmail || result.summary.owner;
+      const commitSha = validationReport?.commit_sha;
+      await client.sendApprovalEvent(result.summary.id, stage, result.summary.projectId, { user, commitSha });
       setSnackbar({
         open: true,
         severity: 'success',
@@ -123,7 +204,7 @@ export function WorkflowDetailPage() {
     if (!result || !rejectingStage) return;
     setSubmittingRejection(true);
     try {
-      await client.sendRejectionEvent(result.summary.id, rejectingStage, data, result.summary.projectId);
+      await client.sendRejectionEvent(result.summary.id, rejectingStage, data, result.summary.projectId, validationReport?.commit_sha);
       setRejectionDialogOpen(false);
       setSnackbar({
         open: true,
@@ -181,6 +262,10 @@ export function WorkflowDetailPage() {
     : null;
   const rejectedFrom = rejection?.reviewerStage as WorkflowStage | null;
   const rejectionReasons = rejection?.reasons ?? [];
+  const wd = instance?.variables?.workflowdata as any;
+  const reviewHistory: Array<{ user: string; stage: string; action: string; timestamp: string; commitSha?: string }> = wd?.reviewHistory ?? [];
+
+  const isReviewStage = REVIEW_STAGES.includes(summary.stage);
 
   return (
     <Page themeId="tool">
@@ -229,9 +314,6 @@ export function WorkflowDetailPage() {
         <InfoCard title="Workflow Progress">
           <WorkflowProgress
             stage={summary.stage}
-            approvingStage={approvingStage}
-            onApprove={handleApprove}
-            onReject={handleReject}
             rejectedFrom={rejectedFrom}
           />
         </InfoCard>
@@ -255,17 +337,34 @@ export function WorkflowDetailPage() {
           </InfoCard>
         )}
 
-        <Grid container spacing={3} className={classes.detailGrid}>
-          <Grid item xs={12} md={6}>
-            <InfoCard title="Project Details">
-              <DetailField label="Project ID" value={summary.projectId} />
-              <DetailField label="Description" value={summary.projectDescription} />
-              <DetailField label="Owner" value={summary.owner} />
-              <DetailField label="SSO User" value={summary.ssoUser} />
-              <DetailField label="Type" value={summary.contentType} />
-              <DetailField label="Deployment Mode" value={summary.deploymentMode} />
-              <DetailField label="State" value={summary.state} />
-              <div>
+        <Tabs
+          value={activeTab}
+          onChange={(_e, v) => setActiveTab(v)}
+          indicatorColor="primary"
+          textColor="primary"
+          style={{ marginBottom: 16, marginTop: 16 }}
+        >
+          <Tab label="Overview" />
+          {isReviewStage && <Tab label="Review" />}
+          <Tab label="Timeline" />
+        </Tabs>
+
+        {activeTab === 0 && (
+          <InfoCard title="Project Details">
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <DetailField label="Project ID" value={summary.projectId} />
+                <DetailField label="Description" value={summary.projectDescription} />
+                <DetailField label="Owner" value={summary.owner} />
+                <DetailField label="SSO User" value={summary.ssoUser} />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <DetailField label="Type" value={summary.contentType} />
+                <DetailField label="Deployment Mode" value={summary.deploymentMode} />
+                <DetailField label="State" value={summary.state} />
+                <DetailField label="Current Stage" value={stageLabel} />
+              </Grid>
+              <Grid item xs={12}>
                 <Typography className={classes.label}>Tags</Typography>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 16 }}>
                   {summary.tags.length > 0
@@ -274,35 +373,153 @@ export function WorkflowDetailPage() {
                       ))
                     : <Typography className={classes.value}>—</Typography>}
                 </div>
+              </Grid>
+            </Grid>
+          </InfoCard>
+        )}
+
+        {isReviewStage && activeTab === 1 && (
+          <InfoCard title="Validation Report">
+            {validationLoading ? (
+              <Progress />
+            ) : validationReport ? (
+              <div>
+                <div style={{
+                  padding: '8px 16px',
+                  marginBottom: 16,
+                  borderRadius: 4,
+                  backgroundColor: validationReport.passed ? '#e8f5e9' : '#ffebee',
+                  color: validationReport.passed ? '#2e7d32' : '#c62828',
+                  fontWeight: 600,
+                }}>
+                  {validationReport.passed ? 'All checks passed' : 'Some checks failed'}
+                </div>
+                {validationReport.commit_sha && (
+                  <Typography variant="body2" style={{ marginBottom: 16, color: '#757575' }}>
+                    Validated against commit <code>{validationReport.commit_sha.substring(0, 7)}</code>
+                  </Typography>
+                )}
+                {Object.entries(
+                  validationReport.results.reduce((acc, check) => {
+                    (acc[check.group] = acc[check.group] || []).push(check);
+                    return acc;
+                  }, {} as Record<string, typeof validationReport.results>),
+                ).map(([group, checks]) => (
+                  <div key={group} style={{ marginBottom: 12 }}>
+                    <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 4 }}>
+                      Group {group}: {CHECK_GROUP_LABELS[group] || group}
+                    </Typography>
+                    {checks.map(check => (
+                      <div key={check.check_id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', paddingLeft: 16, marginBottom: 2 }}>
+                        <span style={{ color: STATUS_COLORS[check.status], fontWeight: 700, fontFamily: 'monospace', width: 16 }}>
+                          {STATUS_ICONS[check.status]}
+                        </span>
+                        <Typography variant="body2">
+                          {check.message}
+                        </Typography>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid #e0e0e0', display: 'flex', gap: 12 }}>
+                  <Button
+                    variant="contained"
+                    style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
+                    size="large"
+                    startIcon={
+                      approvingStage === summary.stage ? (
+                        <CircularProgress size={16} color="inherit" />
+                      ) : undefined
+                    }
+                    onClick={() => handleApprove(summary.stage)}
+                    disabled={approvingStage !== null}
+                  >
+                    {approvingStage === summary.stage ? 'Approving...' : 'Approve'}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    style={{ backgroundColor: '#e57373', color: '#fff', fontWeight: 600 }}
+                    size="large"
+                    disabled={approvingStage !== null}
+                    onClick={() => handleReject(summary.stage)}
+                  >
+                    Reject
+                  </Button>
+                </div>
               </div>
-            </InfoCard>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <InfoCard title="Timeline">
-              <DetailField
-                label="Started"
-                value={
-                  summary.startedAt
-                    ? new Date(summary.startedAt).toLocaleString()
-                    : ''
-                }
-              />
-              <DetailField
-                label="Last Updated"
-                value={
-                  summary.lastUpdate
-                    ? new Date(summary.lastUpdate).toLocaleString()
-                    : ''
-                }
-              />
-              <DetailField label="Jira Ticket" value={summary.epicKey} />
-              <DetailField label="Current Stage" value={stageLabel} />
-              {STAGE_DESCRIPTIONS[summary.stage] && (
-                <DetailField label="What's Happening" value={STAGE_DESCRIPTIONS[summary.stage]} />
-              )}
-            </InfoCard>
-          </Grid>
-        </Grid>
+            ) : (
+              <Typography variant="body2">No validation report available</Typography>
+            )}
+          </InfoCard>
+        )}
+
+        {activeTab === (isReviewStage ? 2 : 1) && (
+          <InfoCard title="Timeline">
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <DetailField
+                  label="Started"
+                  value={summary.startedAt ? new Date(summary.startedAt).toLocaleString() : ''}
+                />
+                <DetailField
+                  label="Last Updated"
+                  value={summary.lastUpdate ? new Date(summary.lastUpdate).toLocaleString() : ''}
+                />
+                <DetailField label="Jira Ticket" value={summary.epicKey} />
+                {STAGE_DESCRIPTIONS[summary.stage] && (
+                  <DetailField label="What's Happening" value={STAGE_DESCRIPTIONS[summary.stage]} />
+                )}
+              </Grid>
+              <Grid item xs={12} md={6}>
+                {wd?.activeCommitSha && (
+                  <DetailField label="Active Commit" value={wd.activeCommitSha.substring(0, 7)} />
+                )}
+              </Grid>
+            </Grid>
+            {reviewHistory.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 8 }}>
+                  Audit History
+                </Typography>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #e0e0e0', textAlign: 'left' }}>
+                      <th style={{ padding: '6px 8px' }}>When</th>
+                      <th style={{ padding: '6px 8px' }}>Who</th>
+                      <th style={{ padding: '6px 8px' }}>Stage</th>
+                      <th style={{ padding: '6px 8px' }}>Action</th>
+                      <th style={{ padding: '6px 8px' }}>Commit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...reviewHistory].reverse().map((entry, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                        <td style={{ padding: '6px 8px' }}>
+                          {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '—'}
+                        </td>
+                        <td style={{ padding: '6px 8px' }}>{entry.user || '—'}</td>
+                        <td style={{ padding: '6px 8px' }}>{STAGE_LABELS[entry.stage as WorkflowStage] || entry.stage}</td>
+                        <td style={{ padding: '6px 8px' }}>
+                          <Chip
+                            label={entry.action}
+                            size="small"
+                            style={{
+                              backgroundColor: entry.action === 'approved' ? '#e8f5e9' : entry.action === 'rejected' ? '#ffebee' : '#e3f2fd',
+                              color: entry.action === 'approved' ? '#2e7d32' : entry.action === 'rejected' ? '#c62828' : '#1565c0',
+                            }}
+                          />
+                        </td>
+                        <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>
+                          {entry.commitSha ? entry.commitSha.substring(0, 7) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </InfoCard>
+        )}
 
         <RejectionDialog
           open={rejectionDialogOpen}

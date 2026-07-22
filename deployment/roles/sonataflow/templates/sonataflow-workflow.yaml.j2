@@ -105,7 +105,9 @@ spec:
               },
               rejection: {
                 isRejected: false
-              }
+              },
+              reviewHistory: [],
+              activeCommitSha: ""
             }
         transition:
           nextState: CreateEpic
@@ -154,8 +156,14 @@ spec:
                   arguments:
                     message: "Intake completed, starting reviews"
             eventDataFilter:
-              data: "{isRejected: false}"
-              toStateData: ".rejection"
+              toStateData: ".latestAudit"
+        stateDataFilter:
+          output: |
+            . + {
+              reviewHistory: ((.reviewHistory // []) + [.latestAudit]),
+              activeCommitSha: (.latestAudit.commitSha // .activeCommitSha),
+              rejection: { isRejected: false }
+            }
         timeouts:
           stateExecTimeout: PT168H
         transition:
@@ -172,6 +180,8 @@ spec:
                   refName: printMessage
                   arguments:
                     message: "Content review approved"
+            eventDataFilter:
+              toStateData: ".latestAudit"
           - eventRefs:
               - ContentReviewRejectedEvent
             actions:
@@ -181,7 +191,14 @@ spec:
                   arguments:
                     message: "Content review rejected — returning to intake"
             eventDataFilter:
-              toStateData: ".rejection"
+              toStateData: ".latestAudit"
+        stateDataFilter:
+          output: |
+            . + {
+              reviewHistory: ((.reviewHistory // []) + [.latestAudit]),
+              activeCommitSha: (if .latestAudit.action == "approved" then .latestAudit.commitSha else .activeCommitSha end),
+              rejection: (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else .rejection end)
+            }
         timeouts:
           stateExecTimeout: PT168H
         transition:
@@ -207,6 +224,8 @@ spec:
                   refName: printMessage
                   arguments:
                     message: "Infra review approved"
+            eventDataFilter:
+              toStateData: ".latestAudit"
           - eventRefs:
               - InfraReviewRejectedEvent
             actions:
@@ -216,7 +235,14 @@ spec:
                   arguments:
                     message: "Infra review rejected — returning to intake"
             eventDataFilter:
-              toStateData: ".rejection"
+              toStateData: ".latestAudit"
+        stateDataFilter:
+          output: |
+            . + {
+              reviewHistory: ((.reviewHistory // []) + [.latestAudit]),
+              activeCommitSha: (if .latestAudit.action == "approved" then .latestAudit.commitSha else .activeCommitSha end),
+              rejection: (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else .rejection end)
+            }
         timeouts:
           stateExecTimeout: PT168H
         transition:
@@ -256,6 +282,13 @@ spec:
                   refName: printMessage
                   arguments:
                     message: "Development completed, transitioning to Ready"
+            eventDataFilter:
+              toStateData: ".latestAudit"
+        stateDataFilter:
+          output: |
+            . + {
+              reviewHistory: ((.reviewHistory // []) + [.latestAudit])
+            }
         timeouts:
           stateExecTimeout: PT168H
         transition:
@@ -272,6 +305,13 @@ spec:
                   refName: printMessage
                   arguments:
                     message: "Ready for publishing"
+            eventDataFilter:
+              toStateData: ".latestAudit"
+        stateDataFilter:
+          output: |
+            . + {
+              reviewHistory: ((.reviewHistory // []) + [.latestAudit])
+            }
         timeouts:
           stateExecTimeout: PT168H
         transition:
