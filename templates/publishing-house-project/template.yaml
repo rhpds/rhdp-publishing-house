@@ -238,16 +238,14 @@ spec:
         if: ${{ steps['check-catalog'].output.entity != null }}
 
     text:
-      - title: Project Created
-        if: ${{ steps['check-catalog'].output.entity == null }}
+      - title: Result
         content: |
-          Your project has been created successfully.
+          {% if steps['check-catalog'].output.entity %}
+          ⚠️ **Scaffolding Skipped!**
 
-          Click **Open in DevSpaces** above to get started, then run `/rhdp-publishing-house` in the Claude CLI.
+          A project named **"{{ parameters.project_name }}"** already exists in the catalog. All steps were skipped — no repository was created and no workflow was started. Click **Start Over** below to choose a different project name.
+          {% else %}
+          🎉 **Project Created!**
 
-      - title: Scaffolding Skipped
-        if: ${{ steps['check-catalog'].output.entity != null }}
-        content: |
-          A project named **${{ parameters.project_name }}** already exists in the catalog.
-
-          All steps were skipped. No repository was created and no workflow was started. Click **Start Over** below to choose a different project name.
+          Your project has been created successfully. Click **Open in DevSpaces** above to get started, then run `/rhdp-publishing-house` in the Claude CLI.
+          {% endif %}
