@@ -129,9 +129,18 @@ spec:
           ui:help: Classic = standard Showroom lab. Zero Touch = embedded runtime/setup automation.
 
   steps:
+    # Step 1: Check if project name is already taken
+    - id: check-catalog
+      name: Check Project Name Availability
+      action: catalog:fetch
+      input:
+        entityRef: component:default/${{ parameters.project_name }}
+        optional: true
+
     # Step 2: Fetch template
     - id: fetch-template
       name: Fetch Publishing House Template
+      if: ${{ steps['check-catalog'].output.entity == null }}
       action: fetch:template
       input:
         url: https://github.com/rhpds/rhdp-publishing-house-template/tree/rearchitecture
@@ -146,6 +155,7 @@ spec:
     # Step 3: Add catalog-info to workspace
     - id: fetch-catalog-info
       name: Add catalog-info.yaml
+      if: ${{ steps['check-catalog'].output.entity == null }}
       action: fetch:template
       input:
         url: ./skeleton
@@ -165,6 +175,7 @@ spec:
     # Step 4: Publish to GitHub with catalog-info included
     - id: publish
       name: Create GitHub Repository
+      if: ${{ steps['check-catalog'].output.entity == null }}
       action: publish:github
       input:
         repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
@@ -177,6 +188,7 @@ spec:
     # Step 5: Trigger workflow via RHDH proxy
     - id: trigger-workflow
       name: Start Publishing House Workflow
+      if: ${{ steps['check-catalog'].output.entity == null }}
       action: http:backstage:request
       input:
         method: POST
@@ -197,10 +209,27 @@ spec:
     # Step 6: Register in catalog
     - id: register
       name: Register in Backstage Catalog
+      if: ${{ steps['check-catalog'].output.entity == null }}
       action: catalog:register
       input:
         repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
         catalogInfoPath: '/catalog-info.yaml'
+
+    # Step 7: Warning if project name was already taken
+    - id: name-taken-warning
+      name: Project Name Already Exists
+      if: ${{ steps['check-catalog'].output.entity != null }}
+      action: debug:log
+      input:
+        message: |
+          ===================================================================
+          WARNING: SCAFFOLDING SKIPPED!
+
+          A project named "${{ parameters.project_name }}" already exists in the catalog.
+          No repository was created and no workflow was started.
+
+          Please choose a different project name and try again.
+          ===================================================================
 
   output:
     links:
