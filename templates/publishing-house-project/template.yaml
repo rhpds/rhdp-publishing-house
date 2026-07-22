@@ -228,7 +228,7 @@ spec:
           A project named "${{ parameters.project_name }}" already exists in the catalog.
           No repository was created and no workflow was started.
 
-          Please choose a different project name and try again.
+          Click "Start Over" below to go back and choose a different project name.
           ===================================================================
 
   output:
