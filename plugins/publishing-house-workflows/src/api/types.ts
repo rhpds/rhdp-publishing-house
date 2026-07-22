@@ -20,7 +20,8 @@ export interface WorkflowVariables {
     jira_url?: string;
     tags?: string[];
     projectDescription?: string;
-    activeCommitSha?: string;
+    approvedSha?: string;
+    auditTrailSha?: string;
     reviewHistory?: AuditEntry[];
   };
 }
@@ -126,6 +127,20 @@ export interface AuditEntry {
   action: string;
   timestamp: string;
   commitSha?: string;
+}
+
+export interface DriftField {
+  field: string;
+  approved_value: any;
+  current_value: any;
+  changed: boolean;
+}
+
+export interface DriftReport {
+  has_drift: boolean;
+  approved_sha: string;
+  current_sha: string;
+  fields: DriftField[];
 }
 
 export interface WorkflowSummary {

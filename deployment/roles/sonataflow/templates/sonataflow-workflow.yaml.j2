@@ -107,7 +107,8 @@ spec:
                 isRejected: false
               },
               reviewHistory: [],
-              activeCommitSha: (.activeCommitSha // "")
+              approvedSha: "",
+              auditTrailSha: ""
             }
         transition:
           nextState: CreateEpic
@@ -160,12 +161,13 @@ spec:
         stateDataFilter:
           input: |
             . + {
-              reviewHistory: ((.reviewHistory // []) + [{stage: "intake", action: "started", timestamp: (now | tostring), user: (.ssoEmail // "system"), commitSha: (.activeCommitSha // "")}])
+              reviewHistory: ((.reviewHistory // []) + [{stage: "intake", action: "started", timestamp: (now | tostring), user: (.ssoEmail // "system"), commitSha: (.auditTrailSha // "")}])
             }
           output: |
             . + {
               reviewHistory: ((.reviewHistory // []) + [.latestAudit]),
-              activeCommitSha: (.latestAudit.commitSha // .activeCommitSha),
+              auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
+              approvedSha: "",
               rejection: { isRejected: false }
             }
         timeouts:
@@ -199,12 +201,13 @@ spec:
         stateDataFilter:
           input: |
             . + {
-              reviewHistory: ((.reviewHistory // []) + [{stage: "content_review", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.activeCommitSha // "")}])
+              reviewHistory: ((.reviewHistory // []) + [{stage: "content_review", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.auditTrailSha // "")}])
             }
           output: |
             . + {
               reviewHistory: ((.reviewHistory // []) + [.latestAudit]),
-              activeCommitSha: (if .latestAudit.action == "approved" then .latestAudit.commitSha else .activeCommitSha end),
+              auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
+              approvedSha: (if .latestAudit.action == "approved" then .latestAudit.commitSha else .approvedSha end),
               rejection: (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else .rejection end)
             }
         timeouts:
@@ -247,12 +250,13 @@ spec:
         stateDataFilter:
           input: |
             . + {
-              reviewHistory: ((.reviewHistory // []) + [{stage: "infra_review", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.activeCommitSha // "")}])
+              reviewHistory: ((.reviewHistory // []) + [{stage: "infra_review", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.auditTrailSha // "")}])
             }
           output: |
             . + {
               reviewHistory: ((.reviewHistory // []) + [.latestAudit]),
-              activeCommitSha: (if .latestAudit.action == "approved" then .latestAudit.commitSha else .activeCommitSha end),
+              auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
+              approvedSha: (if .latestAudit.action == "approved" then .latestAudit.commitSha else .approvedSha end),
               rejection: (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else .rejection end)
             }
         timeouts:
@@ -299,11 +303,12 @@ spec:
         stateDataFilter:
           input: |
             . + {
-              reviewHistory: ((.reviewHistory // []) + [{stage: "development", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.activeCommitSha // "")}])
+              reviewHistory: ((.reviewHistory // []) + [{stage: "development", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.auditTrailSha // "")}])
             }
           output: |
             . + {
-              reviewHistory: ((.reviewHistory // []) + [.latestAudit])
+              reviewHistory: ((.reviewHistory // []) + [.latestAudit]),
+              auditTrailSha: (.latestAudit.commitSha // .auditTrailSha)
             }
         timeouts:
           stateExecTimeout: PT168H
@@ -326,11 +331,12 @@ spec:
         stateDataFilter:
           input: |
             . + {
-              reviewHistory: ((.reviewHistory // []) + [{stage: "testing", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.activeCommitSha // "")}])
+              reviewHistory: ((.reviewHistory // []) + [{stage: "testing", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.auditTrailSha // "")}])
             }
           output: |
             . + {
-              reviewHistory: ((.reviewHistory // []) + [.latestAudit])
+              reviewHistory: ((.reviewHistory // []) + [.latestAudit]),
+              auditTrailSha: (.latestAudit.commitSha // .auditTrailSha)
             }
         timeouts:
           stateExecTimeout: PT168H
@@ -344,7 +350,7 @@ spec:
         stateDataFilter:
           output: |
             . + {
-              reviewHistory: ((.reviewHistory // []) + [{stage: "published", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.activeCommitSha // "")}, {stage: "published", action: "complete", timestamp: (now | tostring), user: "system", commitSha: (.activeCommitSha // "")}])
+              reviewHistory: ((.reviewHistory // []) + [{stage: "published", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.auditTrailSha // "")}, {stage: "published", action: "complete", timestamp: (now | tostring), user: "system", commitSha: (.auditTrailSha // "")}])
             }
         end:
           terminate: true

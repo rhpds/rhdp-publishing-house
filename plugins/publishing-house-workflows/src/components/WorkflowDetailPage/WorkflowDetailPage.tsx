@@ -32,7 +32,7 @@ import BugReportIcon from '@material-ui/icons/BugReport';
 import RefreshIcon from '@material-ui/icons/Refresh';
 import ReplayIcon from '@material-ui/icons/Replay';
 import { createPhWorkflowsClient } from '../../api/client';
-import { WorkflowStage, RejectionData, ValidationReport, CheckStatus } from '../../api/types';
+import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
 
 const REVIEW_STAGES: WorkflowStage[] = ['content_review', 'infra_review'];
@@ -47,7 +47,6 @@ const CHECK_GROUP_LABELS: Record<string, string> = {
   G: 'Automation Manifest',
   H: 'Vocabulary',
   I: 'Auto-Computed',
-  J: 'Spec Drift',
   SYS: 'System',
 };
 
@@ -117,6 +116,8 @@ export function WorkflowDetailPage() {
 
   const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
   const [validationLoading, setValidationLoading] = useState(false);
+  const [driftReport, setDriftReport] = useState<DriftReport | null>(null);
+  const [driftLoading, setDriftLoading] = useState(false);
 
   const fetchReport = useCallback(async () => {
     if (!result) return;
@@ -125,19 +126,27 @@ export function WorkflowDetailPage() {
 
     const repoUrl = result.summary.repoUrl;
     const wd = result.instance?.variables?.workflowdata as any;
-    const activeCommitSha = wd?.activeCommitSha;
+    const approvedSha = wd?.approvedSha;
     if (!repoUrl) return;
 
+    const slug = result.summary.projectId;
+
     setValidationLoading(true);
-    try {
-      const slug = result.summary.projectId;
-      const report = await client.fetchValidationReport(slug, repoUrl, 'main', activeCommitSha);
-      setValidationReport(report);
-    } catch (err: any) {
-      setSnackbar({ open: true, severity: 'error', message: `Validation report failed: ${err.message}` });
-    } finally {
-      setValidationLoading(false);
-    }
+    if (approvedSha) setDriftLoading(true);
+
+    const validationPromise = client.fetchValidationReport(slug, repoUrl, 'main', approvedSha)
+      .then(report => setValidationReport(report))
+      .catch((err: any) => setSnackbar({ open: true, severity: 'error', message: `Validation report failed: ${err.message}` }))
+      .finally(() => setValidationLoading(false));
+
+    const driftPromise = approvedSha
+      ? client.fetchDriftReport(slug, repoUrl, 'main', approvedSha)
+          .then(report => setDriftReport(report))
+          .catch((err: any) => setSnackbar({ open: true, severity: 'error', message: `Drift check failed: ${err.message}` }))
+          .finally(() => setDriftLoading(false))
+      : Promise.resolve();
+
+    await Promise.all([validationPromise, driftPromise]);
   }, [result, client]);
 
   React.useEffect(() => {
@@ -415,6 +424,56 @@ export function WorkflowDetailPage() {
               </InfoCard>
             )}
 
+            {(driftLoading || driftReport) && (
+              <InfoCard title="Changes Since Last Approval">
+                {driftLoading ? (
+                  <Progress />
+                ) : driftReport ? (
+                  <div>
+                    <div style={{
+                      padding: '8px 16px',
+                      marginBottom: 16,
+                      borderRadius: 4,
+                      backgroundColor: driftReport.has_drift ? '#fff3e0' : '#e8f5e9',
+                      color: driftReport.has_drift ? '#e65100' : '#2e7d32',
+                      fontWeight: 600,
+                    }}>
+                      {driftReport.has_drift ? 'Spec fields changed since last approval' : 'No spec changes since last approval'}
+                    </div>
+                    <Typography variant="body2" style={{ marginBottom: 12, color: '#757575' }}>
+                      Approved: <code>{driftReport.approved_sha.substring(0, 7)}</code>
+                      {' → Current: '}
+                      <code>{driftReport.current_sha.substring(0, 7)}</code>
+                    </Typography>
+                    {driftReport.has_drift && (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+                            <th style={{ padding: '6px 8px' }}>Field</th>
+                            <th style={{ padding: '6px 8px' }}>Approved</th>
+                            <th style={{ padding: '6px 8px' }}>Current</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {driftReport.fields.filter(f => f.changed).map(f => (
+                            <tr key={f.field} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                              <td style={{ padding: '6px 8px', fontWeight: 600 }}>{f.field}</td>
+                              <td style={{ padding: '6px 8px', fontFamily: 'monospace', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {f.approved_value != null ? (Array.isArray(f.approved_value) ? JSON.stringify(f.approved_value) : String(f.approved_value)) : '—'}
+                              </td>
+                              <td style={{ padding: '6px 8px', fontFamily: 'monospace', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {f.current_value != null ? (Array.isArray(f.current_value) ? JSON.stringify(f.current_value) : String(f.current_value)) : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                ) : null}
+              </InfoCard>
+            )}
+
             <InfoCard title="Validation Report">
               {validationLoading ? (
                 <Progress />
@@ -596,8 +655,11 @@ export function WorkflowDetailPage() {
                 )}
               </Grid>
               <Grid item xs={12} md={6}>
-                {wd?.activeCommitSha && (
-                  <DetailField label="Active Commit" value={wd.activeCommitSha.substring(0, 7)} />
+                {wd?.approvedSha && (
+                  <DetailField label="Approved Commit" value={wd.approvedSha.substring(0, 7)} />
+                )}
+                {wd?.auditTrailSha && (
+                  <DetailField label="Last Known Commit" value={wd.auditTrailSha.substring(0, 7)} />
                 )}
               </Grid>
             </Grid>

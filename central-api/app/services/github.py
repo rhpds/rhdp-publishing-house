@@ -101,6 +101,22 @@ class GitHubService:
             shutil.rmtree(tmp_dir, ignore_errors=True)
             raise
 
+    async def get_head_sha(self, repo_url: str, branch: str = "main") -> Optional[str]:
+        """Fetch the HEAD commit SHA for a branch without cloning."""
+        try:
+            owner, repo = self.parse_repo_url(repo_url)
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{self.api_base}/repos/{owner}/{repo}/commits/{branch}",
+                    headers={**self.headers, "Accept": "application/vnd.github.sha"},
+                )
+                if response.status_code == 200:
+                    return response.text.strip()
+                return None
+        except Exception as e:
+            logger.error(f"Error fetching HEAD SHA: {e}")
+            return None
+
     async def get_file_content(self, repo_url: str, path: str, branch: str = "main") -> Optional[str]:
         """Fetch a file's raw content from a repository."""
         try:

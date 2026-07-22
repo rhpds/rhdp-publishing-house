@@ -11,7 +11,7 @@ from ..services.validation.policy import load_policy
 from ..services.validation.runner import run_validation
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/validate", tags=["validate"])
+router = APIRouter(prefix="/spec/validation", tags=["validation"])
 _bearer = HTTPBearer(auto_error=False)
 
 

@@ -29,7 +29,7 @@ def main():
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
 
-    url = f"{central_url}/api/v1/validate/policy"
+    url = f"{central_url}/api/v1/spec/validation/policy"
     req = urllib.request.Request(
         url,
         headers={"Authorization": f"Bearer {api_key}"},

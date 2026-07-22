@@ -1,5 +1,5 @@
 import { DiscoveryApi, FetchApi } from '@backstage/core-plugin-api';
-import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport } from './types';
+import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport } from './types';
 import { deriveStage } from '../utils/stageMapping';
 
 const GRAPHQL_QUERY = `
@@ -254,15 +254,15 @@ export function createPhWorkflowsClient(options: {
     slug: string,
     repoUrl: string,
     branch: string = 'main',
-    activeCommitSha?: string,
+    approvedSha?: string,
   ): Promise<ValidationReport> {
     const proxyUrl = await discoveryApi.getBaseUrl('proxy');
     const params = new URLSearchParams({ stage: 'review' });
-    if (activeCommitSha) {
-      params.set('active_commit_sha', activeCommitSha);
+    if (approvedSha) {
+      params.set('approved_sha', approvedSha);
     }
     const response = await fetchApi.fetch(
-      `${proxyUrl}/central-api/validate/${slug}?${params}`,
+      `${proxyUrl}/central-api/spec/validation/${slug}?${params}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -272,6 +272,29 @@ export function createPhWorkflowsClient(options: {
 
     const json = await response.json();
     return json as ValidationReport;
+  }
+
+  async function fetchDriftReport(
+    slug: string,
+    repoUrl: string,
+    branch: string = 'main',
+    approvedSha: string,
+  ): Promise<DriftReport> {
+    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
+    const response = await fetchApi.fetch(
+      `${proxyUrl}/central-api/spec/drift/${slug}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo_url: repoUrl, branch, approved_sha: approvedSha }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Drift check failed: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json() as DriftReport;
   }
 
   async function fetchHeadCommitSha(
@@ -299,6 +322,7 @@ export function createPhWorkflowsClient(options: {
     sendApprovalEvent,
     sendRejectionEvent,
     fetchValidationReport,
+    fetchDriftReport,
     fetchHeadCommitSha,
   };
 }

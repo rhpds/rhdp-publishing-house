@@ -5,13 +5,12 @@ from datetime import datetime
 
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings, Settings
 from .models import HealthResponse
-from .routers import litellm, projects, jira, workspace, validate
+from .routers import litellm, projects, jira, workspace, validate, drift
 from .services.rcars import rcars_overlap_check, rcars_health, rcars_advisor_submit, rcars_advisor_result
 from .auth import init_oidc
 
@@ -20,18 +19,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
-
-security = HTTPBearer()
-
-
-def verify_token(
-    credentials: HTTPAuthorizationCredentials = Security(security),
-    settings: Settings = Depends(get_settings)
-) -> str:
-    """Verify Bearer token for protected endpoints."""
-    if credentials.credentials != settings.ph_api_key:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    return credentials.credentials
 
 
 def create_app() -> FastAPI:
@@ -116,19 +103,14 @@ def create_app() -> FastAPI:
     # Validate router — spec validation endpoint
     app.include_router(validate.router, prefix=settings.api_prefix)
 
+    # Drift router — spec contract drift detection
+    app.include_router(drift.router, prefix=settings.api_prefix)
+
     # Workspace setup — SA token auth, no static API key required
     app.include_router(workspace.router, prefix=settings.api_prefix)
 
-    app.include_router(
-        litellm.router,
-        prefix=settings.api_prefix,
-        dependencies=[Depends(verify_token)]
-    )
-    app.include_router(
-        jira.router,
-        prefix=settings.api_prefix,
-        dependencies=[Depends(verify_token)]
-    )
+    app.include_router(litellm.router, prefix=settings.api_prefix)
+    app.include_router(jira.router, prefix=settings.api_prefix)
 
     static_dir = Path(__file__).parent / "static"
     if static_dir.exists():
