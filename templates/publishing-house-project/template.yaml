@@ -243,7 +243,7 @@ spec:
         content: |
           You are ready to start building. Here is what we set up for you:
 
-          * **Repository created:** ${{ steps.publish.output.remoteUrl }}
+          * **Repository created:** https://github.com/rhpds/${{ parameters.project_name }}
           * **catalog-info.yaml** added to repository
           * **Registered** in Backstage catalog
           * **Orchestrator workflow started** — your AI-guided content pipeline is running!
@@ -265,7 +265,7 @@ spec:
              ```
           2. Clone the repo:
              ```bash
-             git clone ${{ steps.publish.output.remoteUrl }}
+             git clone https://github.com/rhpds/${{ parameters.project_name }}.git
              cd ${{ parameters.project_name }}
              ```
           3. Start Claude CLI: `claude`
