@@ -215,22 +215,6 @@ spec:
         repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
         catalogInfoPath: '/catalog-info.yaml'
 
-    # Step 7: Warning if project name was already taken
-    - id: name-taken-warning
-      name: Project Name Already Exists
-      if: ${{ steps['check-catalog'].output.entity != null }}
-      action: debug:log
-      input:
-        message: |
-          ===================================================================
-          WARNING: SCAFFOLDING SKIPPED!
-
-          A project named "${{ parameters.project_name }}" already exists in the catalog.
-          No repository was created and no workflow was started.
-
-          Click "Start Over" below to go back and choose a different project name.
-          ===================================================================
-
   output:
     links:
       - title: View Repository
