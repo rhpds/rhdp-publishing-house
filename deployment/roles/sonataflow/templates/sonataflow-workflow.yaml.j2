@@ -108,7 +108,7 @@ spec:
               },
               reviewHistory: [],
               approvedSha: "",
-              auditTrailSha: ""
+              auditTrailSha: (.auditTrailSha // "")
             }
         transition:
           nextState: CreateEpic

@@ -192,6 +192,7 @@ spec:
           contentType: ${{ parameters.content_type }}
           tags: ${{ parameters.tags }}
           projectDescription: ${{ parameters.project_description }}
+          auditTrailSha: ${{ steps.publish.output.commitHash }}
 
     # Step 6: Register in catalog
     - id: register
