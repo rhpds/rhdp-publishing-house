@@ -243,7 +243,7 @@ spec:
           {% if steps['check-catalog'].output.entity %}
           ⚠️ **Scaffolding Skipped!**
 
-          A project named **"{{ parameters.project_name }}"** already exists in the catalog. All steps were skipped — no repository was created and no workflow was started. Click **Start Over** below to choose a different project name.
+          A project named **"${{ parameters.project_name }}"** already exists in the catalog. All steps were skipped — no repository was created and no workflow was started. Click **Start Over** below to choose a different project name.
           {% else %}
           🎉 **Project Created!**
 
