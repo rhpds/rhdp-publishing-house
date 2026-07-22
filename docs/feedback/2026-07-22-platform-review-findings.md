@@ -188,13 +188,20 @@ The template repo (`rhdp-publishing-house-template`, `rearchitecture` branch) wo
 
 ---
 
-### 15. Test Cleanup — Git Repos
+### 15. Cascading Cleanup When a Project is Removed
 
-**Observed:** Test repos created in the `rhpds` org during previous testing sessions still exist.
+**Observed:** When a project is deleted or abandoned in Publishing House, its resources remain scattered across systems — GitHub repo, Jira epic, Backstage catalog entry, SonataFlow workflow instance, DevSpaces workspace. Manual cleanup was required across all five systems.
 
-**Expected:** Test repos should be deleted after testing is complete.
+**Expected:** When a project is removed from Publishing House (via RHDH, Central API, or a cleanup tool), all associated resources should be cleaned up automatically or as part of a single coordinated action.
 
-**Action:** Delete all test project repos from the `rhpds` org. Going forward, include repo deletion in the cleanup procedure from finding #2.
+**Action:** Implement cascading cleanup — when a project is deleted/archived in PH, the system should:
+- Delete or archive the GitHub repo
+- Close and archive the Jira epic and child tasks
+- Unregister the Backstage catalog entity
+- Terminate the SonataFlow workflow instance
+- Delete the DevSpaces workspace (if one exists)
+
+This could be a Central API endpoint, a SonataFlow "cancel" workflow path, or a standalone cleanup script — but it needs to be one action, not five manual steps.
 
 ---
 
