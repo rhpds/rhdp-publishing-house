@@ -220,18 +220,34 @@ spec:
       - title: Open Repository
         icon: github
         url: https://github.com/rhpds/${{ parameters.project_name }}
+        if: ${{ steps['check-catalog'].output.entity == null }}
 
       - title: View in Catalog
         icon: catalog
         url: /catalog/default/component/${{ parameters.project_name }}
+        if: ${{ steps['check-catalog'].output.entity == null }}
 
       - title: Open in DevSpaces
         icon: launch
         url: https://devspaces.${{ environment.parameters.baseDomain }}#https://github.com/rhpds/${{ parameters.project_name }}
+        if: ${{ steps['check-catalog'].output.entity == null }}
+
+      - title: View Existing Entity in Catalog
+        icon: catalog
+        url: /catalog/default/component/${{ parameters.project_name }}
+        if: ${{ steps['check-catalog'].output.entity != null }}
 
     text:
-      - title: Result
-        content: >-
-          ${{ steps['check-catalog'].output.entity == null
-          ? 'Your project has been created successfully. Click **Open in DevSpaces** above to get started, then run `/rhdp-publishing-house` in the Claude CLI.'
-          : 'A project named **"' + parameters.project_name + '"** already exists in the catalog. All steps were skipped — no repository was created and no workflow was started. Click **Start Over** to choose a different project name.' }}
+      - title: Project Created
+        if: ${{ steps['check-catalog'].output.entity == null }}
+        content: |
+          Your project has been created successfully.
+
+          Click **Open in DevSpaces** above to get started, then run `/rhdp-publishing-house` in the Claude CLI.
+
+      - title: Scaffolding Skipped
+        if: ${{ steps['check-catalog'].output.entity != null }}
+        content: |
+          A project named **${{ parameters.project_name }}** already exists in the catalog.
+
+          All steps were skipped. No repository was created and no workflow was started. Click **Start Over** below to choose a different project name.
