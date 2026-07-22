@@ -396,6 +396,27 @@ This can be run locally (the skill reads design.md and checks against the policy
 
 **This check is non-blocking.** It shows results and lets the author fix issues before proceeding. It does not gate the flow — the author can acknowledge warnings and move on. The hard gate is still at submission (Phase 6).
 
+### Offline Mode — Intake Without the Platform
+
+The intake skill currently hard-depends on the platform (Central API + SonataFlow). If RHDH is down, SonataFlow is unreachable, or the author is working locally without cluster access, the skill is completely unusable. This is a critical gap — platform outages should not block spec authoring.
+
+Most of the intake flow is local work — asking questions, writing files, generating design docs and module outlines. The platform dependency is only real for three things:
+
+| Capability | Needs Platform? | Offline Behavior |
+|-----------|----------------|-----------------|
+| Interview (Phases 1-2) | No | Works as-is |
+| Validation policy (action verbs, products) | Yes — fetched from Central | Bundle a static fallback in the project template (`publishing-house/policy.json`). Doesn't change often. |
+| RCARS vetting (Phase 3) | Yes — Central is the RCARS gateway | Skip with warning: "RCARS vetting unavailable offline. This will run at submission." |
+| Module outlines (Phase 4) | No | Works as-is |
+| Infra confirmation (Phase 5) | No | Works as-is |
+| Approval checklist (Phase 6) | No | Works as-is |
+| Submission (Phase 6) | Yes — runs Central validation + advances workflow | Defer: "Spec is ready but not submitted. Run the submission step when the platform is available to pass through the review gate." |
+| Workflow state check (pre-flight) | Yes — queries SonataFlow | Assume `intake` stage in offline mode. |
+
+**The offline flow:** The skill detects that Central is unreachable during pre-flight (Step 4 fails). Instead of stopping, it warns the author and continues in offline mode. The full interview, design doc, RCARS vetting (skipped with warning), module outlines, and infra confirmation all proceed normally. At Phase 6, instead of submitting, the skill says: "Your spec is complete and committed locally. When the platform is available, run the submission step to pass through the review gate and enter the review pipeline."
+
+The spec still has to pass all deterministic checks at submission — offline mode doesn't bypass validation, it just defers it.
+
 ### Before vs. After
 
 | Metric | Current | Proposed |
