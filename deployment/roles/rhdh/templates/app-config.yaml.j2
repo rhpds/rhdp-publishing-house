@@ -87,6 +87,12 @@ proxy:
       secure: false
       headers:
         Authorization: Bearer ${PH_API_KEY}
+    /github-api:
+      target: https://api.github.com
+      changeOrigin: true
+      secure: true
+      headers:
+        Authorization: Bearer ${GITHUB_TOKEN}
 
 scaffolder:
   defaultEnvironment:

@@ -63,9 +63,9 @@ spec:
           - contextAttributeName: projectid
         dataOnly: true
         kind: consumed
-        name: ReadyCompleteEvent
+        name: TestingCompleteEvent
         source: publishing-house
-        type: ph.ready.complete
+        type: ph.testing.complete
     functions:
       - name: printMessage
         operation: sysout
@@ -160,7 +160,7 @@ spec:
         stateDataFilter:
           output: |
             . + {
-              reviewHistory: ((.reviewHistory // []) + [.latestAudit]),
+              reviewHistory: (((.reviewHistory // []) + [.latestAudit]) | unique_by(.timestamp + .stage + .action)),
               activeCommitSha: (.latestAudit.commitSha // .activeCommitSha),
               rejection: { isRejected: false }
             }
@@ -195,7 +195,7 @@ spec:
         stateDataFilter:
           output: |
             . + {
-              reviewHistory: ((.reviewHistory // []) + [.latestAudit]),
+              reviewHistory: (((.reviewHistory // []) + [.latestAudit]) | unique_by(.timestamp + .stage + .action)),
               activeCommitSha: (if .latestAudit.action == "approved" then .latestAudit.commitSha else .activeCommitSha end),
               rejection: (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else .rejection end)
             }
@@ -239,7 +239,7 @@ spec:
         stateDataFilter:
           output: |
             . + {
-              reviewHistory: ((.reviewHistory // []) + [.latestAudit]),
+              reviewHistory: (((.reviewHistory // []) + [.latestAudit]) | unique_by(.timestamp + .stage + .action)),
               activeCommitSha: (if .latestAudit.action == "approved" then .latestAudit.commitSha else .activeCommitSha end),
               rejection: (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else .rejection end)
             }
@@ -287,30 +287,30 @@ spec:
         stateDataFilter:
           output: |
             . + {
-              reviewHistory: ((.reviewHistory // []) + [.latestAudit])
+              reviewHistory: (((.reviewHistory // []) + [.latestAudit]) | unique_by(.timestamp + .stage + .action))
             }
         timeouts:
           stateExecTimeout: PT168H
         transition:
-          nextState: Ready
-      - name: Ready
+          nextState: Testing
+      - name: Testing
         type: event
         exclusive: true
         onEvents:
           - eventRefs:
-              - ReadyCompleteEvent
+              - TestingCompleteEvent
             actions:
-              - name: LogReadyComplete
+              - name: LogTestingComplete
                 functionRef:
                   refName: printMessage
                   arguments:
-                    message: "Ready for publishing"
+                    message: "Testing completed, transitioning to Published"
             eventDataFilter:
               toStateData: ".latestAudit"
         stateDataFilter:
           output: |
             . + {
-              reviewHistory: ((.reviewHistory // []) + [.latestAudit])
+              reviewHistory: (((.reviewHistory // []) + [.latestAudit]) | unique_by(.timestamp + .stage + .action))
             }
         timeouts:
           stateExecTimeout: PT168H

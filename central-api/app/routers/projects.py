@@ -261,7 +261,7 @@ _STATE_MAP = {
     "infrareviewdecision": "infra_review",
     "jirasync": "jira_sync",
     "development": "development",
-    "ready": "ready",
+    "testing": "testing",
     "published": "published",
 }
 

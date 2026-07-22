@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 STAGE_GROUPS = {
     "intake": ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
-    "review": ["A", "B", "D", "E", "F"],
+    "review": ["A", "B", "C", "D", "E", "F"],
 }
 
 
@@ -115,6 +115,8 @@ async def run_validation(
             results=all_results,
             auto_computed=auto if "I" in groups else None,
             commit_sha=repo.head_sha,
+            approval_checklist=spec_data.get("approval_checklist"),
+            repo_url=repo_url,
         )
     finally:
         repo.cleanup()

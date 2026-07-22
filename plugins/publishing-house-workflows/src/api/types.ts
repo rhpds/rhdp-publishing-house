@@ -45,7 +45,7 @@ export type WorkflowStage =
   | 'infra_review'
   | 'jira_sync'
   | 'development'
-  | 'ready'
+  | 'testing'
   | 'published'
   | 'error';
 
@@ -78,11 +78,46 @@ export interface AutoComputedFields {
   provisioning_time_min?: number;
 }
 
+export interface RcarsMatch {
+  ci_name: string;
+  display_name: string;
+  url: string;
+}
+
+export interface ApprovalChecklist {
+  content?: {
+    prerequisites_verifiable?: boolean | null;
+    assessment_strategy?: string;
+    differentiation?: string;
+    rcars_overlap_pct?: number | null;
+    rcars_top_matches?: RcarsMatch[];
+    decision?: string | null;
+    decision_notes?: string;
+    rejections?: any[];
+  };
+  infra?: {
+    peak_environments?: number | null;
+    cost_per_run_est?: string;
+    provisioning_time_est?: string;
+    agnosticv_base_ci?: string;
+    decision?: string | null;
+    decision_notes?: string;
+    approved_by?: string;
+    rejections?: any[];
+  };
+  manager?: {
+    decision?: string | null;
+    decision_notes?: string;
+  };
+}
+
 export interface ValidationReport {
   passed: boolean;
   results: ValidationCheck[];
   auto_computed?: AutoComputedFields;
   commit_sha?: string;
+  approval_checklist?: ApprovalChecklist;
+  repo_url?: string;
 }
 
 export interface AuditEntry {

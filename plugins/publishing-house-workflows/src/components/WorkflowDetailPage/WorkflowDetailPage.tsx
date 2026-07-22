@@ -160,9 +160,18 @@ export function WorkflowDetailPage() {
     if (!result) return;
     setApprovingStage(stage);
     try {
-      if (REVIEW_STAGES.includes(stage) && validationReport?.commit_sha && result.summary.repoUrl) {
+      if (REVIEW_STAGES.includes(stage) && result.summary.repoUrl) {
         const latestSha = await client.fetchHeadCommitSha(result.summary.repoUrl);
-        if (latestSha && latestSha !== validationReport.commit_sha) {
+        if (!latestSha) {
+          setSnackbar({
+            open: true,
+            severity: 'error',
+            message: 'Could not verify repo state — approval blocked. Try again.',
+          });
+          setApprovingStage(null);
+          return;
+        }
+        if (validationReport?.commit_sha && latestSha !== validationReport.commit_sha) {
           setSnackbar({
             open: true,
             severity: 'error',
@@ -379,49 +388,163 @@ export function WorkflowDetailPage() {
         )}
 
         {isReviewStage && activeTab === 1 && (
-          <InfoCard title="Validation Report">
-            {validationLoading ? (
-              <Progress />
-            ) : validationReport ? (
-              <div>
-                <div style={{
-                  padding: '8px 16px',
-                  marginBottom: 16,
-                  borderRadius: 4,
-                  backgroundColor: validationReport.passed ? '#e8f5e9' : '#ffebee',
-                  color: validationReport.passed ? '#2e7d32' : '#c62828',
-                  fontWeight: 600,
-                }}>
-                  {validationReport.passed ? 'All checks passed' : 'Some checks failed'}
+          <>
+            {/* Spec File Links */}
+            {summary.repoUrl && (
+              <InfoCard title="Spec Files">
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {[
+                    { label: 'spec.yaml', path: 'publishing-house/spec.yaml' },
+                    { label: 'design.md', path: 'publishing-house/spec/design.md' },
+                    { label: 'Module Outlines', path: 'publishing-house/spec/modules' },
+                    { label: 'automation-manifest.yaml', path: 'publishing-house/spec/automation-manifest.yaml' },
+                  ].map(f => (
+                    <Button
+                      key={f.path}
+                      variant="outlined"
+                      size="small"
+                      startIcon={<GitHubIcon />}
+                      href={`${summary.repoUrl.replace(/\.git$/, '')}/blob/main/${f.path}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {f.label}
+                    </Button>
+                  ))}
                 </div>
-                {validationReport.commit_sha && (
-                  <Typography variant="body2" style={{ marginBottom: 16, color: '#757575' }}>
-                    Validated against commit <code>{validationReport.commit_sha.substring(0, 7)}</code>
-                  </Typography>
-                )}
-                {Object.entries(
-                  validationReport.results.reduce((acc, check) => {
-                    (acc[check.group] = acc[check.group] || []).push(check);
-                    return acc;
-                  }, {} as Record<string, typeof validationReport.results>),
-                ).map(([group, checks]) => (
-                  <div key={group} style={{ marginBottom: 12 }}>
-                    <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 4 }}>
-                      Group {group}: {CHECK_GROUP_LABELS[group] || group}
-                    </Typography>
-                    {checks.map(check => (
-                      <div key={check.check_id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', paddingLeft: 16, marginBottom: 2 }}>
-                        <span style={{ color: STATUS_COLORS[check.status], fontWeight: 700, fontFamily: 'monospace', width: 16 }}>
-                          {STATUS_ICONS[check.status]}
-                        </span>
-                        <Typography variant="body2">
-                          {check.message}
-                        </Typography>
-                      </div>
-                    ))}
+              </InfoCard>
+            )}
+
+            <InfoCard title="Validation Report">
+              {validationLoading ? (
+                <Progress />
+              ) : validationReport ? (
+                <div>
+                  <div style={{
+                    padding: '8px 16px',
+                    marginBottom: 16,
+                    borderRadius: 4,
+                    backgroundColor: validationReport.passed ? '#e8f5e9' : '#ffebee',
+                    color: validationReport.passed ? '#2e7d32' : '#c62828',
+                    fontWeight: 600,
+                  }}>
+                    {validationReport.passed ? 'All checks passed' : 'Some checks failed'}
                   </div>
-                ))}
-                <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid #e0e0e0', display: 'flex', gap: 12 }}>
+                  {validationReport.commit_sha && (
+                    <Typography variant="body2" style={{ marginBottom: 16, color: '#757575' }}>
+                      Validated against commit <code>{validationReport.commit_sha.substring(0, 7)}</code>
+                    </Typography>
+                  )}
+                  {Object.entries(
+                    validationReport.results.reduce((acc, check) => {
+                      (acc[check.group] = acc[check.group] || []).push(check);
+                      return acc;
+                    }, {} as Record<string, typeof validationReport.results>),
+                  ).map(([group, checks]) => (
+                    <div key={group} style={{ marginBottom: 12 }}>
+                      <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 4 }}>
+                        Group {group}: {CHECK_GROUP_LABELS[group] || group}
+                      </Typography>
+                      {checks.map(check => (
+                        <div key={check.check_id} style={{ display: 'flex', gap: 8, alignItems: 'baseline', paddingLeft: 16, marginBottom: 2 }}>
+                          <span style={{ color: STATUS_COLORS[check.status], fontWeight: 700, fontFamily: 'monospace', width: 16 }}>
+                            {STATUS_ICONS[check.status]}
+                          </span>
+                          <Typography variant="body2">
+                            {check.message}
+                          </Typography>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Typography variant="body2">No validation report available</Typography>
+              )}
+            </InfoCard>
+
+            {/* Approval Checklist Answers */}
+            {validationReport?.approval_checklist?.content && (
+              <InfoCard title="Content Review — Approval Checklist">
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <DetailField
+                      label="Prerequisites Verifiable (Q22)"
+                      value={validationReport.approval_checklist.content.prerequisites_verifiable === null ? 'Not set' : String(validationReport.approval_checklist.content.prerequisites_verifiable)}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography className={classes.label}>Assessment Strategy (Q23)</Typography>
+                    <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', backgroundColor: '#f5f5f5', padding: 12, borderRadius: 4 }}>
+                      {validationReport.approval_checklist.content.assessment_strategy || '— not set —'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography className={classes.label}>Differentiation (Q24)</Typography>
+                    <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', backgroundColor: '#f5f5f5', padding: 12, borderRadius: 4 }}>
+                      {validationReport.approval_checklist.content.differentiation || '— not set —'}
+                    </Typography>
+                  </Grid>
+                  {validationReport.approval_checklist.content.rcars_overlap_pct != null && (
+                    <Grid item xs={12}>
+                      <Typography className={classes.label}>RCARS Overlap</Typography>
+                      <Typography variant="body2" style={{ fontWeight: 600, color: (validationReport.approval_checklist.content.rcars_overlap_pct ?? 0) > 60 ? '#c62828' : '#2e7d32' }}>
+                        {validationReport.approval_checklist.content.rcars_overlap_pct}%
+                      </Typography>
+                    </Grid>
+                  )}
+                  {(validationReport.approval_checklist.content.rcars_top_matches ?? []).length > 0 && (
+                    <Grid item xs={12}>
+                      <Typography className={classes.label}>RCARS Top Matches</Typography>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', marginTop: 4 }}>
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid #e0e0e0', textAlign: 'left' }}>
+                            <th style={{ padding: '6px 8px' }}>Catalog Item</th>
+                            <th style={{ padding: '6px 8px' }}>Display Name</th>
+                            <th style={{ padding: '6px 8px' }}>Link</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {validationReport.approval_checklist.content.rcars_top_matches!.map((m, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                              <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{m.ci_name}</td>
+                              <td style={{ padding: '6px 8px' }}>{m.display_name}</td>
+                              <td style={{ padding: '6px 8px' }}>
+                                {m.url ? <a href={m.url} target="_blank" rel="noopener noreferrer">View</a> : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </Grid>
+                  )}
+                </Grid>
+              </InfoCard>
+            )}
+
+            {validationReport?.approval_checklist?.infra && (
+              <InfoCard title="Infra Review — Auto-Computed Fields">
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <DetailField label="Peak Environments" value={validationReport.approval_checklist.infra.peak_environments != null ? String(validationReport.approval_checklist.infra.peak_environments) : 'Not computed'} />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <DetailField label="Cost per Run (est.)" value={validationReport.approval_checklist.infra.cost_per_run_est || 'Not computed'} />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <DetailField label="Provisioning Time (est.)" value={validationReport.approval_checklist.infra.provisioning_time_est || 'Not computed'} />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <DetailField label="AgnosticV Base CI" value={validationReport.approval_checklist.infra.agnosticv_base_ci || 'Not set'} />
+                  </Grid>
+                </Grid>
+              </InfoCard>
+            )}
+
+            {/* Approve / Reject buttons */}
+            {validationReport && (
+              <InfoCard>
+                <div style={{ display: 'flex', gap: 12 }}>
                   <Button
                     variant="contained"
                     style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
@@ -446,11 +569,9 @@ export function WorkflowDetailPage() {
                     Reject
                   </Button>
                 </div>
-              </div>
-            ) : (
-              <Typography variant="body2">No validation report available</Typography>
+              </InfoCard>
             )}
-          </InfoCard>
+          </>
         )}
 
         {activeTab === (isReviewStage ? 2 : 1) && (

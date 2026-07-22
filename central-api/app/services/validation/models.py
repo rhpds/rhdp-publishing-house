@@ -35,3 +35,5 @@ class ValidationResponse(BaseModel):
     results: list[CheckResult]
     auto_computed: Optional[AutoComputedFields] = None
     commit_sha: Optional[str] = None
+    approval_checklist: Optional[dict] = None
+    repo_url: Optional[str] = None

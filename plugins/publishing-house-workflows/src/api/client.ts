@@ -167,6 +167,7 @@ export function createPhWorkflowsClient(options: {
       content_review: 'ph.content-review.complete',
       infra_review: 'ph.infra-review.complete',
       development: 'ph.development.complete',
+      testing: 'ph.testing.complete',
     };
     const eventType = typeMap[stage];
     if (!eventType) {
@@ -283,7 +284,7 @@ export function createPhWorkflowsClient(options: {
 
     const proxyUrl = await discoveryApi.getBaseUrl('proxy');
     const response = await fetchApi.fetch(
-      `${proxyUrl}/github/api/repos/${owner}/${repo}/commits/${branch}`,
+      `${proxyUrl}/github-api/repos/${owner}/${repo}/commits/${branch}`,
       { headers: { Accept: 'application/vnd.github.sha' } },
     );
 
