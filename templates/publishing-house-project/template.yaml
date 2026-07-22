@@ -245,7 +245,29 @@ spec:
 
           A project named **"${{ parameters.project_name }}"** already exists in the catalog. All steps were skipped — no repository was created and no workflow was started. Re-run the template with a different project name.
           {% else %}
-          **Project Created**
+          **Your Publishing House project is live!** You're ready to start building.
 
-          Your project has been created successfully. Click **Open in DevSpaces** above to get started, then run `/rhdp-publishing-house` in the Claude CLI.
+          **Here's what we set up for you:**
+          1. Repository created
+          2. catalog-info.yaml added to repository
+          3. Registered in Backstage catalog
+          4. Orchestrator workflow started — your AI-guided content pipeline is running!
+
+          **What happens next:**
+          Claude will walk you through the entire content lifecycle — from intake and spec creation, through Jira tracking and reviews, all the way to a published lab on RHDP. Just follow the prompts!
+
+          **Getting Started:**
+
+          **Option A — DevSpaces (recommended, fastest way to start!):**
+          1. Click the **Open in DevSpaces** link above
+          2. Once the workspace loads, open a new terminal
+          3. Start Claude CLI: `claude`
+          4. Run: `/rhdp-publishing-house` — and you're off!
+
+          **Option B — Local machine:**
+          1. Install the skills: `git clone https://github.com/rhpds/rhdp-publishing-house-skills.git ~/.claude/skills/publishing-house`
+          2. Clone the repo: `git clone https://github.com/rhpds/${{ parameters.project_name }}`
+          3. `cd ${{ parameters.project_name }}`
+          4. Start Claude CLI: `claude`
+          5. Run: `/rhdp-publishing-house` — and you're off!
           {% endif %}
