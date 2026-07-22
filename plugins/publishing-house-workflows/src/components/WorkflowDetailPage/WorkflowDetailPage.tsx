@@ -495,7 +495,7 @@ export function WorkflowDetailPage() {
                     </Typography>
                   )}
                   {Object.entries(
-                    validationReport.results.reduce((acc, check) => {
+                    (validationReport.results || []).reduce((acc, check) => {
                       (acc[check.group] = acc[check.group] || []).push(check);
                       return acc;
                     }, {} as Record<string, typeof validationReport.results>),
