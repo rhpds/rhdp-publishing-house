@@ -216,3 +216,13 @@ This could be a Central API endpoint, a SonataFlow "cancel" workflow path, or a 
 - Related to finding #12 (workflow data 404) — if the previous project's workflow is in a bad state, it may block creation of a new one with the same name
 
 This reinforces the need for the cleanup procedure (#2) — without it, testing is blocked by leftover state from previous runs.
+
+---
+
+### 17. Validation B-02: max_concurrent_users Required for Per-Student — Deploy Fix
+
+**Observed:** The deployed Central API validation (B-02) requires `max_concurrent_users` for `per-student` and `cnv-pool` topologies. This is wrong — per-student gives each learner their own environment. The number of simultaneous users is an operational/scheduling decision, not something the author knows at intake.
+
+**Status:** Already fixed in `feature/intake-refactor-central` branch (commit `2fa26fe`). B-02 now only requires concurrent users for `shared-cluster` topology. Needs to be merged and deployed.
+
+**Action for Tyrell:** Review and merge `feature/intake-refactor-central`, rebuild and deploy Central API.

@@ -22,12 +22,19 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
             field="approval_checklist.content.prerequisites_verifiable",
         ))
 
-    # C-02: Q23 — assessment_strategy
+    # C-02: assessment_strategy — required only for zero_touch showroom type
     assessment = cl.get("assessment_strategy", "")
-    if not assessment:
+    showroom_type = spec_data.get("project", {}).get("showroom_type", "")
+    if showroom_type == "zero_touch" and not assessment:
         results.append(CheckResult(
             check_id="C-02", group="C", status=CheckStatus.FAIL,
-            message="Q23: assessment_strategy must be non-empty",
+            message="assessment_strategy is required for Zero-Touch labs (solve/validate buttons)",
+            field="approval_checklist.content.assessment_strategy",
+        ))
+    elif not assessment:
+        results.append(CheckResult(
+            check_id="C-02", group="C", status=CheckStatus.SKIP,
+            message="assessment_strategy is optional for classic labs and demos",
             field="approval_checklist.content.assessment_strategy",
         ))
     else:

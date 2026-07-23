@@ -38,9 +38,9 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
             field="spec.environment.worker_*",
         ))
 
-    # B-02: Concurrent users required for per-student / cnv-pool
+    # B-02: Concurrent users required for shared-cluster (sizing for simultaneous users)
     topology = env.get("topology", "")
-    if topology in ("per-student", "cnv-pool"):
+    if topology == "shared-cluster":
         max_users = env.get("max_concurrent_users")
         if max_users is None or max_users == "":
             results.append(CheckResult(
