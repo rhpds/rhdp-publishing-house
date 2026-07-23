@@ -129,8 +129,14 @@ export interface AuditEntry {
   commitSha?: string;
 }
 
-export interface DriftChange {
-  change: string;
+export interface DriftSectionChanges {
+  section: string;
+  changes: string[];
+}
+
+export interface DriftFileChanges {
+  file: string;
+  sections: DriftSectionChanges[];
 }
 
 export interface DriftReport {
@@ -138,8 +144,7 @@ export interface DriftReport {
   approved_sha: string;
   current_sha: string;
   summary: string;
-  module_changes: DriftChange[];
-  environment_changes: DriftChange[];
+  changes: DriftFileChanges[];
 }
 
 export interface WorkflowSummary {

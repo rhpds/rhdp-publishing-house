@@ -13,25 +13,33 @@ logger = logging.getLogger(__name__)
 DESIGN_PATH = "publishing-house/design.md"
 LITELLM_MODEL = "claude-haiku-4-5"
 
-SYSTEM_PROMPT = """You are a technical document reviewer. You will receive two versions of a design document (APPROVED and CURRENT). Compare them and identify meaningful changes in the Module Map/Structure and Environment/Infrastructure sections.
+SYSTEM_PROMPT = """You are a technical document reviewer. You will receive two versions of a design document (APPROVED and CURRENT). Compare them and identify meaningful changes, organized by section.
 
-Ignore cosmetic changes (whitespace, punctuation, rewording that preserves meaning). Only flag substantive changes: added/removed/renamed modules, changed durations, altered infrastructure requirements, changed cluster sizing, added/removed environment dependencies.
+Ignore cosmetic changes (whitespace, punctuation, rewording that preserves meaning). Only flag substantive changes: added/removed/renamed modules, changed durations, altered infrastructure requirements, changed cluster sizing, added/removed environment dependencies, changed products, etc.
 
 Respond with valid JSON only, no markdown fencing:
 {
   "has_drift": true/false,
   "summary": "one-sentence summary of what changed, or 'No meaningful drift detected'",
-  "module_changes": [
-    {"change": "description of module change"}
-  ],
-  "environment_changes": [
-    {"change": "description of environment change"}
+  "sections": [
+    {
+      "section": "section name (e.g. Module Map, Environment, Infrastructure Requirements)",
+      "changes": ["description of change 1", "description of change 2"]
+    }
   ]
-}"""
+}
+
+Only include sections that have meaningful changes. If no drift, return an empty sections array."""
 
 
-class DriftChange(BaseModel):
-    change: str
+class DriftSectionChanges(BaseModel):
+    section: str
+    changes: list[str]
+
+
+class DriftFileChanges(BaseModel):
+    file: str
+    sections: list[DriftSectionChanges]
 
 
 class DriftResponse(BaseModel):
@@ -39,14 +47,23 @@ class DriftResponse(BaseModel):
     approved_sha: str
     current_sha: str
     summary: str
-    module_changes: list[DriftChange]
-    environment_changes: list[DriftChange]
+    changes: list[DriftFileChanges]
 
 
 class DriftRequest(BaseModel):
     repo_url: str
     branch: str = "main"
     approved_sha: str
+
+
+def _empty_response(approved_sha: str, current_sha: str, summary: str, has_drift: bool = False) -> DriftResponse:
+    return DriftResponse(
+        has_drift=has_drift,
+        approved_sha=approved_sha,
+        current_sha=current_sha,
+        summary=summary,
+        changes=[],
+    )
 
 
 async def check_drift(
@@ -62,34 +79,13 @@ async def check_drift(
     current_sha = await github.get_head_sha(repo_url, branch) or ""
 
     if not approved_md and not current_md:
-        return DriftResponse(
-            has_drift=False,
-            approved_sha=approved_sha,
-            current_sha=current_sha,
-            summary="design.md not found in either commit",
-            module_changes=[],
-            environment_changes=[],
-        )
+        return _empty_response(approved_sha, current_sha, "design.md not found in either commit")
 
     if not approved_md:
-        return DriftResponse(
-            has_drift=True,
-            approved_sha=approved_sha,
-            current_sha=current_sha,
-            summary="design.md was added after the approved commit",
-            module_changes=[],
-            environment_changes=[],
-        )
+        return _empty_response(approved_sha, current_sha, "design.md was added after the approved commit", has_drift=True)
 
     if approved_md == current_md:
-        return DriftResponse(
-            has_drift=False,
-            approved_sha=approved_sha,
-            current_sha=current_sha,
-            summary="No changes to design.md",
-            module_changes=[],
-            environment_changes=[],
-        )
+        return _empty_response(approved_sha, current_sha, "No changes to design.md")
 
     user_prompt = f"""## APPROVED VERSION (commit {approved_sha[:8]}):
 
@@ -122,14 +118,7 @@ async def check_drift(
 
         if resp.status_code != 200:
             logger.error(f"LLM drift check failed: {resp.status_code} {resp.text}")
-            return DriftResponse(
-                has_drift=False,
-                approved_sha=approved_sha,
-                current_sha=current_sha,
-                summary=f"LLM comparison failed (HTTP {resp.status_code})",
-                module_changes=[],
-                environment_changes=[],
-            )
+            return _empty_response(approved_sha, current_sha, f"LLM comparison failed (HTTP {resp.status_code})")
 
         content = resp.json()["choices"][0]["message"]["content"]
         content = content.strip()
@@ -138,32 +127,26 @@ async def check_drift(
 
         result = json.loads(content)
 
+        sections = [
+            DriftSectionChanges(section=s["section"], changes=s["changes"])
+            for s in result.get("sections", [])
+        ]
+
+        file_changes = []
+        if sections:
+            file_changes.append(DriftFileChanges(file="design.md", sections=sections))
+
         return DriftResponse(
             has_drift=result.get("has_drift", False),
             approved_sha=approved_sha,
             current_sha=current_sha,
             summary=result.get("summary", ""),
-            module_changes=[DriftChange(change=c["change"]) for c in result.get("module_changes", [])],
-            environment_changes=[DriftChange(change=c["change"]) for c in result.get("environment_changes", [])],
+            changes=file_changes,
         )
 
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse LLM drift response: {e}")
-        return DriftResponse(
-            has_drift=False,
-            approved_sha=approved_sha,
-            current_sha=current_sha,
-            summary="Failed to parse LLM comparison result",
-            module_changes=[],
-            environment_changes=[],
-        )
+        return _empty_response(approved_sha, current_sha, "Failed to parse LLM comparison result")
     except Exception as e:
         logger.error(f"Drift detection error: {e}")
-        return DriftResponse(
-            has_drift=False,
-            approved_sha=approved_sha,
-            current_sha=current_sha,
-            summary=f"Drift detection error: {str(e)}",
-            module_changes=[],
-            environment_changes=[],
-        )
+        return _empty_response(approved_sha, current_sha, f"Drift detection error: {str(e)}")

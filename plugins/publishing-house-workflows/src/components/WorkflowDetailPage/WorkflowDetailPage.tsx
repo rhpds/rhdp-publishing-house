@@ -448,30 +448,25 @@ export function WorkflowDetailPage() {
                     <Typography variant="body2" style={{ marginBottom: 12 }}>
                       {driftReport.summary}
                     </Typography>
-                    {driftReport.has_drift && (
-                      <div>
-                        {driftReport.module_changes.length > 0 && (
-                          <div style={{ marginBottom: 12 }}>
-                            <Typography variant="subtitle2" style={{ marginBottom: 4 }}>Module Changes</Typography>
+                    {driftReport.has_drift && driftReport.changes.map((fileChange, fi) => (
+                      <div key={fi} style={{ marginBottom: 16 }}>
+                        <Typography variant="subtitle2" style={{ marginBottom: 8, fontFamily: 'monospace' }}>
+                          {fileChange.file}
+                        </Typography>
+                        {fileChange.sections.map((sec, si) => (
+                          <div key={si} style={{ marginBottom: 8, marginLeft: 8 }}>
+                            <Typography variant="body2" style={{ fontWeight: 600, marginBottom: 4 }}>
+                              {sec.section}
+                            </Typography>
                             <ul style={{ margin: 0, paddingLeft: 20 }}>
-                              {driftReport.module_changes.map((c, i) => (
-                                <li key={i} style={{ marginBottom: 2 }}>{c.change}</li>
+                              {sec.changes.map((c, ci) => (
+                                <li key={ci} style={{ marginBottom: 2 }}>{c}</li>
                               ))}
                             </ul>
                           </div>
-                        )}
-                        {driftReport.environment_changes.length > 0 && (
-                          <div>
-                            <Typography variant="subtitle2" style={{ marginBottom: 4 }}>Environment Changes</Typography>
-                            <ul style={{ margin: 0, paddingLeft: 20 }}>
-                              {driftReport.environment_changes.map((c, i) => (
-                                <li key={i} style={{ marginBottom: 2 }}>{c.change}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
+                        ))}
                       </div>
-                    )}
+                    ))}
                   </div>
                 ) : null}
               </InfoCard>
