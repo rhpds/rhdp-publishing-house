@@ -17,6 +17,8 @@ components:
       env:
         - name: DEFAULT_EXTENSIONS
           value: '/tmp/claude-code.vsix'
+        - name: CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS
+          value: '1'
 
 commands:
   - id: setup-workspace
