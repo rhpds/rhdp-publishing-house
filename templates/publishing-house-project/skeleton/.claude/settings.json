@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python*publishing-house/tools/*)",
+      "Bash(python3*publishing-house/tools/*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git pull*)",
+      "Bash(git diff*)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git stash*)",
+      "Bash(command -v python*)",
+      "Read(publishing-house/*)",
+      "Edit(publishing-house/*)",
+      "Write(publishing-house/*)",
+      "Read(catalog-info.yaml)",
+      "Edit(catalog-info.yaml)",
+      "Read(/home/user/.claude/skills/publishing-house/**)"
+    ]
+  }
+}

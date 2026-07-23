@@ -144,7 +144,7 @@ export function WorkflowDetailPage() {
           .then(report => setDriftReport(report))
           .catch((err: any) => setSnackbar({ open: true, severity: 'error', message: `Drift check failed: ${err.message}` }))
           .finally(() => setDriftLoading(false))
-      : Promise.resolve();
+      : Promise.resolve().then(() => { setDriftReport(null); setDriftLoading(false); });
 
     await Promise.all([validationPromise, driftPromise]);
   }, [result, client]);
@@ -455,17 +455,30 @@ export function WorkflowDetailPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {driftReport.fields.filter(f => f.changed).map(f => (
-                            <tr key={f.field} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                              <td style={{ padding: '6px 8px', fontWeight: 600 }}>{f.field}</td>
-                              <td style={{ padding: '6px 8px', fontFamily: 'monospace', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {f.approved_value != null ? (Array.isArray(f.approved_value) ? JSON.stringify(f.approved_value) : String(f.approved_value)) : '—'}
-                              </td>
-                              <td style={{ padding: '6px 8px', fontFamily: 'monospace', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {f.current_value != null ? (Array.isArray(f.current_value) ? JSON.stringify(f.current_value) : String(f.current_value)) : '—'}
-                              </td>
-                            </tr>
-                          ))}
+                          {driftReport.fields.filter(f => f.changed).map(f => {
+                            const formatValue = (val: any): React.ReactNode => {
+                              if (val == null) return '—';
+                              if (!Array.isArray(val)) return String(val);
+                              if (val.length === 0) return '(empty)';
+                              if (typeof val[0] === 'object' && val[0] !== null) {
+                                return (
+                                  <ul style={{ margin: 0, paddingLeft: 16 }}>
+                                    {val.map((item: any, i: number) => (
+                                      <li key={i}>{item.title || item.name || JSON.stringify(item)}</li>
+                                    ))}
+                                  </ul>
+                                );
+                              }
+                              return val.join(', ');
+                            };
+                            return (
+                              <tr key={f.field} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                                <td style={{ padding: '6px 8px', fontWeight: 600, verticalAlign: 'top' }}>{f.field}</td>
+                                <td style={{ padding: '6px 8px', maxWidth: 300 }}>{formatValue(f.approved_value)}</td>
+                                <td style={{ padding: '6px 8px', maxWidth: 300 }}>{formatValue(f.current_value)}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     )}

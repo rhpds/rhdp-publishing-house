@@ -2,13 +2,10 @@ schemaVersion: 2.2.0
 metadata:
   name: ${{ values.project_name }}
   displayName: ${{ values.project_name }} - Publishing House Workspace
-  description: Workspace for creating RHDP workshop/lab/demo content with Claude AI assistance
+  description: Workspace for creating RHDP lab/demo content with Claude AI assistance
 
 components:
   - name: dev-tools
-    attributes:
-      che-code.eclipse.org/vscode-extensions:
-        - https://marketplace.visualstudio.com/_apis/public/gallery/publishers/anthropic/vsextensions/claude-code/latest/vspackage
     container:
       image: quay.io/devfile/universal-developer-image:latest
       memoryLimit: 4Gi
@@ -17,6 +14,9 @@ components:
       cpuRequest: 1000m
       mountSources: true
       sourceMapping: /projects
+      env:
+        - name: DEFAULT_EXTENSIONS
+          value: '/tmp/claude-code.vsix'
       endpoints:
         - name: http-preview
           targetPort: 8080
@@ -99,7 +99,10 @@ commands:
       commandLine: |
         command -v python3 >/dev/null 2>&1 || sudo dnf install -y python3 2>/dev/null
         command -v pip3 >/dev/null 2>&1 || python3 -m ensurepip --user 2>/dev/null || sudo dnf install -y python3-pip 2>/dev/null
-        python3 -c "import yaml" 2>/dev/null || pip3 install --user pyyaml 2>/dev/null || echo "WARNING: could not install pyyaml"
+        PROJECT_DIR=$(ls -d /projects/*/ 2>/dev/null | head -1)
+        if [ -f "${PROJECT_DIR}publishing-house/tools/requirements.txt" ]; then
+          pip3 install --user -r "${PROJECT_DIR}publishing-house/tools/requirements.txt" 2>/dev/null || echo "WARNING: could not install Python dependencies"
+        fi
       workingDir: /projects
       label: "Install Python dependencies"
       group:
@@ -190,36 +193,21 @@ commands:
         kind: build
         isDefault: false
 
-  - id: start-claude
-    exec:
-      component: dev-tools
-      commandLine: |
-        PROJECT_DIR=$(ls -d /projects/*/ 2>/dev/null | head -1)
-        cd "$PROJECT_DIR"
-        exec /home/user/.local/bin/claude
-      workingDir: /projects
-      group:
-        kind: run
-        isDefault: true
 
-  - id: preview-content
+  - id: download-claude-extension
     exec:
       component: dev-tools
       commandLine: |
-        PROJECT_DIR=$(ls -d /projects/*/ 2>/dev/null | head -1)
-        cd "$PROJECT_DIR"
-        if [ -d "content" ]; then
-          cd content
-          python3 -m http.server 8080
-        else
-          echo "No content directory found. Create 'content/' to preview."
-        fi
+        curl -sL -o /tmp/claude-code.vsix "https://open-vsx.org/api/Anthropic/claude-code/linux-x64/2.1.218/file/Anthropic.claude-code-2.1.218@linux-x64.vsix"
       workingDir: /projects
+      label: "Download Claude Code Extension"
       group:
-        kind: run
+        kind: build
+        isDefault: false
 
 events:
   postStart:
+    - download-claude-extension
     - install-deps
     - install-claude
     - setup-workspace

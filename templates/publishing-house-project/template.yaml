@@ -6,7 +6,7 @@ metadata:
   description: Create a new PH content project with orchestrated workflow
   tags:
     - publishing-house
-    - workshop
+    - lab
     - devspaces
 
 spec:
@@ -24,7 +24,7 @@ spec:
         project_name:
           title: Project Name
           type: string
-          description: Name for your workshop/lab/demo (letters and hyphens only)
+          description: Name for your lab/demo (letters and hyphens only)
           ui:autofocus: true
           ui:placeholder: "openshift-ai-workshop"
           pattern: '^[a-z0-9-]+$'
@@ -37,13 +37,13 @@ spec:
           ui:widget: textarea
           ui:options:
             rows: 3
-          ui:placeholder: "A hands-on workshop teaching developers how to deploy and manage AI workloads on OpenShift using RHOAI"
+          ui:placeholder: "A hands-on lab teaching developers how to deploy and manage AI workloads on OpenShift using RHOAI"
 
         content_type:
           title: Content Type
           type: string
-          enum: [workshop, lab, demo]
-          default: workshop
+          enum: [lab, demo]
+          default: lab
 
         deployment_mode:
           title: Deployment Mode
