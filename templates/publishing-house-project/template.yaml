@@ -137,22 +137,25 @@ spec:
         entityRef: component:default/${{ parameters.project_name }}
         optional: true
 
-    # Step 2: Create repo using GitHub's native Template API
+    # Step 2: Create repo from GitHub template via API
     - id: create-from-github-template
       name: Create Repository from GitHub Template
       if: ${{ steps['check-catalog'].output.entity == null }}
-      action: publish:github
+      action: http:backstage:request
       input:
-        repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
-        templateRepository: rhpds/rhdp-publishing-house-template
-        copyRepositoryContents: true
-        description: ${{ parameters.project_description }}
-        defaultBranch: main
-        repoVisibility: public
-        protectDefaultBranch: false
-        collaborators: ${{ parameters.github_users }}
+        method: POST
+        path: '/proxy/github-api/repos/rhpds/rhdp-publishing-house-template/generate'
+        headers:
+          content-type: 'application/json'
+          Accept: 'application/vnd.github+json'
+        body:
+          owner: rhpds
+          name: ${{ parameters.project_name }}
+          description: ${{ parameters.project_description }}
+          private: false
+          include_all_branches: false
 
-    # Step 3: Generate skeleton artifacts in workspace
+    # Step 3: Render skeleton artifacts into workspace
     - id: generate-skeleton
       name: Generate Skeleton Artifacts
       if: ${{ steps['check-catalog'].output.entity == null }}
@@ -194,7 +197,7 @@ spec:
           content-type: 'application/json'
         body:
           projectId: ${{ parameters.project_name }}
-          repoUrl: ${{ steps['create-from-github-template'].output.remoteUrl }}
+          repoUrl: https://github.com/rhpds/${{ parameters.project_name }}
           ssoUser: ${{ user.entity.metadata.name }}
           ssoEmail: ${{ user.entity.spec.profile.email }}
           deploymentMode: ${{ parameters.deployment_mode }}
@@ -209,7 +212,7 @@ spec:
       if: ${{ steps['check-catalog'].output.entity == null }}
       action: catalog:register
       input:
-        repoContentsUrl: ${{ steps['create-from-github-template'].output.repoContentsUrl }}
+        repoContentsUrl: https://github.com/rhpds/${{ parameters.project_name }}/tree/main
         catalogInfoPath: '/catalog-info.yaml'
 
   output:
