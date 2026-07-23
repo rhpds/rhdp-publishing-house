@@ -148,13 +148,55 @@ commands:
           "env": {
             "ANTHROPIC_BASE_URL": "${LITELLM_URL}",
             "ANTHROPIC_MODEL": "${LITELLM_MODEL}"
+          },
+          "permissions": {
+            "allow": [
+              "Bash(python*publishing-house/tools/*)",
+              "Bash(python3*publishing-house/tools/*)",
+              "Bash(git add*)",
+              "Bash(git commit*)",
+              "Bash(git push*)",
+              "Bash(git pull*)",
+              "Bash(git diff*)",
+              "Bash(git status*)",
+              "Bash(git log*)",
+              "Bash(git stash*)",
+              "Bash(command -v python*)",
+              "Read(publishing-house/*)",
+              "Edit(publishing-house/*)",
+              "Write(publishing-house/*)",
+              "Read(catalog-info.yaml)",
+              "Edit(catalog-info.yaml)",
+              "Read(/home/user/.claude/skills/publishing-house/**)"
+            ]
           }
         }
         SETTINGSEOF
         else
           cat > /home/user/.claude/settings.json << 'SETTINGSEOF'
         {
-          "apiKeyHelper": "/home/user/.local/bin/claude-api-key-helper.sh"
+          "apiKeyHelper": "/home/user/.local/bin/claude-api-key-helper.sh",
+          "permissions": {
+            "allow": [
+              "Bash(python*publishing-house/tools/*)",
+              "Bash(python3*publishing-house/tools/*)",
+              "Bash(git add*)",
+              "Bash(git commit*)",
+              "Bash(git push*)",
+              "Bash(git pull*)",
+              "Bash(git diff*)",
+              "Bash(git status*)",
+              "Bash(git log*)",
+              "Bash(git stash*)",
+              "Bash(command -v python*)",
+              "Read(publishing-house/*)",
+              "Edit(publishing-house/*)",
+              "Write(publishing-house/*)",
+              "Read(catalog-info.yaml)",
+              "Edit(catalog-info.yaml)",
+              "Read(/home/user/.claude/skills/publishing-house/**)"
+            ]
+          }
         }
         SETTINGSEOF
         fi
