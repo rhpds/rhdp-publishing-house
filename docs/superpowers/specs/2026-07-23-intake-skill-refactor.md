@@ -100,15 +100,15 @@ The skill must handle three starting scenarios, plus a resume path.
 
 Fresh conversational interview. Full Phase 1 through Phase 6. This is the default path.
 
-### Path B — "I have something written up"
+### Path B — "I have something written up elsewhere"
 
-The author has an existing document — Google Doc, meeting notes, a rough outline, a Jira issue — that is NOT in Publishing House format. The skill reads it (pasted content, file path, or URL), extracts what it can into design.md and spec.yaml format, asks follow-up questions for gaps, and proceeds through the remaining phases.
+The author has requirements in an existing document — Google Doc, meeting notes, a rough outline, a Jira issue — that is NOT in the Publishing House project repo. It needs to be converted. The skill reads it (pasted content, file path, or URL), extracts what it can into design.md and spec.yaml format, asks follow-up questions for gaps, and proceeds through the remaining phases.
 
-### Path C — "I already filled this out"
+### Path C — "The design is already in the repo"
 
-The author already filled in `publishing-house/spec/design.md` and possibly the module outlines directly in the repo. The skill reads what's there, validates completeness, fills spec.yaml from the design content, asks about any gaps (missing fields, empty sections), and moves toward approval. No full interview — just gap-fill and validation.
+The author already filled in `publishing-house/spec/design.md` and possibly the module outlines directly in the project repo. They don't need an interview — they need validation and gap-fill. The skill checks the four required data points for Phase 2 (goal, audience, products, content type), asks about any that are missing, and skips ahead to infrastructure confirmation or finalize.
 
-**Detection:** The skill checks whether design.md still has `[placeholder]` markers or contains real content. If mostly filled in → Path C. If the author explicitly says "I already did this" → Path C.
+**Detection:** The skill checks whether design.md still has `[placeholder]` markers or contains real content. If mostly filled in → Path C. If the author explicitly says "the design is in the repo" → Path C.
 
 ### Resume — "I started this before"
 
