@@ -155,7 +155,15 @@ spec:
           private: false
           include_all_branches: false
 
-    # Step 3: Render skeleton artifacts into workspace
+    # Step 3: Clone the newly created repo into workspace (brings git history)
+    - id: fetch-created-repo
+      name: Clone Created Repository
+      if: ${{ steps['check-catalog'].output.entity == null }}
+      action: fetch:plain
+      input:
+        url: https://github.com/rhpds/${{ parameters.project_name }}
+
+    # Step 4: Overlay skeleton artifacts on top of cloned repo
     - id: generate-skeleton
       name: Generate Skeleton Artifacts
       if: ${{ steps['check-catalog'].output.entity == null }}
@@ -175,31 +183,15 @@ spec:
           devspaces_url: https://devspaces.${{ environment.parameters.baseDomain }}
           central_api_url: https://central-api-publishing-house.${{ environment.parameters.baseDomain }}
 
-    # Step 4: Create PR with skeleton files (clones repo first, so existing history is preserved)
-    - id: push-skeleton-pr
-      name: Push Skeleton Artifacts
+    # Step 5: Push skeleton commit on top of existing history
+    - id: push-skeleton
+      name: Commit & Push Skeleton Artifacts
       if: ${{ steps['check-catalog'].output.entity == null }}
-      action: publish:github:pull-request
+      action: github:repo:push
       input:
         repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
-        branchName: skeleton-overlay
-        title: "Add Publishing House skeleton artifacts"
-        description: "Auto-generated skeleton files from Publishing House scaffolder"
-
-    # Step 5: Auto-merge the skeleton PR and capture commit SHA
-    - id: merge-skeleton
-      name: Merge Skeleton Artifacts
-      if: ${{ steps['check-catalog'].output.entity == null }}
-      action: http:backstage:request
-      input:
-        method: PUT
-        path: '/proxy/github-api/repos/rhpds/${{ parameters.project_name }}/pulls/${{ steps["push-skeleton-pr"].output.pullRequestNumber }}/merge'
-        headers:
-          content-type: 'application/json'
-          Accept: 'application/vnd.github+json'
-        body:
-          merge_method: squash
-          commit_title: "Add Publishing House skeleton artifacts"
+        defaultBranch: main
+        gitCommitMessage: "Add templated skeleton artifacts"
 
     # Step 6: Trigger workflow via RHDH proxy
     - id: trigger-workflow
@@ -220,7 +212,7 @@ spec:
           contentType: ${{ parameters.content_type }}
           tags: ${{ parameters.tags }}
           projectDescription: ${{ parameters.project_description }}
-          auditTrailSha: ${{ steps['merge-skeleton'].output.body.sha }}
+          auditTrailSha: ${{ steps['push-skeleton'].output.commitHash }}
 
     # Step 7: Register in catalog
     - id: register
