@@ -49,14 +49,6 @@ const useStyles = makeStyles(theme => ({
     fontWeight: 600,
     fontSize: '0.75rem',
   },
-  tagChip: {
-    margin: 2,
-    height: 22,
-    fontSize: '0.7rem',
-  },
-  tagFilter: {
-    minWidth: 180,
-  },
 }));
 
 function StageChip({ stage }: { stage: WorkflowStage }) {
@@ -159,10 +151,8 @@ export function WorkflowListPage() {
   const navigate = useNavigate();
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
-  const [stateFilter, setStateFilter] = useState<string>('ALL');
   const [stageFilter, setStageFilter] = useState<string>('ALL');
   const [searchText, setSearchText] = useState('');
-  const [tagFilter, setTagFilter] = useState<string>('ALL');
   const [refreshKey, setRefreshKey] = useState(0);
 
   const client = createPhWorkflowsClient({ discoveryApi, fetchApi });
@@ -176,14 +166,8 @@ export function WorkflowListPage() {
     setRefreshKey(k => k + 1);
   }, []);
 
-  const allTags = Array.from(
-    new Set((workflows ?? []).flatMap(w => w.tags)),
-  ).sort();
-
   const filtered = (workflows ?? []).filter(w => {
-    if (stateFilter !== 'ALL' && w.state !== stateFilter) return false;
     if (stageFilter !== 'ALL' && w.stage !== stageFilter) return false;
-    if (tagFilter !== 'ALL' && !w.tags.includes(tagFilter)) return false;
     if (searchText) {
       const term = searchText.toLowerCase();
       const match =
@@ -236,36 +220,6 @@ export function WorkflowListPage() {
               <MenuItem value="error">Error</MenuItem>
             </Select>
           </FormControl>
-          <FormControl variant="outlined" size="small" className={classes.filterControl}>
-            <InputLabel>State</InputLabel>
-            <Select
-              value={stateFilter}
-              onChange={e => setStateFilter(e.target.value as string)}
-              label="State"
-            >
-              <MenuItem value="ALL">All States</MenuItem>
-              <MenuItem value="ACTIVE">Active</MenuItem>
-              <MenuItem value="COMPLETED">Completed</MenuItem>
-              <MenuItem value="ERROR">Error</MenuItem>
-            </Select>
-          </FormControl>
-          {allTags.length > 0 && (
-            <FormControl variant="outlined" size="small" className={classes.filterControl}>
-              <InputLabel>Tag</InputLabel>
-              <Select
-                value={tagFilter}
-                onChange={e => setTagFilter(e.target.value as string)}
-                label="Tag"
-              >
-                <MenuItem value="ALL">All Tags</MenuItem>
-                {allTags.map(tag => (
-                  <MenuItem key={tag} value={tag}>
-                    {tag}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
         </div>
         <Table<WorkflowSummary>
           title="Workflow Instances"

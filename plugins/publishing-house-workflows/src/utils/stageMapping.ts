@@ -1,6 +1,7 @@
 import { WorkflowNode, WorkflowStage } from '../api/types';
 
 const STATE_MAP: Record<string, WorkflowStage> = {
+  createepic: 'intake',
   intake: 'intake',
   contentreview: 'content_review',
   contentreviewdecision: 'content_review',
@@ -8,6 +9,8 @@ const STATE_MAP: Record<string, WorkflowStage> = {
   infrareviewdecision: 'infra_review',
   jirasync: 'jira_sync',
   development: 'development',
+  driftcheck: 'development',
+  driftdecision: 'development',
   testing: 'testing',
   published: 'published',
 };

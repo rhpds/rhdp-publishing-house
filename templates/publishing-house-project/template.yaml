@@ -137,24 +137,24 @@ spec:
         entityRef: component:default/${{ parameters.project_name }}
         optional: true
 
-    # Step 2: Fetch template
-    - id: fetch-template
-      name: Fetch Publishing House Template
+    # Step 2: Create repo using GitHub's native Template API
+    - id: create-from-github-template
+      name: Create Repository from GitHub Template
       if: ${{ steps['check-catalog'].output.entity == null }}
-      action: fetch:template
+      action: publish:github
       input:
-        url: https://github.com/rhpds/rhdp-publishing-house-template/tree/rearchitecture
-        values:
-          project_name: ${{ parameters.project_name }}
-          project_description: ${{ parameters.project_description }}
-          content_type: ${{ parameters.content_type }}
-          deployment_mode: ${{ parameters.deployment_mode }}
-          github_user: ${{ parameters.github_users[0].user }}
-          user_email: ${{ user.entity.spec.profile.email }}
+        repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
+        templateRepository: rhpds/rhdp-publishing-house-template
+        copyRepositoryContents: true
+        description: ${{ parameters.project_description }}
+        defaultBranch: main
+        repoVisibility: public
+        protectDefaultBranch: false
+        collaborators: ${{ parameters.github_users }}
 
-    # Step 3: Add catalog-info to workspace
-    - id: fetch-catalog-info
-      name: Add catalog-info.yaml
+    # Step 3: Generate skeleton artifacts in workspace
+    - id: generate-skeleton
+      name: Generate Skeleton Artifacts
       if: ${{ steps['check-catalog'].output.entity == null }}
       action: fetch:template
       input:
@@ -172,18 +172,15 @@ spec:
           devspaces_url: https://devspaces.${{ environment.parameters.baseDomain }}
           central_api_url: https://central-api-publishing-house.${{ environment.parameters.baseDomain }}
 
-    # Step 4: Publish to GitHub with catalog-info included
-    - id: publish
-      name: Create GitHub Repository
+    # Step 4: Push skeleton artifacts into the created repo
+    - id: push-skeleton-artifacts
+      name: Commit & Push Skeleton Artifacts
       if: ${{ steps['check-catalog'].output.entity == null }}
-      action: publish:github
+      action: github:repo:push
       input:
         repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
-        description: ${{ parameters.project_description }}
         defaultBranch: main
-        repoVisibility: public
-        protectDefaultBranch: false
-        collaborators: ${{ parameters.github_users }}
+        gitCommitMessage: "Add templated skeleton artifacts"
 
     # Step 5: Trigger workflow via RHDH proxy
     - id: trigger-workflow
@@ -197,14 +194,14 @@ spec:
           content-type: 'application/json'
         body:
           projectId: ${{ parameters.project_name }}
-          repoUrl: ${{ steps.publish.output.remoteUrl }}
+          repoUrl: ${{ steps['create-from-github-template'].output.remoteUrl }}
           ssoUser: ${{ user.entity.metadata.name }}
           ssoEmail: ${{ user.entity.spec.profile.email }}
           deploymentMode: ${{ parameters.deployment_mode }}
           contentType: ${{ parameters.content_type }}
           tags: ${{ parameters.tags }}
           projectDescription: ${{ parameters.project_description }}
-          auditTrailSha: ${{ steps.publish.output.commitHash }}
+          auditTrailSha: ${{ steps['push-skeleton-artifacts'].output.commitHash }}
 
     # Step 6: Register in catalog
     - id: register
@@ -212,7 +209,7 @@ spec:
       if: ${{ steps['check-catalog'].output.entity == null }}
       action: catalog:register
       input:
-        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        repoContentsUrl: ${{ steps['create-from-github-template'].output.repoContentsUrl }}
         catalogInfoPath: '/catalog-info.yaml'
 
   output:
