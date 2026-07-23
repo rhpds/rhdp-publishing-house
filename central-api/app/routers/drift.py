@@ -1,4 +1,4 @@
-"""Drift router — spec contract drift detection endpoint."""
+"""Drift router — design.md drift detection endpoint."""
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Security, status
@@ -35,10 +35,19 @@ async def detect_drift(
     body: DriftRequest,
     owner: str = Depends(_require_auth),
 ):
-    """Compare spec contract fields at approved SHA vs current HEAD."""
+    """Compare design.md between approved SHA and current HEAD using LLM."""
     settings = get_settings()
     if not settings.github_token:
         raise HTTPException(status_code=500, detail="GITHUB_TOKEN not configured on Central API")
+    if not settings.ph_internal_ai_api_key:
+        raise HTTPException(status_code=500, detail="PH_INTERNAL_AI_API_KEY not configured on Central API")
 
     github = GitHubService(token=settings.github_token)
-    return await check_drift(github, body.repo_url, body.branch, body.approved_sha)
+    return await check_drift(
+        github,
+        body.repo_url,
+        body.branch,
+        body.approved_sha,
+        settings.litellm_api_url,
+        settings.ph_internal_ai_api_key,
+    )

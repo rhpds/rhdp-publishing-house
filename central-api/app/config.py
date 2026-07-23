@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     oidc_issuer_url: str = ""
     oidc_client_id: str = ""
 
+    # PH Internal AI (drift detection via MaaS)
+    ph_internal_ai_api_key: str = ""
+
     # RCARS integration
     rcars_url: str = "https://rcars-api.apps.ocpv-infra01.dal12.infra.demo.redhat.com"
     rcars_api_key: str = ""

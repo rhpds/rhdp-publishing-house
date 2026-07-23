@@ -129,18 +129,17 @@ export interface AuditEntry {
   commitSha?: string;
 }
 
-export interface DriftField {
-  field: string;
-  approved_value: any;
-  current_value: any;
-  changed: boolean;
+export interface DriftChange {
+  change: string;
 }
 
 export interface DriftReport {
   has_drift: boolean;
   approved_sha: string;
   current_sha: string;
-  fields: DriftField[];
+  summary: string;
+  module_changes: DriftChange[];
+  environment_changes: DriftChange[];
 }
 
 export interface WorkflowSummary {

@@ -73,6 +73,11 @@ spec:
                 secretKeyRef:
                   name: publishing-house-credentials
                   key: github-token
+            - name: PH_INTERNAL_AI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: publishing-house-credentials
+                  key: ph-internal-ai-api-key
             - name: RCARS_URL
               valueFrom:
                 secretKeyRef:

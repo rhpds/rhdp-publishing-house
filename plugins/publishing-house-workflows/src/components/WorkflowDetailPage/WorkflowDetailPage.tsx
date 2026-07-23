@@ -438,49 +438,39 @@ export function WorkflowDetailPage() {
                       color: driftReport.has_drift ? '#e65100' : '#2e7d32',
                       fontWeight: 600,
                     }}>
-                      {driftReport.has_drift ? 'Spec fields changed since last approval' : 'No spec changes since last approval'}
+                      {driftReport.has_drift ? 'Design changes detected since last approval' : 'No design changes since last approval'}
                     </div>
-                    <Typography variant="body2" style={{ marginBottom: 12, color: '#757575' }}>
+                    <Typography variant="body2" style={{ marginBottom: 8, color: '#757575' }}>
                       Approved: <code>{driftReport.approved_sha.substring(0, 7)}</code>
                       {' → Current: '}
                       <code>{driftReport.current_sha.substring(0, 7)}</code>
                     </Typography>
+                    <Typography variant="body2" style={{ marginBottom: 12 }}>
+                      {driftReport.summary}
+                    </Typography>
                     {driftReport.has_drift && (
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                        <thead>
-                          <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
-                            <th style={{ padding: '6px 8px' }}>Field</th>
-                            <th style={{ padding: '6px 8px' }}>Approved</th>
-                            <th style={{ padding: '6px 8px' }}>Current</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {driftReport.fields.filter(f => f.changed).map(f => {
-                            const formatValue = (val: any): React.ReactNode => {
-                              if (val == null) return '—';
-                              if (!Array.isArray(val)) return String(val);
-                              if (val.length === 0) return '(empty)';
-                              if (typeof val[0] === 'object' && val[0] !== null) {
-                                return (
-                                  <ul style={{ margin: 0, paddingLeft: 16 }}>
-                                    {val.map((item: any, i: number) => (
-                                      <li key={i}>{item.title || item.name || JSON.stringify(item)}</li>
-                                    ))}
-                                  </ul>
-                                );
-                              }
-                              return val.join(', ');
-                            };
-                            return (
-                              <tr key={f.field} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                                <td style={{ padding: '6px 8px', fontWeight: 600, verticalAlign: 'top' }}>{f.field}</td>
-                                <td style={{ padding: '6px 8px', maxWidth: 300 }}>{formatValue(f.approved_value)}</td>
-                                <td style={{ padding: '6px 8px', maxWidth: 300 }}>{formatValue(f.current_value)}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                      <div>
+                        {driftReport.module_changes.length > 0 && (
+                          <div style={{ marginBottom: 12 }}>
+                            <Typography variant="subtitle2" style={{ marginBottom: 4 }}>Module Changes</Typography>
+                            <ul style={{ margin: 0, paddingLeft: 20 }}>
+                              {driftReport.module_changes.map((c, i) => (
+                                <li key={i} style={{ marginBottom: 2 }}>{c.change}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {driftReport.environment_changes.length > 0 && (
+                          <div>
+                            <Typography variant="subtitle2" style={{ marginBottom: 4 }}>Environment Changes</Typography>
+                            <ul style={{ margin: 0, paddingLeft: 20 }}>
+                              {driftReport.environment_changes.map((c, i) => (
+                                <li key={i} style={{ marginBottom: 2 }}>{c.change}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 ) : null}
