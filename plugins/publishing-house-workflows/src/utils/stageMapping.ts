@@ -11,6 +11,8 @@ const STATE_MAP: Record<string, WorkflowStage> = {
   development: 'development',
   driftcheck: 'development',
   driftdecision: 'development',
+  driftreview: 'drift_review',
+  driftreviewdecision: 'drift_review',
   testing: 'testing',
   published: 'published',
 };
@@ -42,6 +44,7 @@ export const STAGE_ORDER: WorkflowStage[] = [
   'content_review',
   'infra_review',
   'development',
+  'drift_review',
   'testing',
   'published',
 ];
@@ -55,6 +58,7 @@ export const STAGE_LABELS: Record<WorkflowStage, string> = {
   infra_review: 'Infra Review',
   jira_sync: 'Jira Sync',
   development: 'Development',
+  drift_review: 'Drift Review',
   testing: 'Testing',
   published: 'Published',
   error: 'Error',
@@ -65,6 +69,7 @@ export const STAGE_DESCRIPTIONS: Record<string, string> = {
   content_review: 'The design spec and module outlines are being reviewed for completeness and accuracy. A reviewer must approve or reject before proceeding.',
   infra_review: 'Infrastructure requirements (cluster type, sizing, workloads) are being reviewed. A reviewer must approve or reject before proceeding.',
   development: 'Lab content is being developed. The author is writing the actual lab modules and showroom content.',
+  drift_review: 'Design changes were detected since the last approval. A reviewer must approve or reject the drift before proceeding to testing.',
   testing: 'Development is complete. The project is undergoing testing before release.',
   published: 'The project has been published to the RHDP catalog and is available to users.',
   error: 'The workflow encountered an error. Check the Orchestrator logs for details.',

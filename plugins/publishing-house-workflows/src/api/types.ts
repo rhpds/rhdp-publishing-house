@@ -46,6 +46,7 @@ export type WorkflowStage =
   | 'infra_review'
   | 'jira_sync'
   | 'development'
+  | 'drift_review'
   | 'testing'
   | 'published'
   | 'error';

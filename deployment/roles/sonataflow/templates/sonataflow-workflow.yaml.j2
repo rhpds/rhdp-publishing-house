@@ -63,6 +63,20 @@ spec:
           - contextAttributeName: projectid
         dataOnly: true
         kind: consumed
+        name: DriftReviewApprovedEvent
+        source: publishing-house
+        type: ph.drift-review.approved
+      - correlation:
+          - contextAttributeName: projectid
+        dataOnly: true
+        kind: consumed
+        name: DriftReviewRejectedEvent
+        source: publishing-house
+        type: ph.drift-review.rejected
+      - correlation:
+          - contextAttributeName: projectid
+        dataOnly: true
+        kind: consumed
         name: TestingCompleteEvent
         source: publishing-house
         type: ph.testing.complete
@@ -348,7 +362,56 @@ spec:
         dataConditions:
           - condition: "${ .hasDrift == true }"
             transition:
-              nextState: ContentReview
+              nextState: DriftReview
+        defaultCondition:
+          transition:
+            nextState: Testing
+      - name: DriftReview
+        type: event
+        exclusive: true
+        onEvents:
+          - eventRefs:
+              - DriftReviewApprovedEvent
+            actions:
+              - name: LogDriftReviewApproved
+                functionRef:
+                  refName: printMessage
+                  arguments:
+                    message: "Drift review approved — proceeding to testing"
+            eventDataFilter:
+              toStateData: ".latestAudit"
+          - eventRefs:
+              - DriftReviewRejectedEvent
+            actions:
+              - name: LogDriftReviewRejected
+                functionRef:
+                  refName: printMessage
+                  arguments:
+                    message: "Drift review rejected — returning to development"
+            eventDataFilter:
+              toStateData: ".latestAudit"
+        stateDataFilter:
+          input: |
+            . + {
+              latestAudit: null,
+              reviewHistory: ((.reviewHistory // []) + [{stage: "drift_review", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.auditTrailSha // "")}])
+            }
+          output: |
+            . + {
+              reviewHistory: ((.reviewHistory // []) + (if .latestAudit then [.latestAudit] else [] end)),
+              auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
+              rejection: (if .latestAudit then (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else .rejection end) else .rejection end)
+            }
+        timeouts:
+          stateExecTimeout: PT168H
+        transition:
+          nextState: DriftReviewDecision
+      - name: DriftReviewDecision
+        type: switch
+        dataConditions:
+          - condition: "${ .rejection.isRejected == true }"
+            transition:
+              nextState: Development
         defaultCondition:
           transition:
             nextState: Testing

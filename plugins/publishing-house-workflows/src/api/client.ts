@@ -167,6 +167,7 @@ export function createPhWorkflowsClient(options: {
       content_review: 'ph.content-review.complete',
       infra_review: 'ph.infra-review.complete',
       development: 'ph.development.complete',
+      drift_review: 'ph.drift-review.approved',
       testing: 'ph.testing.complete',
     };
     const eventType = typeMap[stage];
@@ -213,6 +214,7 @@ export function createPhWorkflowsClient(options: {
     const typeMap: Partial<Record<WorkflowStage, string>> = {
       content_review: 'ph.content-review.rejected',
       infra_review: 'ph.infra-review.rejected',
+      drift_review: 'ph.drift-review.rejected',
     };
     const eventType = typeMap[stage];
     if (!eventType) {

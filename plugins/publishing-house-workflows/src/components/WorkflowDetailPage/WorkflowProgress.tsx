@@ -7,6 +7,7 @@ import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
 import FiberManualRecordIcon from '@material-ui/icons/FiberManualRecord';
 import ErrorIcon from '@material-ui/icons/Error';
+import RemoveCircleOutlineIcon from '@material-ui/icons/RemoveCircleOutline';
 import { WorkflowStage } from '../../api/types';
 import { STAGE_ORDER, STAGE_LABELS, stageIndex } from '../../utils/stageMapping';
 
@@ -42,10 +43,11 @@ const useStyles = makeStyles(theme => ({
   completed: { color: '#4caf50' },
   active: { color: '#4caf50' },
   error: { color: '#f44336' },
+  skipped: { color: theme.palette.text.disabled },
   iconLarge: { fontSize: '1.3rem' },
 }));
 
-type NodeState = 'completed' | 'active' | 'pending' | 'error';
+type NodeState = 'completed' | 'active' | 'pending' | 'error' | 'skipped';
 
 function NodeIcon({ state }: { state: NodeState }) {
   const classes = useStyles();
@@ -57,17 +59,29 @@ function NodeIcon({ state }: { state: NodeState }) {
       return <FiberManualRecordIcon className={`${classes.active} ${cls}`} />;
     case 'error':
       return <ErrorIcon className={`${classes.error} ${cls}`} />;
+    case 'skipped':
+      return <RemoveCircleOutlineIcon className={`${classes.skipped} ${cls}`} />;
     default:
       return <RadioButtonUncheckedIcon className={cls} />;
   }
 }
 
-function getNodeState(s: WorkflowStage, currentStage: WorkflowStage): NodeState {
+function getNodeState(
+  s: WorkflowStage,
+  currentStage: WorkflowStage,
+  driftSkipped?: boolean,
+): NodeState {
   if (currentStage === 'error') return 'error';
-  if (currentStage === 'published') return 'completed';
+  if (currentStage === 'published') {
+    if (s === 'drift_review' && driftSkipped) return 'skipped';
+    return 'completed';
+  }
   const cur = stageIndex(currentStage);
   const idx = stageIndex(s);
-  if (idx < cur) return 'completed';
+  if (idx < cur) {
+    if (s === 'drift_review' && driftSkipped) return 'skipped';
+    return 'completed';
+  }
   if (idx === cur) return 'active';
   return 'pending';
 }
@@ -75,10 +89,13 @@ function getNodeState(s: WorkflowStage, currentStage: WorkflowStage): NodeState 
 interface WorkflowProgressProps {
   stage: WorkflowStage;
   rejectedFrom?: WorkflowStage | null;
+  hasDrift?: boolean;
 }
 
-export function WorkflowProgress({ stage }: WorkflowProgressProps) {
+export function WorkflowProgress({ stage, hasDrift }: WorkflowProgressProps) {
   const classes = useStyles();
+  const pastDrift = stageIndex(stage) > stageIndex('drift_review');
+  const driftSkipped = pastDrift && hasDrift === false;
 
   const lineCls = () => classes.line;
 
@@ -86,7 +103,7 @@ export function WorkflowProgress({ stage }: WorkflowProgressProps) {
     <div className={classes.root}>
       <div className={classes.pipeline}>
         {STAGE_ORDER.map((s, i) => {
-          const st = getNodeState(s, stage);
+          const st = getNodeState(s, stage, driftSkipped);
           return (
             <React.Fragment key={s}>
               <div className={classes.node}>

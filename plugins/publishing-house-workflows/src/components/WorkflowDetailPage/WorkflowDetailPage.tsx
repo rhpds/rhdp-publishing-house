@@ -35,7 +35,7 @@ import { createPhWorkflowsClient } from '../../api/client';
 import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
 
-const REVIEW_STAGES: WorkflowStage[] = ['content_review', 'infra_review'];
+const REVIEW_STAGES: WorkflowStage[] = ['content_review', 'infra_review', 'drift_review'];
 
 const CHECK_GROUP_LABELS: Record<string, string> = {
   A: 'Spec Fields',
@@ -131,13 +131,17 @@ export function WorkflowDetailPage() {
 
     const slug = result.summary.projectId;
 
-    setValidationLoading(true);
+    const isDriftReview = stage === 'drift_review';
+
+    if (!isDriftReview) setValidationLoading(true);
     if (approvedSha) setDriftLoading(true);
 
-    const validationPromise = client.fetchValidationReport(slug, repoUrl, 'main', approvedSha)
-      .then(report => setValidationReport(report))
-      .catch((err: any) => setSnackbar({ open: true, severity: 'error', message: `Validation report failed: ${err.message}` }))
-      .finally(() => setValidationLoading(false));
+    const validationPromise = isDriftReview
+      ? Promise.resolve()
+      : client.fetchValidationReport(slug, repoUrl, 'main', approvedSha)
+          .then(report => setValidationReport(report))
+          .catch((err: any) => setSnackbar({ open: true, severity: 'error', message: `Validation report failed: ${err.message}` }))
+          .finally(() => setValidationLoading(false));
 
     const driftPromise = approvedSha
       ? client.fetchDriftReport(slug, repoUrl, 'main', approvedSha)
@@ -333,6 +337,7 @@ export function WorkflowDetailPage() {
           <WorkflowProgress
             stage={summary.stage}
             rejectedFrom={rejectedFrom}
+            hasDrift={wd?.hasDrift}
           />
         </InfoCard>
 
@@ -472,6 +477,7 @@ export function WorkflowDetailPage() {
               </InfoCard>
             )}
 
+            {summary.stage !== 'drift_review' && (
             <InfoCard title="Validation Report">
               {validationLoading ? (
                 <Progress />
@@ -519,7 +525,10 @@ export function WorkflowDetailPage() {
                 <Typography variant="body2">No validation report available</Typography>
               )}
             </InfoCard>
+            )}
 
+            {summary.stage !== 'drift_review' && (
+            <>
             {/* Approval Checklist Answers */}
             {validationReport?.approval_checklist?.content && (
               <InfoCard title="Content Review — Approval Checklist">
@@ -648,9 +657,11 @@ export function WorkflowDetailPage() {
                 </InfoCard>
               );
             })()}
+            </>
+            )}
 
             {/* Approve / Reject buttons */}
-            {validationReport && (
+            {(validationReport || driftReport) && (
               <InfoCard>
                 <div style={{ display: 'flex', gap: 12 }}>
                   <Button
