@@ -112,6 +112,31 @@ export interface ApprovalChecklist {
   };
 }
 
+export interface SpecEnvironment {
+  topology?: string;
+  ocp_version?: string;
+  cloud_provider?: string;
+  cluster_type?: string;
+  control_plane_instance_count?: number;
+  control_plane_cpu?: number;
+  control_plane_ram_gb?: number;
+  worker_count?: number | null;
+  worker_cpu?: number | null;
+  worker_ram_gb?: number | null;
+  worker_disk_gb?: number | null;
+  max_concurrent_users?: number | null;
+  ai_requirement?: string;
+  ai_model_tier?: string;
+  ai_model_name?: string;
+  ai_justification?: string;
+  aap_version?: string;
+  external_services?: string[];
+  non_ga_products?: string[];
+  non_ga_access_plan?: string;
+  gpu_nodes?: number;
+  gpu_type?: string;
+}
+
 export interface ValidationReport {
   passed: boolean;
   results: ValidationCheck[];
@@ -119,6 +144,7 @@ export interface ValidationReport {
   commit_sha?: string;
   approval_checklist?: ApprovalChecklist;
   repo_url?: string;
+  spec_environment?: SpecEnvironment;
 }
 
 export interface AuditEntry {

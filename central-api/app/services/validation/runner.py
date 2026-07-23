@@ -110,6 +110,8 @@ async def run_validation(
 
         passed = not any(r.status == CheckStatus.FAIL for r in all_results)
 
+        env = spec_data.get("spec", {}).get("environment") if spec_data else None
+
         return ValidationResponse(
             passed=passed,
             results=all_results,
@@ -117,6 +119,7 @@ async def run_validation(
             commit_sha=repo.head_sha,
             approval_checklist=spec_data.get("approval_checklist"),
             repo_url=repo_url,
+            spec_environment=env,
         )
     finally:
         repo.cleanup()

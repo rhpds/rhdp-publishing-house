@@ -583,24 +583,71 @@ export function WorkflowDetailPage() {
               </InfoCard>
             )}
 
-            {validationReport?.approval_checklist?.infra && (
-              <InfoCard title="Infra Review — Auto-Computed Fields">
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <DetailField label="Peak Environments" value={validationReport.approval_checklist.infra.peak_environments != null ? String(validationReport.approval_checklist.infra.peak_environments) : 'Not computed'} />
+            {validationReport?.spec_environment && (() => {
+              const env = validationReport.spec_environment!;
+              const has = (v: any) => v != null && v !== '' && v !== 0;
+              const hasArr = (v: any[] | undefined) => v && v.length > 0;
+              return (
+                <InfoCard title="Infra Review — Environment Spec">
+                  <Grid container spacing={2}>
+                    {has(env.topology) && (
+                      <Grid item xs={4}><DetailField label="Topology" value={env.topology!} /></Grid>
+                    )}
+                    {has(env.ocp_version) && (
+                      <Grid item xs={4}><DetailField label="OCP Version" value={env.ocp_version!} /></Grid>
+                    )}
+                    {has(env.cloud_provider) && (
+                      <Grid item xs={4}><DetailField label="Cloud Provider" value={env.cloud_provider!} /></Grid>
+                    )}
+                    {has(env.cluster_type) && (
+                      <Grid item xs={4}><DetailField label="Cluster Type" value={env.cluster_type!} /></Grid>
+                    )}
+                    {has(env.control_plane_instance_count) && (
+                      <Grid item xs={4}><DetailField label="Control Plane Nodes" value={String(env.control_plane_instance_count)} /></Grid>
+                    )}
+                    {has(env.control_plane_cpu) && (
+                      <Grid item xs={4}><DetailField label="Control Plane CPU / RAM" value={`${env.control_plane_cpu} vCPU / ${env.control_plane_ram_gb ?? '?'} GB`} /></Grid>
+                    )}
+                    {has(env.worker_count) && (
+                      <Grid item xs={4}><DetailField label="Worker Nodes" value={String(env.worker_count)} /></Grid>
+                    )}
+                    {has(env.worker_cpu) && (
+                      <Grid item xs={4}><DetailField label="Worker CPU / RAM" value={`${env.worker_cpu} vCPU / ${env.worker_ram_gb ?? '?'} GB`} /></Grid>
+                    )}
+                    {has(env.worker_disk_gb) && (
+                      <Grid item xs={4}><DetailField label="Worker Disk" value={`${env.worker_disk_gb} GB`} /></Grid>
+                    )}
+                    {has(env.max_concurrent_users) && (
+                      <Grid item xs={4}><DetailField label="Max Concurrent Users" value={String(env.max_concurrent_users)} /></Grid>
+                    )}
+                    {has(env.ai_requirement) && env.ai_requirement !== 'none' && (
+                      <Grid item xs={4}><DetailField label="AI Requirement" value={env.ai_requirement!} /></Grid>
+                    )}
+                    {has(env.ai_model_tier) && (
+                      <Grid item xs={4}><DetailField label="AI Model" value={`${env.ai_model_tier}${env.ai_model_name ? ` — ${env.ai_model_name}` : ''}`} /></Grid>
+                    )}
+                    {has(env.ai_justification) && (
+                      <Grid item xs={12}><DetailField label="AI Justification" value={env.ai_justification!} /></Grid>
+                    )}
+                    {has(env.gpu_nodes) && (
+                      <Grid item xs={4}><DetailField label="GPU" value={`${env.gpu_nodes}x ${env.gpu_type || '?'}`} /></Grid>
+                    )}
+                    {has(env.aap_version) && (
+                      <Grid item xs={4}><DetailField label="AAP Version" value={env.aap_version!} /></Grid>
+                    )}
+                    {hasArr(env.external_services) && (
+                      <Grid item xs={6}><DetailField label="External Services" value={env.external_services!.join(', ')} /></Grid>
+                    )}
+                    {hasArr(env.non_ga_products) && (
+                      <Grid item xs={6}><DetailField label="Non-GA Products" value={env.non_ga_products!.join(', ')} /></Grid>
+                    )}
+                    {has(env.non_ga_access_plan) && (
+                      <Grid item xs={12}><DetailField label="Non-GA Access Plan" value={env.non_ga_access_plan!} /></Grid>
+                    )}
                   </Grid>
-                  <Grid item xs={6}>
-                    <DetailField label="Cost per Run (est.)" value={validationReport.approval_checklist.infra.cost_per_run_est || 'Not computed'} />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <DetailField label="Provisioning Time (est.)" value={validationReport.approval_checklist.infra.provisioning_time_est || 'Not computed'} />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <DetailField label="AgnosticV Base CI" value={validationReport.approval_checklist.infra.agnosticv_base_ci || 'Not set'} />
-                  </Grid>
-                </Grid>
-              </InfoCard>
-            )}
+                </InfoCard>
+              );
+            })()}
 
             {/* Approve / Reject buttons */}
             {validationReport && (

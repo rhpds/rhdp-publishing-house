@@ -37,3 +37,4 @@ class ValidationResponse(BaseModel):
     commit_sha: Optional[str] = None
     approval_checklist: Optional[dict] = None
     repo_url: Optional[str] = None
+    spec_environment: Optional[dict] = None
