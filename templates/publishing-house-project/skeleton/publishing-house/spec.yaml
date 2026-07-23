@@ -29,7 +29,7 @@ spec:
     control_plane_cpu: 32            # 32 if sno, 16 if multinode
     control_plane_ram_gb: 128        # 128 if sno, 64 if multinode
     # --- Infrastructure fields (Parts 3 of gate validation spec RHDPCD-170) ---
-    max_concurrent_users: null     # required if topology = per-student or cnv-pool — Q14
+    max_concurrent_users: null     # required if topology = shared-cluster (sizing for simultaneous users)
     aap_version: ""                # required if AAP in products — Q16
     ai_requirement: ""             # maas | gpu | none — Q15
     ai_model_tier: ""              # open-source | frontier (required if ai_requirement = maas or gpu)
