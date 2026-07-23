@@ -17,11 +17,6 @@ components:
       env:
         - name: DEFAULT_EXTENSIONS
           value: '/tmp/claude-code.vsix'
-      endpoints:
-        - name: http-preview
-          targetPort: 8080
-          exposure: public
-          protocol: https
 
 commands:
   - id: setup-workspace
@@ -131,34 +126,9 @@ commands:
       component: dev-tools
       commandLine: |
         AUTH_FILE=/home/user/.config/publishing-house/auth.json
+        mkdir -p /home/user/.local/bin /home/user/.claude
 
-        cat > /home/user/.claude-env.sh << 'ENVEOF'
-        export CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1
-        AUTH_FILE=/home/user/.config/publishing-house/auth.json
-        if [ -f "$AUTH_FILE" ]; then
-          LITELLM_KEY=$(python3 -c "import json; print(json.load(open('$AUTH_FILE')).get('litellm_key',''))" 2>/dev/null)
-          LITELLM_URL=$(python3 -c "import json; print(json.load(open('$AUTH_FILE')).get('litellm_endpoint',''))" 2>/dev/null)
-          LITELLM_MODEL=$(python3 -c "import json; print(json.load(open('$AUTH_FILE')).get('litellm_model',''))" 2>/dev/null)
-          [ -n "$LITELLM_KEY" ] && {
-            export ANTHROPIC_API_KEY="$LITELLM_KEY"
-            export ANTHROPIC_BASE_URL="$LITELLM_URL"
-            export ANTHROPIC_MODEL="$LITELLM_MODEL"
-          }
-        fi
-        ENVEOF
-
-        cat > /home/user/.local/bin/claude-wrapper.sh << 'WRAPEOF'
-        #!/bin/bash
-        [ -f /home/user/.claude-env.sh ] && source /home/user/.claude-env.sh
-        [ -z "$ANTHROPIC_API_KEY" ] && {
-          echo "ANTHROPIC_API_KEY not set - export your own key or check workspace setup"
-          exit 1
-        }
-        exec /home/user/.local/bin/claude "$@"
-        WRAPEOF
-        chmod +x /home/user/.local/bin/claude-wrapper.sh
-
-        # apiKeyHelper for the VS Code extension (reads from auth.json)
+        # apiKeyHelper script (reads API key from auth.json)
         cat > /home/user/.local/bin/claude-api-key-helper.sh << 'HELPEREOF'
         #!/bin/bash
         AUTH_FILE=/home/user/.config/publishing-house/auth.json
@@ -168,8 +138,7 @@ commands:
         HELPEREOF
         chmod +x /home/user/.local/bin/claude-api-key-helper.sh
 
-        # Configure Claude Code extension to use the apiKeyHelper
-        mkdir -p /home/user/.claude
+        # Configure Claude Code (CLI + extension) via settings.json
         if [ -f "$AUTH_FILE" ]; then
           LITELLM_URL=$(python3 -c "import json; print(json.load(open('$AUTH_FILE')).get('litellm_endpoint',''))" 2>/dev/null)
           LITELLM_MODEL=$(python3 -c "import json; print(json.load(open('$AUTH_FILE')).get('litellm_model',''))" 2>/dev/null)
@@ -189,20 +158,6 @@ commands:
         }
         SETTINGSEOF
         fi
-
-        grep -q "alias claude=" /home/user/.bashrc 2>/dev/null || {
-          echo "" >> /home/user/.bashrc
-          echo "alias claude='/home/user/.local/bin/claude-wrapper.sh'" >> /home/user/.bashrc
-        }
-
-        for file in /home/user/.bashrc /home/user/.bash_profile; do
-          grep -q ".claude-env.sh" "$file" 2>/dev/null || {
-            echo "" >> "$file"
-            echo "[ -f /home/user/.claude-env.sh ] && source /home/user/.claude-env.sh" >> "$file"
-          }
-        done
-
-        source /home/user/.claude-env.sh
       workingDir: /projects
       label: "Setup environment script"
       group:
