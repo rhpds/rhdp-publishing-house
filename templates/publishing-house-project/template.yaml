@@ -137,41 +137,7 @@ spec:
         entityRef: component:default/${{ parameters.project_name }}
         optional: true
 
-    # Step 2: Create repo from GitHub template via API
-    - id: create-from-github-template
-      name: Create Repository from GitHub Template
-      if: ${{ steps['check-catalog'].output.entity == null }}
-      action: http:backstage:request
-      input:
-        method: POST
-        path: '/proxy/github-api/repos/rhpds/rhdp-publishing-house-template/generate'
-        headers:
-          content-type: 'application/json'
-          Accept: 'application/vnd.github+json'
-        body:
-          owner: rhpds
-          name: ${{ parameters.project_name }}
-          description: ${{ parameters.project_description }}
-          private: false
-          include_all_branches: false
-
-    # Step 3: Wait for GitHub to finish initializing the repo
-    - id: wait-for-repo
-      name: Wait for Repository Initialization
-      if: ${{ steps['check-catalog'].output.entity == null }}
-      action: debug:wait
-      input:
-        seconds: 8
-
-    # Step 4: Clone the newly created repo into workspace
-    - id: fetch-created-repo
-      name: Clone Created Repository
-      if: ${{ steps['check-catalog'].output.entity == null }}
-      action: fetch:plain
-      input:
-        url: https://github.com/rhpds/${{ parameters.project_name }}
-
-    # Step 5: Overlay skeleton artifacts on top of cloned repo
+    # Step 2: Render skeleton artifacts into workspace
     - id: generate-skeleton
       name: Generate Skeleton Artifacts
       if: ${{ steps['check-catalog'].output.entity == null }}
@@ -191,17 +157,21 @@ spec:
           devspaces_url: https://devspaces.${{ environment.parameters.baseDomain }}
           central_api_url: https://central-api-publishing-house.${{ environment.parameters.baseDomain }}
 
-    # Step 6: Push skeleton commit on top of existing history
-    - id: push-skeleton
-      name: Commit & Push Skeleton Artifacts
+    # Step 3: Create repo from GitHub template, overlay skeleton, commit and push
+    - id: create-and-push
+      name: Create Repository & Push Skeleton
       if: ${{ steps['check-catalog'].output.entity == null }}
-      action: github:repo:push
+      action: github:repo:create-from-template
       input:
         repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
+        templateRepo: rhpds/rhdp-publishing-house-template
+        description: ${{ parameters.project_description }}
         defaultBranch: main
+        repoVisibility: public
         gitCommitMessage: "Add templated skeleton artifacts"
+        collaborators: ${{ parameters.github_users }}
 
-    # Step 7: Trigger workflow via RHDH proxy
+    # Step 4: Trigger workflow via RHDH proxy
     - id: trigger-workflow
       name: Start Publishing House Workflow
       if: ${{ steps['check-catalog'].output.entity == null }}
@@ -220,15 +190,15 @@ spec:
           contentType: ${{ parameters.content_type }}
           tags: ${{ parameters.tags }}
           projectDescription: ${{ parameters.project_description }}
-          auditTrailSha: ${{ steps['push-skeleton'].output.commitHash }}
+          auditTrailSha: ${{ steps['create-and-push'].output.commitHash }}
 
-    # Step 8: Register in catalog
+    # Step 5: Register in catalog
     - id: register
       name: Register in Backstage Catalog
       if: ${{ steps['check-catalog'].output.entity == null }}
       action: catalog:register
       input:
-        repoContentsUrl: https://github.com/rhpds/${{ parameters.project_name }}/tree/main
+        repoContentsUrl: ${{ steps['create-and-push'].output.repoContentsUrl }}
         catalogInfoPath: '/catalog-info.yaml'
 
   output:

@@ -1,0 +1,41 @@
+# Multi-stage build for scaffolder-github-template RHDH dynamic plugin
+# Produces a scratch-based OCI image compatible with RHDH dynamic plugin loading
+
+# Stage 1: Build and export the dynamic plugin
+FROM node:20-alpine AS builder
+
+WORKDIR /plugin
+
+COPY package.json ./
+
+RUN npm pkg delete dependencies.@rollup/rollup-darwin-arm64 \
+    dependencies.@swc/core-darwin-arm64 && \
+    npm install --legacy-peer-deps --ignore-scripts 2>&1 | tail -5 && \
+    touch yarn.lock
+
+COPY . .
+
+RUN npx tsc && npx --yes @red-hat-developer-hub/cli@1.8.0 plugin export 2>&1
+
+# Build index.json and compute the OCI annotation value
+RUN node -e " \
+  const pkg = require('./dist-dynamic/package.json'); \
+  const meta = [{ [pkg.name]: { \
+    name: pkg.name + '-dynamic', \
+    version: pkg.version, \
+    backstage: pkg.backstage, \
+    license: pkg.license \
+  }}]; \
+  const json = JSON.stringify(meta); \
+  require('fs').writeFileSync('/plugin/index.json', json); \
+  require('fs').writeFileSync('/plugin/annotation.txt', Buffer.from(json).toString('base64')); \
+"
+
+# Remove .bin symlinks that cause warnings during RHDH init-container extraction
+RUN find dist-dynamic/node_modules -type d -name .bin -exec rm -rf {} + 2>/dev/null || true
+
+# Stage 2: Assemble the final layout
+FROM scratch
+
+COPY --from=builder /plugin/dist-dynamic/ backstage-plugin-scaffolder-backend-module-github-template/
+COPY --from=builder /plugin/index.json .
