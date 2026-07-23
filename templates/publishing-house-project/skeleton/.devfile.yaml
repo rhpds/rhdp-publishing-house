@@ -158,6 +158,38 @@ commands:
         WRAPEOF
         chmod +x /home/user/.local/bin/claude-wrapper.sh
 
+        # apiKeyHelper for the VS Code extension (reads from auth.json)
+        cat > /home/user/.local/bin/claude-api-key-helper.sh << 'HELPEREOF'
+        #!/bin/bash
+        AUTH_FILE=/home/user/.config/publishing-house/auth.json
+        if [ -f "$AUTH_FILE" ]; then
+          python3 -c "import json; print(json.load(open('$AUTH_FILE')).get('litellm_key',''))" 2>/dev/null
+        fi
+        HELPEREOF
+        chmod +x /home/user/.local/bin/claude-api-key-helper.sh
+
+        # Configure Claude Code extension to use the apiKeyHelper
+        mkdir -p /home/user/.claude
+        if [ -f "$AUTH_FILE" ]; then
+          LITELLM_URL=$(python3 -c "import json; print(json.load(open('$AUTH_FILE')).get('litellm_endpoint',''))" 2>/dev/null)
+          LITELLM_MODEL=$(python3 -c "import json; print(json.load(open('$AUTH_FILE')).get('litellm_model',''))" 2>/dev/null)
+          cat > /home/user/.claude/settings.json << SETTINGSEOF
+        {
+          "apiKeyHelper": "/home/user/.local/bin/claude-api-key-helper.sh",
+          "env": {
+            "ANTHROPIC_BASE_URL": "${LITELLM_URL}",
+            "ANTHROPIC_MODEL": "${LITELLM_MODEL}"
+          }
+        }
+        SETTINGSEOF
+        else
+          cat > /home/user/.claude/settings.json << 'SETTINGSEOF'
+        {
+          "apiKeyHelper": "/home/user/.local/bin/claude-api-key-helper.sh"
+        }
+        SETTINGSEOF
+        fi
+
         grep -q "alias claude=" /home/user/.bashrc 2>/dev/null || {
           echo "" >> /home/user/.bashrc
           echo "alias claude='/home/user/.local/bin/claude-wrapper.sh'" >> /home/user/.bashrc
