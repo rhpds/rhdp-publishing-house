@@ -153,23 +153,20 @@ commands:
           },
           "permissions": {
             "allow": [
-              "Bash(python*publishing-house/tools/*)",
-              "Bash(python3*publishing-house/tools/*)",
-              "Bash(git add*)",
-              "Bash(git commit*)",
-              "Bash(git push*)",
-              "Bash(git pull*)",
-              "Bash(git diff*)",
-              "Bash(git status*)",
-              "Bash(git log*)",
-              "Bash(git stash*)",
-              "Bash(command -v python*)",
-              "Read(publishing-house/*)",
+              "Bash(python*)",
+              "Bash(python3*)",
+              "Bash(pip*)",
+              "Bash(git *)",
+              "Bash(command -v *)",
+              "Bash(curl *)",
+              "Bash(cat *)",
+              "Bash(ls *)",
+              "Bash(mkdir *)",
+              "Bash(cd *)",
+              "Read(*)",
               "Edit(publishing-house/*)",
               "Write(publishing-house/*)",
-              "Read(catalog-info.yaml)",
-              "Edit(catalog-info.yaml)",
-              "Read(/home/user/.claude/skills/publishing-house/**)"
+              "Edit(catalog-info.yaml)"
             ]
           }
         }
@@ -180,23 +177,20 @@ commands:
           "apiKeyHelper": "/home/user/.local/bin/claude-api-key-helper.sh",
           "permissions": {
             "allow": [
-              "Bash(python*publishing-house/tools/*)",
-              "Bash(python3*publishing-house/tools/*)",
-              "Bash(git add*)",
-              "Bash(git commit*)",
-              "Bash(git push*)",
-              "Bash(git pull*)",
-              "Bash(git diff*)",
-              "Bash(git status*)",
-              "Bash(git log*)",
-              "Bash(git stash*)",
-              "Bash(command -v python*)",
-              "Read(publishing-house/*)",
+              "Bash(python*)",
+              "Bash(python3*)",
+              "Bash(pip*)",
+              "Bash(git *)",
+              "Bash(command -v *)",
+              "Bash(curl *)",
+              "Bash(cat *)",
+              "Bash(ls *)",
+              "Bash(mkdir *)",
+              "Bash(cd *)",
+              "Read(*)",
               "Edit(publishing-house/*)",
               "Write(publishing-house/*)",
-              "Read(catalog-info.yaml)",
-              "Edit(catalog-info.yaml)",
-              "Read(/home/user/.claude/skills/publishing-house/**)"
+              "Edit(catalog-info.yaml)"
             ]
           }
         }
