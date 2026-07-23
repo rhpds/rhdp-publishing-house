@@ -27,9 +27,6 @@ class Settings(BaseSettings):
     litellm_api_url: str = "https://maas-rhdp.apps.maas.redhatworkshops.io"
     litellm_master_key: str
 
-    # Policy defaults
-    ocp_version_minimum: str = "4.20"
-
     # Jira integration
     jira_url: str = ""
     jira_email: str = ""

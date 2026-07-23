@@ -79,8 +79,7 @@ GET /api/v1/projects/{project_id}
 
 ### Policy Reference (No Auth)
 ```bash
-GET /api/v1/reference/ocp-policy
-GET /api/v1/reference/vocabulary
+GET /api/v1/spec/validation/policy
 ```
 
 ## Event → Stage Mapping

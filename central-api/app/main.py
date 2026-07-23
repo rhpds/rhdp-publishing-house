@@ -60,11 +60,6 @@ def create_app() -> FastAPI:
             "clientId": settings.oidc_client_id,
         }
 
-    @app.get(f"{settings.api_prefix}/spec/ocp-policy")
-    async def get_ocp_policy():
-        """Get OCP version policy (no auth required)."""
-        return {"ocp_version_minimum": settings.ocp_version_minimum}
-
     @app.get(f"{settings.api_prefix}/rcars/overlap")
     async def get_rcars_overlap(
         products: Optional[str] = Query(None, description="Comma-separated product names"),
