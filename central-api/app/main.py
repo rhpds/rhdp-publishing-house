@@ -60,7 +60,7 @@ def create_app() -> FastAPI:
             "clientId": settings.oidc_client_id,
         }
 
-    @app.get(f"{settings.api_prefix}/reference/ocp-policy")
+    @app.get(f"{settings.api_prefix}/spec/ocp-policy")
     async def get_ocp_policy():
         """Get OCP version policy (no auth required)."""
         return {"ocp_version_minimum": settings.ocp_version_minimum}
