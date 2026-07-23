@@ -43,12 +43,14 @@ _FALLBACK_POLICY = {
         "difficulty level",
         "environment",
         "infrastructure requirements",
+    ],
+    "optional_design_sections": [
         "assessment strategy",
     ],
     "required_outline_sections": [
         "brief overview",
         "audience and time",
-        "see/learn/do",
+        "learning objectives",
         "lab structure",
         "key takeaways",
     ],
