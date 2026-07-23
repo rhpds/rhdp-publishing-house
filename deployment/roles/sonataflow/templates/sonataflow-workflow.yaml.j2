@@ -76,6 +76,9 @@ spec:
       - name: syncjiratasks
         operation: specs/central-api.yaml#syncJiraTasks
         type: rest
+      - name: checkdrift
+        operation: specs/central-api.yaml#checkDrift
+        type: rest
     start:
       stateName: Init
     states:
@@ -108,7 +111,8 @@ spec:
               },
               reviewHistory: [],
               approvedSha: "",
-              auditTrailSha: (.auditTrailSha // "")
+              auditTrailSha: (.auditTrailSha // ""),
+              hasDrift: false
             }
         transition:
           nextState: CreateEpic
@@ -169,7 +173,8 @@ spec:
               reviewHistory: ((.reviewHistory // []) + (if .latestAudit then [.latestAudit] else [] end)),
               auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
               approvedSha: "",
-              rejection: { isRejected: false }
+              rejection: { isRejected: false },
+              hasDrift: false
             }
         timeouts:
           stateExecTimeout: PT168H
@@ -317,7 +322,36 @@ spec:
         timeouts:
           stateExecTimeout: PT168H
         transition:
-          nextState: Testing
+          nextState: DriftCheck
+      - name: DriftCheck
+        type: operation
+        actions:
+          - name: CheckSpecDrift
+            functionRef:
+              refName: checkdrift
+              arguments:
+                slug: .projectid
+                repo_url: .repoUrl
+                branch: "main"
+                approved_sha: .approvedSha
+            actionDataFilter:
+              toStateData: .driftResponse
+        stateDataFilter:
+          output: |
+            . + {
+              hasDrift: (if .driftResponse then .driftResponse.has_drift else false end)
+            }
+        transition:
+          nextState: DriftDecision
+      - name: DriftDecision
+        type: switch
+        dataConditions:
+          - condition: "${ .hasDrift == true }"
+            transition:
+              nextState: Intake
+        defaultCondition:
+          transition:
+            nextState: Testing
       - name: Testing
         type: event
         exclusive: true

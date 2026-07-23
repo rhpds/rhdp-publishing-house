@@ -35,6 +35,30 @@
     "projectDescription": {
       "type": "string",
       "description": "Brief overview of what the project will deliver"
+    },
+    "hasDrift": {
+      "type": "boolean",
+      "description": "Whether spec contract drift was detected after development",
+      "default": false
+    },
+    "driftResponse": {
+      "type": "object",
+      "description": "Response from the drift check endpoint",
+      "properties": {
+        "has_drift": { "type": "boolean" },
+        "approved_sha": { "type": "string" },
+        "current_sha": { "type": "string" },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": { "type": "string" },
+              "changed": { "type": "boolean" }
+            }
+          }
+        }
+      }
     }
   }
 }

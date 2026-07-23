@@ -75,6 +75,60 @@ paths:
                     type: boolean
       security:
         - bearerAuth: []
+  /spec/drift/{slug}:
+    post:
+      operationId: checkDrift
+      summary: Check for spec contract drift between approved SHA and HEAD
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - repo_url
+                - approved_sha
+              properties:
+                repo_url:
+                  type: string
+                branch:
+                  type: string
+                  default: main
+                approved_sha:
+                  type: string
+      responses:
+        '200':
+          description: Drift check completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  has_drift:
+                    type: boolean
+                  approved_sha:
+                    type: string
+                  current_sha:
+                    type: string
+                  fields:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                        approved_value: {}
+                        current_value: {}
+                        changed:
+                          type: boolean
+      security:
+        - bearerAuth: []
 components:
   securitySchemes:
     bearerAuth:
