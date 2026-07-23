@@ -6,6 +6,42 @@ info:
 servers:
   - url: https://central-api-{{ app_namespace }}.{{ ocp_apps_domain }}/api/v1
 paths:
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Health check
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  version:
+                    type: string
+                  timestamp:
+                    type: string
+  /auth/config:
+    get:
+      operationId: authConfig
+      summary: Get OIDC auth configuration
+      responses:
+        '200':
+          description: Auth config
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                  realm:
+                    type: string
+                  clientId:
+                    type: string
   /jira/epic:
     post:
       operationId: createJiraEpic
@@ -75,6 +111,92 @@ paths:
                     type: boolean
       security:
         - bearerAuth: []
+  /spec/validation/policy:
+    get:
+      operationId: getValidationPolicy
+      summary: Get validation policy rules
+      responses:
+        '200':
+          description: Validation policy
+          content:
+            application/json:
+              schema:
+                type: object
+      security:
+        - bearerAuth: []
+  /spec/validation/{slug}:
+    post:
+      operationId: validateSpec
+      summary: Run spec validation checks
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: stage
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - repo_url
+              properties:
+                repo_url:
+                  type: string
+                branch:
+                  type: string
+                  default: main
+      responses:
+        '200':
+          description: Validation passed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  passed:
+                    type: boolean
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        check_id:
+                          type: string
+                        group:
+                          type: string
+                        status:
+                          type: string
+                        message:
+                          type: string
+                        field:
+                          type: string
+                  auto_computed:
+                    type: object
+                    properties:
+                      peak_environments:
+                        type: integer
+                      cost_per_run_est:
+                        type: number
+                      provisioning_time_min:
+                        type: integer
+                  commit_sha:
+                    type: string
+                  approval_checklist:
+                    type: object
+                  repo_url:
+                    type: string
+        '422':
+          description: Validation failed (same response shape)
+      security:
+        - bearerAuth: []
   /spec/drift/{slug}:
     post:
       operationId: checkDrift
@@ -129,6 +251,253 @@ paths:
                           type: boolean
       security:
         - bearerAuth: []
+  /projects/{project_id}/workflow-data:
+    get:
+      operationId: getWorkflowData
+      summary: Get workflow data for a project
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workflow data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  project_id:
+                    type: string
+                  workflow_id:
+                    type: string
+                  epic_key:
+                    type: string
+                  rejection:
+                    type: object
+      security:
+        - bearerAuth: []
+  /projects/workflow-state/{workflow_id}:
+    get:
+      operationId: getWorkflowState
+      summary: Get current workflow stage
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workflow state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stage:
+                    type: string
+                  workflow_id:
+                    type: string
+                  source:
+                    type: string
+      security:
+        - bearerAuth: []
+  /projects/intake/{project_slug}:
+    post:
+      operationId: submitIntake
+      summary: Submit intake for validation and workflow advancement
+      parameters:
+        - name: project_slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - repo_url
+              properties:
+                repo_url:
+                  type: string
+                branch:
+                  type: string
+                  default: main
+      responses:
+        '201':
+          description: Intake submitted, workflow advanced
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                  stage:
+                    type: string
+                  error:
+                    type: string
+                  validation:
+                    type: object
+        '422':
+          description: Validation failed
+        '409':
+          description: Workflow not in intake stage
+        '404':
+          description: No workflow found
+      security:
+        - bearerAuth: []
+  /litellm/keys/generate:
+    post:
+      operationId: generateLitellmKey
+      summary: Generate a LiteLLM virtual key for a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - project_id
+                - user_email
+              properties:
+                project_id:
+                  type: string
+                user_email:
+                  type: string
+      responses:
+        '200':
+          description: Key generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  project_id:
+                    type: string
+                  litellm_key:
+                    type: string
+                  litellm_endpoint:
+                    type: string
+                  litellm_model:
+                    type: string
+                  message:
+                    type: string
+      security:
+        - bearerAuth: []
+  /workspace/setup:
+    post:
+      operationId: workspaceSetup
+      summary: Set up workspace auth for a DevSpaces user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+              properties:
+                username:
+                  type: string
+      responses:
+        '200':
+          description: Workspace configured
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  api_key:
+                    type: string
+                  user_email:
+                    type: string
+  /rcars/overlap:
+    get:
+      operationId: rcarsOverlap
+      summary: Query RCARS for existing catalog overlap
+      parameters:
+        - name: products
+          in: query
+          schema:
+            type: string
+        - name: audience
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 5
+      responses:
+        '200':
+          description: Overlap results
+          content:
+            application/json:
+              schema:
+                type: object
+  /rcars/advisor:
+    post:
+      operationId: rcarsAdvisorSubmit
+      summary: Submit a natural-language query to RCARS advisor
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+  /rcars/advisor/{job_id}:
+    get:
+      operationId: rcarsAdvisorResult
+      summary: Get RCARS advisor job result
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  result:
+                    type: object
+                  error:
+                    type: string
+  /rcars/health:
+    get:
+      operationId: rcarsHealth
+      summary: Check RCARS service health
+      responses:
+        '200':
+          description: RCARS health status
+          content:
+            application/json:
+              schema:
+                type: object
 components:
   securitySchemes:
     bearerAuth:
