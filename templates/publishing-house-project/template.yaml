@@ -175,17 +175,33 @@ spec:
           devspaces_url: https://devspaces.${{ environment.parameters.baseDomain }}
           central_api_url: https://central-api-publishing-house.${{ environment.parameters.baseDomain }}
 
-    # Step 4: Push skeleton artifacts into the created repo
-    - id: push-skeleton-artifacts
-      name: Commit & Push Skeleton Artifacts
+    # Step 4: Create PR with skeleton files (clones repo first, so existing history is preserved)
+    - id: push-skeleton-pr
+      name: Push Skeleton Artifacts
       if: ${{ steps['check-catalog'].output.entity == null }}
-      action: github:repo:push
+      action: publish:github:pull-request
       input:
         repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
-        defaultBranch: main
-        gitCommitMessage: "Add templated skeleton artifacts"
+        branchName: skeleton-overlay
+        title: "Add Publishing House skeleton artifacts"
+        description: "Auto-generated skeleton files from Publishing House scaffolder"
 
-    # Step 5: Trigger workflow via RHDH proxy
+    # Step 5: Auto-merge the skeleton PR and capture commit SHA
+    - id: merge-skeleton
+      name: Merge Skeleton Artifacts
+      if: ${{ steps['check-catalog'].output.entity == null }}
+      action: http:backstage:request
+      input:
+        method: PUT
+        path: '/proxy/github-api/repos/rhpds/${{ parameters.project_name }}/pulls/${{ steps["push-skeleton-pr"].output.pullRequestNumber }}/merge'
+        headers:
+          content-type: 'application/json'
+          Accept: 'application/vnd.github+json'
+        body:
+          merge_method: squash
+          commit_title: "Add Publishing House skeleton artifacts"
+
+    # Step 6: Trigger workflow via RHDH proxy
     - id: trigger-workflow
       name: Start Publishing House Workflow
       if: ${{ steps['check-catalog'].output.entity == null }}
@@ -204,9 +220,9 @@ spec:
           contentType: ${{ parameters.content_type }}
           tags: ${{ parameters.tags }}
           projectDescription: ${{ parameters.project_description }}
-          auditTrailSha: ${{ steps['push-skeleton-artifacts'].output.commitHash }}
+          auditTrailSha: ${{ steps['merge-skeleton'].output.body.sha }}
 
-    # Step 6: Register in catalog
+    # Step 7: Register in catalog
     - id: register
       name: Register in Backstage Catalog
       if: ${{ steps['check-catalog'].output.entity == null }}
