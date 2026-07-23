@@ -71,6 +71,7 @@ spec:
           ui:help: "e.g. LB1234, openshift, ansible"
 
     - title: GitHub Collaborators
+      description: Enter your GitHub username first. You can also add collaborators who will have write access to the project repo.
       required:
         - github_users
       properties:
@@ -78,6 +79,7 @@ spec:
           title: GitHub Users
           type: array
           minItems: 1
+          ui:help: "Your GitHub ID is required as the first entry. Additional collaborators are optional."
           ui:options:
             addable: true
             orderable: false
@@ -90,7 +92,7 @@ spec:
               user:
                 title: GitHub Username
                 type: string
-                ui:placeholder: "github-username"
+                ui:placeholder: "your-github-id"
               access:
                 title: Access
                 type: string
