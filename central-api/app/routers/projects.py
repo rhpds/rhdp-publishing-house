@@ -127,12 +127,11 @@ def _require_auth(
 def _advance_workflow(
     project_slug: str, wf_uuid: str, owner: str,
     stage: str = "intake", commit_sha: str | None = None, settings=None,
-) -> str:
-    """Send a stage-complete CloudEvent to SonataFlow and verify advancement.
+) -> None:
+    """Send a stage-complete CloudEvent to SonataFlow (fire-and-forget).
     project_slug is the business key for event correlation.
-    wf_uuid is the process instance UUID for state polling.
     stage is the current stage being completed (e.g. 'intake', 'development').
-    Returns the new stage name or raises HTTPException if workflow didn't advance."""
+    Raises HTTPException if the CloudEvent send fails."""
     if not settings:
         settings = get_settings()
 
@@ -159,25 +158,12 @@ def _advance_workflow(
             data=json.dumps(cloud_event).encode(),
             headers={"Content-Type": "application/cloudevents+json"}
         )
-        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=30) as r:
             pass
         logger.info("sent %s for workflow=%s", event_type, project_slug)
     except Exception as e:
         logger.warning("CloudEvent send failed for workflow %s: %s", project_slug, e)
         raise HTTPException(status_code=502, detail=f"CloudEvent send failed: {e}")
-
-    for attempt in range(3):
-        time.sleep(5)
-        current = _get_workflow_state(wf_uuid).get("stage", stage)
-        if current != stage:
-            logger.info("workflow %s advanced to %s after %d poll(s)", project_slug, current, attempt + 1)
-            return current
-
-    raise HTTPException(
-        status_code=502,
-        detail=f"Workflow '{project_slug}' did not advance from {stage} after 15s. "
-               "CloudEvent was sent but SonataFlow may not have processed it.",
-    )
 
 
 # ── Auth Endpoints (Portal key management) ────────────────────────────────────
@@ -421,15 +407,15 @@ async def submit_intake(
                 validation=result.model_dump(),
             ).model_dump())
 
-        # Advance workflow
-        new_stage = _advance_workflow(
+        # Advance workflow (fire-and-forget)
+        _advance_workflow(
             project_slug, wf_uuid, owner, stage="intake",
             commit_sha=result.commit_sha, settings=settings,
         )
-        logger.info("intake: workflow advanced to %s for %s", new_stage, project_slug)
+        logger.info("intake: submitted for %s", project_slug)
 
         return JSONResponse(status_code=201, content=IntakeResponse(
-            status=201, stage=new_stage,
+            status=201, stage=stage,
         ).model_dump())
 
     except HTTPException as e:
@@ -503,14 +489,14 @@ async def submit_development(
                 validation=result.model_dump(),
             ).model_dump())
 
-        new_stage = _advance_workflow(
+        _advance_workflow(
             project_slug, wf_uuid, owner, stage="development",
             commit_sha=result.commit_sha, settings=settings,
         )
-        logger.info("development: workflow advanced to %s for %s", new_stage, project_slug)
+        logger.info("development: submitted for %s", project_slug)
 
         return JSONResponse(status_code=201, content=DevelopmentResponse(
-            status=201, stage=new_stage,
+            status=201, stage=stage,
         ).model_dump())
 
     except HTTPException as e:
