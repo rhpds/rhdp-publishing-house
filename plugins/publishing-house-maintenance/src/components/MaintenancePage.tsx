@@ -38,11 +38,9 @@ interface ComponentRow {
   description: string;
   owner: string;
   repoUrl: string;
-  repoSlug: string;
   jiraUrl: string;
   jiraLabel: string;
   contentType: string;
-  startedAt: string;
 }
 
 function toRow(entity: Entity, wfMap: Record<string, WorkflowInfo>): ComponentRow {
@@ -52,9 +50,12 @@ function toRow(entity: Entity, wfMap: Record<string, WorkflowInfo>): ComponentRo
   const name = entity.metadata?.name ?? '';
 
   const wf = wfMap[name];
-  const jiraUrl = wf?.jiraUrl ?? '';
-  const jiraLabel = wf?.epicKey ?? '';
   const owner = annotations['ph.rhdp.io/owner'] ?? '';
+
+  // Jira: check annotations first, fall back to workflow data
+  const annJiraUrl = Object.values(annotations).find(v => typeof v === 'string' && v.includes('atlassian.net/browse/')) ?? '';
+  const jiraUrl = annJiraUrl || wf?.jiraUrl || '';
+  const jiraLabel = jiraUrl ? (jiraUrl.split('/').pop() ?? 'Epic') : '';
 
   return {
     entity,
@@ -62,11 +63,9 @@ function toRow(entity: Entity, wfMap: Record<string, WorkflowInfo>): ComponentRo
     description: entity.metadata?.description ?? '',
     owner,
     repoUrl,
-    repoSlug: slug,
     jiraUrl,
     jiraLabel,
     contentType: annotations['ph.rhdp.io/content-type'] ?? '',
-    startedAt: wf?.startedAt || '',
   };
 }
 
@@ -135,11 +134,11 @@ export function MaintenancePage() {
     },
     {
       title: 'Repo',
-      field: 'repoSlug',
+      field: 'repoUrl',
       render: (row: ComponentRow) =>
         row.repoUrl ? (
           <a href={row.repoUrl} target="_blank" rel="noopener noreferrer">
-            {row.repoSlug}
+            {row.repoUrl}
           </a>
         ) : (
           '—'
@@ -151,24 +150,11 @@ export function MaintenancePage() {
       render: (row: ComponentRow) =>
         row.jiraUrl ? (
           <a href={row.jiraUrl} target="_blank" rel="noopener noreferrer">
-            {row.jiraLabel || 'Epic'}
+            {row.jiraLabel}
           </a>
         ) : (
           '—'
         ),
-    },
-    {
-      title: 'Created',
-      field: 'startedAt',
-      render: (row: ComponentRow) =>
-        row.startedAt
-          ? new Date(row.startedAt).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })
-          : '—',
-      defaultSort: 'desc' as const,
     },
     {
       title: 'Actions',
