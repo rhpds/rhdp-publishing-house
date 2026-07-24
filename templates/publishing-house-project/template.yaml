@@ -24,7 +24,6 @@ spec:
         timestamp:
           title: Creation Timestamp
           type: string
-          format: date-time
           default: "${{ 'now' | date('YYYY-MM-DDTHH:mm:ss.SSS[Z]') }}"
         project_name:
           title: Project Name
