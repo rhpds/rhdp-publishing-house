@@ -158,7 +158,7 @@ spec:
           showroom_type: ${{ parameters.showroom_type }}
           devspaces_url: https://devspaces.${{ environment.parameters.baseDomain }}
           central_api_url: https://central-api-publishing-house.${{ environment.parameters.baseDomain }}
-          created_at: "${{ 'now' | date('YYYY-MM-DDTHH:mm:ss.SSS[Z]') }}"
+          created_at: "${{ aDate().toISOString() }}"
 
     # Step 3: Create repo from GitHub template, overlay skeleton, commit and push
     - id: create-and-push
