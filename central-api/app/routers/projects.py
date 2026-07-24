@@ -5,6 +5,7 @@ import logging
 import secrets
 import ssl
 import time
+import urllib.parse
 import urllib.request
 import uuid
 from datetime import datetime, timezone
@@ -547,30 +548,50 @@ async def delete_project(
     settings = get_settings()
     result = DeleteProjectResponse(slug=project_slug)
 
-    # 1. Get workflow data (needed for workflow_id and epic_key)
+    # 1. Get workflow data — find ALL instances, prefer ACTIVE for epic_key
     epic_key = ""
-    wf_uuid = ""
+    active_ids = []
     try:
-        wd = _get_workflow_data(project_slug)
-        wf_uuid = wd.get("workflow_id", "")
-        epic_key = wd.get("epic_key", "")
-    except HTTPException:
-        result.errors.append("No workflow found — skipping workflow abort and Jira archive")
+        graphql_query = {
+            "query": """
+                query GetAllInstances($bk: String!) {
+                    ProcessInstances(where: { businessKey: { equal: $bk } }) {
+                        id state variables
+                    }
+                }
+            """,
+            "variables": {"bk": project_slug}
+        }
+        req = urllib.request.Request(
+            f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+            data=json.dumps(graphql_query).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
+            gql_result = json.loads(r.read().decode())
+        for inst in gql_result.get("data", {}).get("ProcessInstances", []):
+            if inst.get("state") == "ACTIVE":
+                active_ids.append(inst["id"])
+            if not epic_key:
+                wd = (inst.get("variables") or {}).get("workflowdata") or {}
+                epic_key = wd.get("epic_key", "")
+    except Exception as e:
+        result.errors.append(f"Workflow query failed: {e}")
 
-    # 2. Abort SonataFlow workflow
-    if wf_uuid:
+    # 2. Abort ALL active SonataFlow workflow instances
+    for wf_id in active_ids:
         try:
             req = urllib.request.Request(
-                f"{settings.sonataflow_url.rstrip('/')}/management/processes/publishinghouseworkflow/instances/{wf_uuid}",
+                f"{settings.sonataflow_url.rstrip('/')}/management/processes/publishinghouseworkflow/instances/{wf_id}",
                 method="DELETE",
             )
             with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
                 pass
             result.workflow_aborted = True
-            logger.info("delete: aborted workflow %s for %s", wf_uuid, project_slug)
+            logger.info("delete: aborted workflow %s for %s", wf_id, project_slug)
         except Exception as e:
-            result.errors.append(f"Workflow abort failed: {e}")
-            logger.warning("delete: workflow abort failed for %s: %s", project_slug, e)
+            result.errors.append(f"Workflow abort failed ({wf_id}): {e}")
+            logger.warning("delete: workflow abort failed for %s/%s: %s", project_slug, wf_id, e)
 
     # 3. Delete LiteLLM keys
     try:
