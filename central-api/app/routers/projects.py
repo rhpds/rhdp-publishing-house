@@ -2,6 +2,7 @@
 import hashlib
 import json
 import logging
+import re
 import secrets
 import ssl
 import time
@@ -92,6 +93,7 @@ class DevelopmentResponse(BaseModel):
 class DeleteProjectResponse(BaseModel):
     slug: str
     workflow_aborted: bool = False
+    catalog_cleaned: bool = False
     litellm_keys_deleted: int = 0
     jira_archived: bool = False
     repo_deleted: bool = False
@@ -592,6 +594,55 @@ async def delete_project(
         except Exception as e:
             result.errors.append(f"Workflow abort failed ({wf_id}): {e}")
             logger.warning("delete: workflow abort failed for %s/%s: %s", project_slug, wf_id, e)
+
+    # 2b. Delete catalog location and entity from RHDH
+    if settings.rhdh_service_token:
+        try:
+            catalog_base = f"{settings.rhdh_internal_url.rstrip('/')}/api/catalog"
+            catalog_headers = {
+                "Authorization": f"Bearer {settings.rhdh_service_token}",
+                "Accept": "application/json",
+            }
+            entity_url = f"{catalog_base}/entities/by-name/component/default/{project_slug}"
+            req = urllib.request.Request(entity_url, headers=catalog_headers)
+            with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
+                entity = json.loads(r.read().decode())
+
+            location_ref = entity.get("metadata", {}).get("annotations", {}).get(
+                "backstage.io/managed-by-location", ""
+            )
+            match = re.match(r"url:(.+)", location_ref)
+            if match:
+                target_url = match.group(1)
+                req = urllib.request.Request(f"{catalog_base}/locations", headers=catalog_headers)
+                with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
+                    locations = json.loads(r.read().decode())
+                for loc in locations:
+                    loc_target = (loc.get("data") or {}).get("target", "") or loc.get("target", "")
+                    if loc_target == target_url:
+                        req = urllib.request.Request(
+                            f"{catalog_base}/locations/{loc['id']}",
+                            method="DELETE",
+                            headers=catalog_headers,
+                        )
+                        urllib.request.urlopen(req, context=_SSL_CTX, timeout=10)
+                        logger.info("delete: removed catalog location for %s", project_slug)
+                        break
+
+            entity_uid = entity.get("metadata", {}).get("uid", "")
+            if entity_uid:
+                req = urllib.request.Request(
+                    f"{catalog_base}/entities/by-uid/{entity_uid}",
+                    method="DELETE",
+                    headers=catalog_headers,
+                )
+                urllib.request.urlopen(req, context=_SSL_CTX, timeout=10)
+                logger.info("delete: removed catalog entity %s", project_slug)
+
+            result.catalog_cleaned = True
+        except Exception as e:
+            result.errors.append(f"Catalog cleanup failed: {e}")
+            logger.warning("delete: catalog cleanup failed for %s: %s", project_slug, e)
 
     # 3. Delete LiteLLM keys
     try:

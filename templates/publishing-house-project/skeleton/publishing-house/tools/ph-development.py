@@ -96,7 +96,11 @@ def main():
         with urllib.request.urlopen(req, context=ctx, timeout=60) as resp:
             result = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
-        result = json.loads(e.read().decode())
+        body = e.read().decode()
+        try:
+            result = json.loads(body) if body else {"status": e.code, "error": e.reason}
+        except json.JSONDecodeError:
+            result = {"status": e.code, "error": body or e.reason}
     except Exception as e:
         result = {"status": 500, "error": f"Request failed: {e}"}
 

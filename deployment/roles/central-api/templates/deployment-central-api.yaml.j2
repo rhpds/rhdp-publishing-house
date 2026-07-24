@@ -88,6 +88,13 @@ spec:
                 secretKeyRef:
                   name: publishing-house-credentials
                   key: rcars-api-key
+            - name: RHDH_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ph-developer-hub-env
+                  key: RHDH_SERVICE_TOKEN
+            - name: RHDH_INTERNAL_URL
+              value: "http://backstage-developer-hub.{{ app_namespace }}.svc.cluster.local:7007"
           volumeMounts:
             - name: validation-policy
               mountPath: /etc/ph-policy

@@ -24,7 +24,6 @@ import {
   fetchApiRef,
   useApi,
 } from '@backstage/core-plugin-api';
-import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { Entity } from '@backstage/catalog-model';
 import { createPhMaintenanceClient, DeleteProjectResult } from '../api/client';
 
@@ -54,7 +53,6 @@ export function DeleteDialog({ open, entity, onClose, onDeleted }: DeleteDialogP
   const classes = useStyles();
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
-  const catalogApi = useApi(catalogApiRef);
 
   const [deleteRepo, setDeleteRepo] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -81,36 +79,12 @@ export function DeleteDialog({ open, entity, onClose, onDeleted }: DeleteDialogP
       const client = createPhMaintenanceClient({ discoveryApi, fetchApi });
       const res = await client.deleteProject(slug, deleteRepo);
       setResult(res);
-
-      const uid = entity.metadata?.uid;
-      if (uid) {
-        try {
-          const fullEntity = await catalogApi.getEntityByRef({kind: entity.kind, namespace: entity.metadata?.namespace ?? 'default', name: entity.metadata?.name ?? ''});
-          const locationRef = fullEntity?.metadata?.annotations?.['backstage.io/managed-by-location'] ?? '';
-          const match = locationRef.match(/url:(.+)/);
-          if (match) {
-            const proxyUrl = await discoveryApi.getBaseUrl('catalog');
-            const locResponse = await fetchApi.fetch(`${proxyUrl}/locations`);
-            if (locResponse.ok) {
-              const locations = await locResponse.json();
-              const loc = (locations as any[]).find((l: any) => (l.data?.target ?? l.target) === match[1]);
-              if (loc) {
-                await fetchApi.fetch(`${proxyUrl}/locations/${loc.id}`, { method: 'DELETE' });
-              }
-            }
-          }
-          await catalogApi.removeEntityByUid(uid);
-        } catch (e: any) {
-          res.errors.push(`Catalog unregister: ${e.message}`);
-        }
-      }
-
     } catch (e: any) {
       setError(e.message || 'Unknown error');
     } finally {
       setDeleting(false);
     }
-  }, [entity, slug, deleteRepo, discoveryApi, fetchApi, catalogApi]);
+  }, [entity, slug, deleteRepo, discoveryApi, fetchApi]);
 
   return (
     <Dialog open={open} onClose={deleting || result ? undefined : handleClose} maxWidth="sm" fullWidth disableEscapeKeyDown={!!result || deleting}>
@@ -135,11 +109,11 @@ export function DeleteDialog({ open, entity, onClose, onDeleted }: DeleteDialogP
               </ListItem>
               <ListItem>
                 <ListItemIcon><WarningIcon fontSize="small" /></ListItemIcon>
-                <ListItemText primary="Archive the Jira epic" />
+                <ListItemText primary="Remove catalog location and entity" />
               </ListItem>
               <ListItem>
                 <ListItemIcon><WarningIcon fontSize="small" /></ListItemIcon>
-                <ListItemText primary="Unregister entity from the catalog" />
+                <ListItemText primary="Archive the Jira epic" />
               </ListItem>
             </List>
             <FormControlLabel
@@ -162,10 +136,10 @@ export function DeleteDialog({ open, entity, onClose, onDeleted }: DeleteDialogP
             </Typography>
             <List dense>
               <ResultItem label="Workflow aborted" success={result.workflow_aborted} />
+              <ResultItem label="Catalog location removed" success={result.catalog_cleaned} />
               <ResultItem label={`LiteLLM keys deleted: ${result.litellm_keys_deleted}`} success={result.litellm_keys_deleted > 0} />
               <ResultItem label="Jira epic archived" success={result.jira_archived} />
               {deleteRepo && <ResultItem label="GitHub repo deleted" success={result.repo_deleted} />}
-              <ResultItem label="Catalog entity unregistered" success />
             </List>
             {result.errors.length > 0 && (
               <Alert severity="warning" style={{ marginTop: 8 }}>

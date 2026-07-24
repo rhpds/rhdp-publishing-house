@@ -41,6 +41,7 @@ interface ComponentRow {
   jiraUrl: string;
   jiraLabel: string;
   contentType: string;
+  createdAt: string;
 }
 
 function toRow(entity: Entity, wfMap: Record<string, WorkflowInfo>): ComponentRow {
@@ -58,6 +59,12 @@ function toRow(entity: Entity, wfMap: Record<string, WorkflowInfo>): ComponentRo
   const jiraUrl = jiraLink?.url || wf?.jiraUrl || '';
   const jiraLabel = jiraUrl ? (jiraUrl.split('/').pop() ?? 'Epic') : '';
 
+  const rawTs = annotations['ph.rhdp.io/created-at'] ?? '';
+  let createdAt = '';
+  if (rawTs) {
+    try { createdAt = new Date(rawTs).toLocaleDateString(); } catch { createdAt = rawTs; }
+  }
+
   return {
     entity,
     name,
@@ -67,6 +74,7 @@ function toRow(entity: Entity, wfMap: Record<string, WorkflowInfo>): ComponentRo
     jiraUrl,
     jiraLabel,
     contentType: annotations['ph.rhdp.io/content-type'] ?? '',
+    createdAt,
   };
 }
 
@@ -133,6 +141,11 @@ export function MaintenancePage() {
     {
       title: 'Type',
       field: 'contentType',
+    },
+    {
+      title: 'Created',
+      field: 'createdAt',
+      render: (row: ComponentRow) => row.createdAt || '—',
     },
     {
       title: 'Repo',

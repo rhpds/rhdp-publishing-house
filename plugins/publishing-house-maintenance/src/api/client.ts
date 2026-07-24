@@ -3,6 +3,7 @@ import { DiscoveryApi, FetchApi } from '@backstage/core-plugin-api';
 export interface DeleteProjectResult {
   slug: string;
   workflow_aborted: boolean;
+  catalog_cleaned: boolean;
   litellm_keys_deleted: number;
   jira_archived: boolean;
   repo_deleted: boolean;

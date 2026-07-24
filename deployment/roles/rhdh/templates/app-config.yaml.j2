@@ -26,6 +26,10 @@ backend:
         options:
           subject: legacy-default-config
           secret: ${BACKEND_SECRET}
+      - type: static
+        options:
+          subject: catalog-automation
+          token: ${RHDH_SERVICE_TOKEN}
   baseUrl: ${BACKEND_URL}
   cors:
     origin: ${BACKEND_URL}

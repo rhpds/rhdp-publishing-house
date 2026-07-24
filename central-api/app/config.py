@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     rcars_url: str = "https://rcars-api.apps.ocpv-infra01.dal12.infra.demo.redhat.com"
     rcars_api_key: str = ""
 
+    # RHDH catalog API (for location cleanup on project delete)
+    rhdh_service_token: str = ""
+    rhdh_internal_url: str = "http://backstage-developer-hub.publishing-house.svc.cluster.local:7007"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
