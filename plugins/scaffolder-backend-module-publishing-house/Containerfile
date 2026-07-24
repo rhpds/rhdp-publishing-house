@@ -1,8 +1,8 @@
-# Multi-stage build for scaffolder-github-template RHDH dynamic plugin
+# Multi-stage build for scaffolder-backend-module-publishing-house RHDH dynamic plugin
 # Produces a scratch-based OCI image compatible with RHDH dynamic plugin loading
 
 # Stage 1: Build and export the dynamic plugin
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /plugin
 
@@ -37,5 +37,5 @@ RUN find dist-dynamic/node_modules -type d -name .bin -exec rm -rf {} + 2>/dev/n
 # Stage 2: Assemble the final layout
 FROM scratch
 
-COPY --from=builder /plugin/dist-dynamic/ backstage-plugin-scaffolder-backend-module-github-template/
+COPY --from=builder /plugin/dist-dynamic/ backstage-plugin-scaffolder-backend-module-publishing-house/
 COPY --from=builder /plugin/index.json .

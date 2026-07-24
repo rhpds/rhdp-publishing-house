@@ -5,10 +5,12 @@ import {
 import { scaffolderActionsExtensionPoint } from '@backstage/plugin-scaffolder-node';
 import { ScmIntegrations } from '@backstage/integration';
 import { createGithubRepoFromTemplateAction } from './actions/createFromTemplate';
+import { createAnnotateAction } from './actions/annotate';
+import { createTimestampAction } from './actions/timestamp';
 
 export default createBackendModule({
   pluginId: 'scaffolder',
-  moduleId: 'github-template',
+  moduleId: 'publishing-house',
   register({ registerInit }) {
     registerInit({
       deps: {
@@ -19,6 +21,8 @@ export default createBackendModule({
         const integrations = ScmIntegrations.fromConfig(config);
         scaffolder.addActions(
           createGithubRepoFromTemplateAction({ integrations }),
+          createAnnotateAction(),
+          createTimestampAction(),
         );
       },
     });

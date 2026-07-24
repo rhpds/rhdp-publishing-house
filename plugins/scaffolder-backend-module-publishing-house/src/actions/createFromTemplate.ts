@@ -39,7 +39,7 @@ export function createGithubRepoFromTemplateAction(options: {
   const { integrations } = options;
 
   return createTemplateAction({
-    id: 'github:repo:create-from-template',
+    id: 'publishing-house:create-github-repo',
     description: 'Create a GitHub repo from a template, overlay workspace files, commit and push',
     schema: {
       input: {

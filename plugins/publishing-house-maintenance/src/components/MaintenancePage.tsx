@@ -52,9 +52,10 @@ function toRow(entity: Entity, wfMap: Record<string, WorkflowInfo>): ComponentRo
   const wf = wfMap[name];
   const owner = annotations['ph.rhdp.io/owner'] ?? '';
 
-  // Jira: check annotations first, fall back to workflow data
-  const annJiraUrl = Object.values(annotations).find(v => typeof v === 'string' && v.includes('atlassian.net/browse/')) ?? '';
-  const jiraUrl = annJiraUrl || wf?.jiraUrl || '';
+  // Jira: check catalog-info links first, fall back to workflow data
+  const links = (entity.metadata as any)?.links ?? [];
+  const jiraLink = links.find((l: any) => l.title === 'Jira Epic' || (l.url && l.url.includes('atlassian.net/browse/')));
+  const jiraUrl = jiraLink?.url || wf?.jiraUrl || '';
   const jiraLabel = jiraUrl ? (jiraUrl.split('/').pop() ?? 'Epic') : '';
 
   return {
@@ -88,6 +89,7 @@ export function MaintenancePage() {
           'metadata.description',
           'metadata.uid',
           'metadata.annotations',
+          'metadata.links',
           'metadata.tags',
           'kind',
         ],

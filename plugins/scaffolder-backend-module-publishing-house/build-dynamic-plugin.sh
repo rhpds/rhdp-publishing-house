@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build and push the scaffolder-github-template RHDH dynamic plugin as an OCI image
+# Build and push the scaffolder-backend-module-publishing-house RHDH dynamic plugin as an OCI image
 #
 # Usage:
 #   ./build-dynamic-plugin.sh                    # build and push 1.0.0
@@ -11,7 +11,7 @@ set -euo pipefail
 VERSION="${1:-1.0.0}"
 NO_PUSH="${2:-}"
 PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
-IMAGE="quay.io/rhpds/backstage-plugin-scaffolder-github-template:${VERSION}"
+IMAGE="quay.io/rhpds/backstage-plugin-scaffolder-backend-module-publishing-house:${VERSION}"
 
 echo "==> Building plugin version ${VERSION}"
 

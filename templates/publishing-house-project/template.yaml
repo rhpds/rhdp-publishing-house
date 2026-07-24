@@ -159,11 +159,17 @@ spec:
           devspaces_url: https://devspaces.${{ environment.parameters.baseDomain }}
           central_api_url: https://central-api-publishing-house.${{ environment.parameters.baseDomain }}
 
-    # Step 3: Create repo from GitHub template, overlay skeleton, commit and push
+    # Step 3: Set created-at timestamp on catalog-info.yaml
+    - id: timestamp
+      name: Set Creation Timestamp
+      if: ${{ steps['check-catalog'].output.entity == null }}
+      action: publishing-house:timestamp
+
+    # Step 4: Create repo from GitHub template, overlay skeleton, commit and push
     - id: create-and-push
       name: Create Repository & Push Skeleton
       if: ${{ steps['check-catalog'].output.entity == null }}
-      action: github:repo:create-from-template
+      action: publishing-house:create-github-repo
       input:
         repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
         templateRepo: rhpds/rhdp-publishing-house-template
@@ -173,7 +179,7 @@ spec:
         gitCommitMessage: "Add templated skeleton artifacts"
         collaborators: ${{ parameters.github_users }}
 
-    # Step 4: Trigger workflow via RHDH proxy
+    # Step 5: Trigger workflow via RHDH proxy
     - id: trigger-workflow
       name: Start Publishing House Workflow
       if: ${{ steps['check-catalog'].output.entity == null }}
@@ -194,7 +200,7 @@ spec:
           projectDescription: ${{ parameters.project_description }}
           auditTrailSha: ${{ steps['create-and-push'].output.commitHash }}
 
-    # Step 5: Register in catalog
+    # Step 6: Register in catalog
     - id: register
       name: Register in Backstage Catalog
       if: ${{ steps['check-catalog'].output.entity == null }}
