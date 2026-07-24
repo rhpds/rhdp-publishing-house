@@ -76,6 +76,18 @@ class IntakeResponse(BaseModel):
     validation: Optional[dict] = None
 
 
+class DevelopmentRequest(BaseModel):
+    repo_url: str
+    branch: str = "main"
+
+
+class DevelopmentResponse(BaseModel):
+    status: int
+    stage: Optional[str] = None
+    error: Optional[str] = None
+    validation: Optional[dict] = None
+
+
 # ── Auth Helpers ──────────────────────────────────────────────────────────────
 
 def _create_key(email: str, label: str = "API Key") -> tuple:
@@ -113,19 +125,22 @@ def _require_auth(
 
 
 def _advance_workflow(
-    project_slug: str, wf_uuid: str, owner: str, commit_sha: str | None = None, settings=None,
+    project_slug: str, wf_uuid: str, owner: str,
+    stage: str = "intake", commit_sha: str | None = None, settings=None,
 ) -> str:
-    """Send IntakeCompleteEvent CloudEvent to SonataFlow and verify advancement.
+    """Send a stage-complete CloudEvent to SonataFlow and verify advancement.
     project_slug is the business key for event correlation.
     wf_uuid is the process instance UUID for state polling.
+    stage is the current stage being completed (e.g. 'intake', 'development').
     Returns the new stage name or raises HTTPException if workflow didn't advance."""
     if not settings:
         settings = get_settings()
 
+    event_type = f"ph.{stage}.complete"
     try:
         cloud_event = {
             "specversion": "1.0",
-            "type": "ph.intake.complete",
+            "type": event_type,
             "source": "publishing-house",
             "id": str(uuid.uuid4()),
             "kogitobusinesskey": project_slug,
@@ -133,7 +148,7 @@ def _advance_workflow(
             "datacontenttype": "application/json",
             "data": {
                 "user": owner,
-                "stage": "intake",
+                "stage": stage,
                 "action": "submitted",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "commitSha": commit_sha,
@@ -146,21 +161,21 @@ def _advance_workflow(
         )
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
             pass
-        logger.info("sent IntakeCompleteEvent for workflow=%s", project_slug)
+        logger.info("sent %s for workflow=%s", event_type, project_slug)
     except Exception as e:
         logger.warning("CloudEvent send failed for workflow %s: %s", project_slug, e)
         raise HTTPException(status_code=502, detail=f"CloudEvent send failed: {e}")
 
     for attempt in range(3):
         time.sleep(5)
-        stage = _get_workflow_state(wf_uuid).get("stage", "intake")
-        if stage != "intake":
-            logger.info("workflow %s advanced to %s after %d poll(s)", project_slug, stage, attempt + 1)
-            return stage
+        current = _get_workflow_state(wf_uuid).get("stage", stage)
+        if current != stage:
+            logger.info("workflow %s advanced to %s after %d poll(s)", project_slug, current, attempt + 1)
+            return current
 
     raise HTTPException(
         status_code=502,
-        detail=f"Workflow '{project_slug}' did not advance from intake after 15s. "
+        detail=f"Workflow '{project_slug}' did not advance from {stage} after 15s. "
                "CloudEvent was sent but SonataFlow may not have processed it.",
     )
 
@@ -408,7 +423,8 @@ async def submit_intake(
 
         # Advance workflow
         new_stage = _advance_workflow(
-            project_slug, wf_uuid, owner, commit_sha=result.commit_sha, settings=settings,
+            project_slug, wf_uuid, owner, stage="intake",
+            commit_sha=result.commit_sha, settings=settings,
         )
         logger.info("intake: workflow advanced to %s for %s", new_stage, project_slug)
 
@@ -423,5 +439,86 @@ async def submit_intake(
     except Exception as e:
         logger.exception("intake: unexpected error for %s", project_slug)
         return JSONResponse(status_code=500, content=IntakeResponse(
+            status=500, stage=stage, error=f"Internal server error: {e}",
+        ).model_dump())
+
+
+@router.post("/development/{project_slug}", response_model=DevelopmentResponse)
+async def submit_development(
+    project_slug: str,
+    body: DevelopmentRequest,
+    owner: str = Depends(_require_auth),
+):
+    """Validate development artifacts, then advance workflow past development.
+
+    Returns a unified response shape for all outcomes:
+    201 — validation passed, workflow advanced
+    422 — validation failed
+    409 — workflow not in development stage
+    404 — no workflow found
+    500 — unexpected server error
+    """
+    from fastapi.responses import JSONResponse
+    from ..services.github import GitHubService
+    from ..services.validation.runner import run_validation
+
+    stage = None
+
+    try:
+        try:
+            wd = _get_workflow_data(project_slug)
+        except HTTPException as e:
+            if e.status_code == 404:
+                return JSONResponse(status_code=404, content=DevelopmentResponse(
+                    status=404, error=f"No workflow found for {project_slug}",
+                ).model_dump())
+            raise
+
+        wf_uuid = wd.get("workflow_id", "")
+        if not wf_uuid:
+            return JSONResponse(status_code=404, content=DevelopmentResponse(
+                status=404, error=f"No workflow found for {project_slug}",
+            ).model_dump())
+
+        current = _get_workflow_state(wf_uuid).get("stage", "unknown")
+        stage = current
+        if current != "development":
+            return JSONResponse(status_code=409, content=DevelopmentResponse(
+                status=409, stage=current,
+                error=f"Workflow is in '{current}' stage. Development requires 'development'.",
+            ).model_dump())
+
+        settings = get_settings()
+        if not settings.github_token:
+            return JSONResponse(status_code=500, content=DevelopmentResponse(
+                status=500, stage=stage, error="GITHUB_TOKEN not configured on Central API",
+            ).model_dump())
+
+        github = GitHubService(token=settings.github_token)
+        result = await run_validation(github, body.repo_url, body.branch, "development")
+
+        if not result.passed:
+            return JSONResponse(status_code=422, content=DevelopmentResponse(
+                status=422, stage=stage, error="Validation failed",
+                validation=result.model_dump(),
+            ).model_dump())
+
+        new_stage = _advance_workflow(
+            project_slug, wf_uuid, owner, stage="development",
+            commit_sha=result.commit_sha, settings=settings,
+        )
+        logger.info("development: workflow advanced to %s for %s", new_stage, project_slug)
+
+        return JSONResponse(status_code=201, content=DevelopmentResponse(
+            status=201, stage=new_stage,
+        ).model_dump())
+
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code, content=DevelopmentResponse(
+            status=e.status_code, stage=stage, error=e.detail,
+        ).model_dump())
+    except Exception as e:
+        logger.exception("development: unexpected error for %s", project_slug)
+        return JSONResponse(status_code=500, content=DevelopmentResponse(
             status=500, stage=stage, error=f"Internal server error: {e}",
         ).model_dump())

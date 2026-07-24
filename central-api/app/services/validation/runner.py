@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 STAGE_GROUPS = {
     "intake": ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
     "review": ["A", "B", "C", "D", "E", "F"],
+    "development": [],
 }
 
 
