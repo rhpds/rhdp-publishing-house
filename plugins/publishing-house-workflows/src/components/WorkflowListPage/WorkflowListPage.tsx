@@ -92,6 +92,24 @@ const columns: TableColumn<WorkflowSummary>[] = [
     render: (row: WorkflowSummary) => <StageChip stage={row.stage} />,
   },
   {
+    title: 'State',
+    field: 'state',
+    render: (row: WorkflowSummary) => {
+      const color =
+        row.state === 'ACTIVE' ? '#4caf50' :
+        row.state === 'ERROR' ? '#f44336' :
+        row.state === 'SUSPENDED' ? '#ff9800' :
+        undefined;
+      return (
+        <Chip
+          label={row.state}
+          size="small"
+          style={color ? { backgroundColor: color, color: '#fff', fontWeight: 600, fontSize: '0.7rem' } : { fontWeight: 600, fontSize: '0.7rem' }}
+        />
+      );
+    },
+  },
+  {
     title: 'Tags',
     field: 'tags',
     render: (row: WorkflowSummary) =>

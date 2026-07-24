@@ -1,6 +1,5 @@
 """LiteLLM integration service."""
 import httpx
-import uuid
 from typing import Optional
 import logging
 
@@ -18,9 +17,46 @@ class LiteLLMService:
             "Content-Type": "application/json"
         }
 
+    async def _next_index(self, project_id: str) -> int:
+        """Find the next unused index for ph-{project_id}-{index}."""
+        async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+            index = 1
+            while index <= 100:
+                alias = f"ph-{project_id}-{index}"
+                resp = await client.get(
+                    f"{self.api_url}/key/list",
+                    headers=self.headers,
+                    params={"key_alias": alias},
+                )
+                if resp.status_code == 200 and resp.json().get("total_count", 0) == 0:
+                    return index
+                index += 1
+        return index
+
+    async def find_keys_for_project(self, project_id: str) -> list[str]:
+        """Return all key hashes for ph-{project_id}-1, -2, ... until miss."""
+        keys = []
+        async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+            index = 1
+            while index <= 100:
+                alias = f"ph-{project_id}-{index}"
+                resp = await client.get(
+                    f"{self.api_url}/key/list",
+                    headers=self.headers,
+                    params={"key_alias": alias},
+                )
+                if resp.status_code != 200:
+                    break
+                data = resp.json()
+                if data.get("total_count", 0) == 0:
+                    break
+                keys.extend(data.get("keys", []))
+                index += 1
+        return keys
+
     async def generate_key(self, project_id: str, user_email: str, max_budget: float = 10.0) -> Optional[str]:
-        short_id = uuid.uuid4().hex[:8]
-        alias = f"ph-{project_id}-{short_id}"
+        index = await self._next_index(project_id)
+        alias = f"ph-{project_id}-{index}"
 
         try:
             async with httpx.AsyncClient(timeout=10.0, verify=False) as client:

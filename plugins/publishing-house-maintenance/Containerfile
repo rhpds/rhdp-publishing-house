@@ -1,0 +1,33 @@
+# Multi-stage build for Publishing House Maintenance RHDH dynamic plugin
+
+FROM node:20-alpine AS builder
+
+WORKDIR /plugin
+
+COPY package.json ./
+
+RUN npm pkg delete dependencies.@rollup/rollup-darwin-arm64 \
+    dependencies.@swc/core-darwin-arm64 && \
+    npm install --legacy-peer-deps --ignore-scripts 2>&1 | tail -5
+
+COPY . .
+
+RUN npx --yes @red-hat-developer-hub/cli@1.8.0 plugin export 2>&1
+
+RUN node -e " \
+  const pkg = require('./dist-dynamic/package.json'); \
+  const meta = [{ [pkg.name]: { \
+    name: pkg.name + '-dynamic', \
+    version: pkg.version, \
+    backstage: pkg.backstage, \
+    license: pkg.license \
+  }}]; \
+  const json = JSON.stringify(meta); \
+  require('fs').writeFileSync('/plugin/index.json', json); \
+  require('fs').writeFileSync('/plugin/annotation.txt', Buffer.from(json).toString('base64')); \
+"
+
+FROM scratch
+
+COPY --from=builder /plugin/dist-dynamic/ backstage-plugin-ph-maintenance/
+COPY --from=builder /plugin/index.json .

@@ -74,8 +74,39 @@ plugins:
               - importName: PhWorkflowsPage
                 menuItem:
                   icon: phWorkflowIcon
-                  text: Publishing House
+                  text: Workflows
                 path: /publishing-house-workflows
+            menuItems:
+              publishing-house-workflows:
+                priority: 10
+                parent: publishing-house
+              publishing-house:
+                icon: phWorkflowIcon
+                title: Publishing House
+                priority: 100
+  - disabled: false
+    package: 'oci://quay.io/rhpds/backstage-plugin-ph-maintenance:1.0.4!backstage-plugin-ph-maintenance'
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          backstage-plugin-ph-maintenance:
+            appIcons:
+              - importName: PhMaintenanceIcon
+                name: phMaintenanceIcon
+            dynamicRoutes:
+              - importName: PhMaintenancePage
+                menuItem:
+                  icon: phMaintenanceIcon
+                  text: Maintenance
+                path: /publishing-house-maintenance
+            menuItems:
+              publishing-house-maintenance:
+                priority: 20
+                parent: publishing-house
+              publishing-house:
+                icon: phWorkflowIcon
+                title: Publishing House
+                priority: 100
   - disabled: false
     package: 'oci://quay.io/rhpds/backstage-plugin-scaffolder-github-template:1.0.0!backstage-plugin-scaffolder-backend-module-github-template'
   - disabled: false

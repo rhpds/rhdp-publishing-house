@@ -104,6 +104,12 @@ spec:
         - initiative_key
         - showroom_type
       properties:
+        timestamp:
+          title: Creation Timestamp
+          type: string
+          format: date-time
+          default: "${{ 'now' | date('YYYY-MM-DDTHH:mm:ssZ') }}"
+          ui:widget: hidden
         initiative_key:
           title: Initiative
           type: string
@@ -158,6 +164,7 @@ spec:
           showroom_type: ${{ parameters.showroom_type }}
           devspaces_url: https://devspaces.${{ environment.parameters.baseDomain }}
           central_api_url: https://central-api-publishing-house.${{ environment.parameters.baseDomain }}
+          created_at: ${{ parameters.timestamp }}
 
     # Step 3: Create repo from GitHub template, overlay skeleton, commit and push
     - id: create-and-push

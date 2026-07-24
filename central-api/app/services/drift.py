@@ -10,7 +10,7 @@ from .github import GitHubService
 
 logger = logging.getLogger(__name__)
 
-DESIGN_PATH = "publishing-house/design.md"
+DESIGN_PATH = "publishing-house/spec/design.md"
 LITELLM_MODEL = "claude-haiku-4-5"
 
 SYSTEM_PROMPT = """You are a technical document reviewer. You will receive two versions of a design document (APPROVED and CURRENT). Compare them and identify meaningful changes, organized by section.

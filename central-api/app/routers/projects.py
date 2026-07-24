@@ -88,6 +88,15 @@ class DevelopmentResponse(BaseModel):
     validation: Optional[dict] = None
 
 
+class DeleteProjectResponse(BaseModel):
+    slug: str
+    workflow_aborted: bool = False
+    litellm_keys_deleted: int = 0
+    jira_archived: bool = False
+    repo_deleted: bool = False
+    errors: list[str] = []
+
+
 # ── Auth Helpers ──────────────────────────────────────────────────────────────
 
 def _create_key(email: str, label: str = "API Key") -> tuple:
@@ -415,7 +424,7 @@ async def submit_intake(
         logger.info("intake: submitted for %s", project_slug)
 
         return JSONResponse(status_code=201, content=IntakeResponse(
-            status=201, stage=stage,
+            status=201,
         ).model_dump())
 
     except HTTPException as e:
@@ -496,7 +505,7 @@ async def submit_development(
         logger.info("development: submitted for %s", project_slug)
 
         return JSONResponse(status_code=201, content=DevelopmentResponse(
-            status=201, stage=stage,
+            status=201,
         ).model_dump())
 
     except HTTPException as e:
@@ -508,3 +517,131 @@ async def submit_development(
         return JSONResponse(status_code=500, content=DevelopmentResponse(
             status=500, stage=stage, error=f"Internal server error: {e}",
         ).model_dump())
+
+
+# ── Project Deletion ─────────────────────────────────────────────────────────
+
+def _require_service_auth(
+    credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
+) -> str:
+    """Only accept the master PH_API_KEY — not per-user keys."""
+    settings = get_settings()
+    if not credentials or credentials.credentials != settings.ph_api_key:
+        raise HTTPException(status_code=403, detail="This endpoint requires the service API key")
+    return "service"
+
+
+@router.delete("/{project_slug}", response_model=DeleteProjectResponse)
+async def delete_project(
+    project_slug: str,
+    delete_repo: bool = False,
+    owner: str = Depends(_require_service_auth),
+):
+    """Delete a project and clean up all associated resources.
+
+    Requires the master service key (PH_API_KEY). Best-effort: each step
+    runs independently. Failures are reported but don't block subsequent steps.
+    """
+    from ..services.litellm import LiteLLMService
+
+    settings = get_settings()
+    result = DeleteProjectResponse(slug=project_slug)
+
+    # 1. Get workflow data (needed for workflow_id and epic_key)
+    epic_key = ""
+    wf_uuid = ""
+    try:
+        wd = _get_workflow_data(project_slug)
+        wf_uuid = wd.get("workflow_id", "")
+        epic_key = wd.get("epic_key", "")
+    except HTTPException:
+        result.errors.append("No workflow found — skipping workflow abort and Jira archive")
+
+    # 2. Abort SonataFlow workflow
+    if wf_uuid:
+        try:
+            req = urllib.request.Request(
+                f"{settings.sonataflow_url.rstrip('/')}/management/processes/publishinghouseworkflow/instances/{wf_uuid}",
+                method="DELETE",
+            )
+            with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+                pass
+            result.workflow_aborted = True
+            logger.info("delete: aborted workflow %s for %s", wf_uuid, project_slug)
+        except Exception as e:
+            result.errors.append(f"Workflow abort failed: {e}")
+            logger.warning("delete: workflow abort failed for %s: %s", project_slug, e)
+
+    # 3. Delete LiteLLM keys
+    try:
+        litellm = LiteLLMService(settings.litellm_api_url, settings.litellm_master_key)
+        key_hashes = await litellm.find_keys_for_project(project_slug)
+        deleted = 0
+        for kh in key_hashes:
+            if await litellm.delete_key(kh):
+                deleted += 1
+        result.litellm_keys_deleted = deleted
+        logger.info("delete: removed %d LiteLLM keys for %s", deleted, project_slug)
+    except Exception as e:
+        result.errors.append(f"LiteLLM key cleanup failed: {e}")
+        logger.warning("delete: LiteLLM cleanup failed for %s: %s", project_slug, e)
+
+    # 4. Archive Jira epic and children
+    if epic_key:
+        try:
+            from .jira import _jira_headers
+            headers = _jira_headers(settings)
+            keys_to_archive = [epic_key]
+
+            # Find child issues
+            try:
+                jql = urllib.parse.quote(f"parent={epic_key}")
+                search_url = f"{settings.jira_url}/rest/api/3/search?jql={jql}&fields=key"
+                req = urllib.request.Request(search_url, headers=headers)
+                with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
+                    children = json.loads(r.read().decode())
+                    for issue in children.get("issues", []):
+                        keys_to_archive.append(issue["key"])
+            except Exception as e:
+                logger.warning("delete: failed to query children for %s: %s", epic_key, e)
+
+            archive_url = f"{settings.jira_url}/rest/api/3/issue/archive"
+            req = urllib.request.Request(
+                archive_url,
+                data=json.dumps({"issueIdsOrKeys": keys_to_archive}).encode(),
+                headers=headers,
+                method="PUT",
+            )
+            with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+                pass
+            result.jira_archived = True
+            logger.info("delete: archived Jira issues %s for %s", keys_to_archive, project_slug)
+        except urllib.error.HTTPError as e:
+            body = e.read().decode() if e.fp else ""
+            result.errors.append(f"Jira archive failed: {e} — {body}")
+            logger.warning("delete: Jira archive failed for %s: %s — %s", project_slug, e, body)
+        except Exception as e:
+            result.errors.append(f"Jira archive failed: {e}")
+            logger.warning("delete: Jira archive failed for %s: %s", project_slug, e)
+
+    # 5. Delete GitHub repo (optional)
+    if delete_repo and settings.github_token:
+        try:
+            req = urllib.request.Request(
+                f"https://api.github.com/repos/rhpds/{project_slug}",
+                headers={
+                    "Authorization": f"Bearer {settings.github_token}",
+                    "Accept": "application/vnd.github+json",
+                },
+                method="DELETE",
+            )
+            with urllib.request.urlopen(req, context=_SSL_CTX, timeout=15):
+                pass
+            result.repo_deleted = True
+            logger.info("delete: deleted repo rhpds/%s", project_slug)
+        except Exception as e:
+            result.errors.append(f"Repo deletion failed: {e}")
+            logger.warning("delete: repo deletion failed for %s: %s", project_slug, e)
+
+    logger.info("delete: cleanup complete for %s — %s", project_slug, result.model_dump())
+    return result

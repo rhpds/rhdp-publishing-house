@@ -4,7 +4,7 @@ import { deriveStage } from '../utils/stageMapping';
 
 const GRAPHQL_QUERY = `
   query GetPublishingHouseWorkflows {
-    ProcessInstances(where: { processId: { equal: "publishinghouseworkflow" } }) {
+    ProcessInstances(where: { processId: { equal: "publishinghouseworkflow" }, state: { in: [ACTIVE, ERROR, SUSPENDED] } }) {
       id
       businessKey
       processId
