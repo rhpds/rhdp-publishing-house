@@ -7,5 +7,5 @@ python-multipart==0.0.12
 pyyaml==6.0.2
 cloudevents==1.11.0
 kubernetes==31.0.0
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.4.0
 python-keycloak==4.2.2
