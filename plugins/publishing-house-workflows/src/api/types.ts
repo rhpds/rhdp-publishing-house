@@ -88,6 +88,8 @@ export interface RcarsMatch {
 
 export interface ApprovalChecklist {
   content?: {
+    prerequisites_verifiable?: boolean | null;
+    assessment_strategy?: string;
     differentiation?: string;
     design_overview?: string;
     module_summaries?: Array<{ title: string; overview: string }>;

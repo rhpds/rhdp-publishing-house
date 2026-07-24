@@ -537,8 +537,22 @@ export function WorkflowDetailPage() {
             {validationReport?.approval_checklist?.content && (
               <InfoCard title="Content Review — Approval Checklist">
                 <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography className={classes.label}>Prerequisites Verifiable</Typography>
+                    <Typography variant="body2" style={{ backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 4 }}>
+                      {validationReport.approval_checklist.content.prerequisites_verifiable == null
+                        ? '— not set —'
+                        : validationReport.approval_checklist.content.prerequisites_verifiable ? 'Yes' : 'No'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography className={classes.label}>Assessment Strategy</Typography>
+                    <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 4 }}>
+                      {validationReport.approval_checklist.content.assessment_strategy || '— not set (optional for classic) —'}
+                    </Typography>
+                  </Grid>
                   <Grid item xs={12}>
-                    <Typography className={classes.label}>Differentiation (Q24)</Typography>
+                    <Typography className={classes.label}>Differentiation</Typography>
                     <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 4 }}>
                       {validationReport.approval_checklist.content.differentiation || '— not set —'}
                     </Typography>

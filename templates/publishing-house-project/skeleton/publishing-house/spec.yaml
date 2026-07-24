@@ -19,26 +19,26 @@ project:
 spec:
   title: ""
   learning_objectives: []
-  modules: []              # [{title, duration_min}] — written by intake after Q8
+  modules: []              # [{title, duration_min}] — written by intake Phase 4
   environment:
-    ocp_version: ""        # e.g. 4.18 — Q11
-    topology: ""           # shared-cluster | per-student | cnv-pool — Q6
-    cloud_provider: cnv    # cnv | aws — Q12; cnv is default
-    cluster_type: sno      # sno | multinode — Q12; derived from worker count
+    ocp_version: ""        # e.g. 4.18 — Phase 5
+    topology: ""           # shared-cluster | per-student | cnv-pool — Phase 2
+    cloud_provider: cnv    # cnv | aws — Phase 5; cnv is default
+    cluster_type: sno      # sno | multinode — Phase 5; derived from worker count
     control_plane_instance_count: 1  # 1 if sno, 3 if multinode
     control_plane_cpu: 32            # 32 if sno, 16 if multinode
     control_plane_ram_gb: 128        # 128 if sno, 64 if multinode
-    # --- Infrastructure fields (Parts 3 of gate validation spec RHDPCD-170) ---
+    # --- Infrastructure fields (Phase 5 — infra confirmation) ---
     max_concurrent_users: null     # required if topology = shared-cluster; default 30
-    aap_version: ""                # required if AAP in products — Q16
-    ai_requirement: ""             # maas | gpu | none — Q15
+    aap_version: ""                # required if AAP in products — Phase 5
+    ai_requirement: ""             # maas | gpu | none — Phase 5
     ai_model_tier: ""              # open-source | frontier (required if ai_requirement = maas or gpu)
     ai_model_name: ""              # specific model e.g. granite-3.1-8b
     ai_justification: ""           # required if ai_model_tier = frontier or ai_requirement = gpu
-    non_ga_products: []            # list of non-GA products/versions — Q18
+    non_ga_products: []            # list of non-GA products/versions — Phase 5
     non_ga_access_plan: ""         # how access will be provided for non-GA products
-    external_services: []          # named external service dependencies — Q17 e.g. [github.com]
-    worker_count: null             # number of worker nodes — Q12 extended
+    external_services: []          # named external service dependencies — Phase 5 e.g. [github.com]
+    worker_count: null             # number of worker nodes — Phase 5
     worker_cpu: null               # vCPU per worker
     worker_ram_gb: null            # RAM per worker in GB
     worker_disk_gb: null           # disk per worker in GB
@@ -55,17 +55,20 @@ tracking:
   paused: false
   pause_reason: null
 
-# Approval checklist — filled collaboratively by author + system + reviewers
-# Authors fill: differentiation
-# Skill generates: design_overview, module_summaries
+# Approval checklist — filled collaboratively by author + skill + system + reviewers
+# Phase 3 (RCARS): differentiation
+# Phase 4 (module outlines): design_overview, module_summaries
+# Phase 6 (finalize): prerequisites_verifiable, assessment_strategy
 # System auto-computes: rcars_overlap_pct, rcars_top_matches, peak_environments, cost_per_run_est
 approval_checklist:
 
   # Content review — authored + skill-generated + auto-computed RCARS overlap
   content:
-    differentiation: ""            # Q24: author explains how this differs from existing content
-    design_overview: ""            # SKILL-GENERATED: summary of design.md
-    module_summaries: []           # SKILL-GENERATED: [{title, overview}] — one per module
+    prerequisites_verifiable: null # Phase 6: can prereqs be validated in-lab? (true/false)
+    assessment_strategy: ""        # Phase 6: per-module validation approach (zero-touch only)
+    differentiation: ""            # Phase 3: author explains how this differs from existing content
+    design_overview: ""            # Phase 4: skill-generated summary of design.md
+    module_summaries: []           # Phase 4: skill-generated [{title, overview}] — one per module
     rcars_overlap_pct: null        # AUTO-COMPUTED by Central intake endpoint
     rcars_top_matches: []          # AUTO-COMPUTED: [{ci_name, display_name, url}]
     rejections: []                 # list of {rejection_id, reviewer, timestamp, reasons: [{id, text, resolved}]}

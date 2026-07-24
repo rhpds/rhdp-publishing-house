@@ -7,12 +7,36 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
     approval = spec_data.get("approval_checklist", {})
     cl = approval.get("content", {})
 
-    # C-03: Q24 — differentiation
+    # C-01: prerequisites_verifiable
+    pv = cl.get("prerequisites_verifiable")
+    if pv is None:
+        results.append(CheckResult(
+            check_id="C-01", group="C", status=CheckStatus.FAIL,
+            message="prerequisites_verifiable must be true or false (Phase 6)",
+            field="approval_checklist.content.prerequisites_verifiable",
+        ))
+    else:
+        results.append(CheckResult(
+            check_id="C-01", group="C", status=CheckStatus.PASS,
+            message=f"prerequisites_verifiable = {pv}",
+            field="approval_checklist.content.prerequisites_verifiable",
+        ))
+
+    # C-02: assessment_strategy (optional for classic labs)
+    strategy = cl.get("assessment_strategy", "")
+    results.append(CheckResult(
+        check_id="C-02", group="C",
+        status=CheckStatus.PASS if strategy else CheckStatus.SKIP,
+        message="assessment_strategy is optional for classic labs and demos" if not strategy else f"assessment_strategy set ({len(strategy)} chars)",
+        field="approval_checklist.content.assessment_strategy",
+    ))
+
+    # C-03: differentiation (Phase 3 RCARS)
     diff = cl.get("differentiation", "")
     if not diff:
         results.append(CheckResult(
             check_id="C-03", group="C", status=CheckStatus.FAIL,
-            message="Q24: differentiation must be non-empty",
+            message="differentiation must be non-empty (Phase 3)",
             field="approval_checklist.content.differentiation",
         ))
     else:
