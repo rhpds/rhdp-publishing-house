@@ -21,10 +21,6 @@ spec:
         - content_type
         - deployment_mode
       properties:
-        timestamp:
-          title: Creation Timestamp
-          type: string
-          default: "${{ 'now' | date('YYYY-MM-DDTHH:mm:ss.SSS[Z]') }}"
         project_name:
           title: Project Name
           type: string
@@ -73,9 +69,6 @@ spec:
             title: Tag
             ui:placeholder: "e.g. LB1234, openshift, ansible"
           ui:help: "e.g. LB1234, openshift, ansible"
-      uiSchema:
-        timestamp:
-          ui:widget: hidden
 
     - title: GitHub Collaborators
       description: Enter your GitHub username first. You can also add collaborators who will have write access to the project repo.
@@ -165,7 +158,7 @@ spec:
           showroom_type: ${{ parameters.showroom_type }}
           devspaces_url: https://devspaces.${{ environment.parameters.baseDomain }}
           central_api_url: https://central-api-publishing-house.${{ environment.parameters.baseDomain }}
-          created_at: ${{ parameters.timestamp }}
+          created_at: "${{ 'now' | date('YYYY-MM-DDTHH:mm:ss.SSS[Z]') }}"
 
     # Step 3: Create repo from GitHub template, overlay skeleton, commit and push
     - id: create-and-push
