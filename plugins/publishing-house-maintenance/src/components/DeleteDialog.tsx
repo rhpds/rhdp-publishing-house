@@ -113,7 +113,7 @@ export function DeleteDialog({ open, entity, onClose, onDeleted }: DeleteDialogP
   }, [entity, slug, deleteRepo, discoveryApi, fetchApi, catalogApi]);
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={deleting || result ? undefined : handleClose} maxWidth="sm" fullWidth disableEscapeKeyDown={!!result || deleting}>
       <DialogTitle>Delete Component: {slug}</DialogTitle>
       <DialogContent>
         {!result && !error && (

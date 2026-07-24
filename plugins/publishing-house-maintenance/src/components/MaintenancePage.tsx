@@ -66,7 +66,7 @@ function toRow(entity: Entity, wfMap: Record<string, WorkflowInfo>): ComponentRo
     jiraUrl,
     jiraLabel,
     contentType: annotations['ph.rhdp.io/content-type'] ?? '',
-    startedAt: annotations['ph.rhdp.io/created-at'] || wf?.startedAt || '',
+    startedAt: wf?.startedAt || '',
   };
 }
 

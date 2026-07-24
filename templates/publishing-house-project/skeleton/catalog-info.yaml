@@ -10,7 +10,6 @@ metadata:
     ph.rhdp.io/deployment-mode: ${{ values.deployment_mode }}
     ph.rhdp.io/github-user: ${{ values.github_user }}
     ph.rhdp.io/owner: ${{ values.user_email }}
-    ph.rhdp.io/created-at: "${{ values.created_at }}"
 
     # TechDocs
     backstage.io/techdocs-ref: dir:.
