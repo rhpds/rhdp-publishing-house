@@ -56,25 +56,18 @@ tracking:
   pause_reason: null
 
 # Approval checklist — filled collaboratively by author + system + reviewers
-# Authors fill: differentiation, assessment_strategy, prerequisites_verifiable
+# Authors fill: differentiation
+# Skill generates: design_overview, module_summaries
 # System auto-computes: rcars_overlap_pct, rcars_top_matches, peak_environments, cost_per_run_est
-# Reviewers fill: their decision + notes
 approval_checklist:
 
-  # Content Dev Manager — reads spec/design.md/module outlines directly; no authored fields from author
-  manager:
-    decision: null                 # approved | denied | needs_info
-    decision_notes: ""
-
-  # Content review — three authored fields + auto-computed RCARS overlap
+  # Content review — authored + skill-generated + auto-computed RCARS overlap
   content:
-    prerequisites_verifiable: null # true | false — Q22: can lab validate prereqs automatically?
-    assessment_strategy: ""        # Q23: how success is measured per module
     differentiation: ""            # Q24: author explains how this differs from existing content
+    design_overview: ""            # SKILL-GENERATED: summary of design.md
+    module_summaries: []           # SKILL-GENERATED: [{title, overview}] — one per module
     rcars_overlap_pct: null        # AUTO-COMPUTED by Central intake endpoint
     rcars_top_matches: []          # AUTO-COMPUTED: [{ci_name, display_name, url}]
-    decision: null                 # approved | denied | needs_info
-    decision_notes: ""
     rejections: []                 # list of {rejection_id, reviewer, timestamp, reasons: [{id, text, resolved}]}
 
   # Infra review — auto-computed fields + infra fills base CI and provisioning time for non-standard
@@ -83,7 +76,5 @@ approval_checklist:
     cost_per_run_est: ""           # AUTO-COMPUTED: indicative cost from sizing
     provisioning_time_est: ""      # AUTO-COMPUTED for standard CNV; infra fills for GPU/non-GA/non-CNV
     agnosticv_base_ci: ""          # INFRA fills: which base CI supports this (e.g. ocp4-cluster-cnv)
-    decision: null                 # approved | denied | needs_info
-    decision_notes: ""
     approved_by: ""                # GitHub ID of infra approver
     rejections: []                 # list of {rejection_id, reviewer, timestamp, reasons: [{id, text, resolved}]}

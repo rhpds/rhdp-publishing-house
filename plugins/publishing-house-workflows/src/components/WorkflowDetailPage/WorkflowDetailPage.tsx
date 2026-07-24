@@ -36,6 +36,9 @@ import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftRepor
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
 
 const REVIEW_STAGES: WorkflowStage[] = ['content_review', 'infra_review', 'drift_review'];
+const STAGES_WITH_REVIEW_TAB: WorkflowStage[] = [
+  'content_review', 'infra_review', 'development', 'drift_review', 'testing',
+];
 
 const CHECK_GROUP_LABELS: Record<string, string> = {
   A: 'Spec Fields',
@@ -122,7 +125,7 @@ export function WorkflowDetailPage() {
   const fetchReport = useCallback(async () => {
     if (!result) return;
     const stage = result.summary.stage;
-    if (!REVIEW_STAGES.includes(stage)) return;
+    if (!STAGES_WITH_REVIEW_TAB.includes(stage)) return;
 
     const repoUrl = result.summary.repoUrl;
     const wd = result.instance?.variables?.workflowdata as any;
@@ -154,7 +157,7 @@ export function WorkflowDetailPage() {
   }, [result, client]);
 
   React.useEffect(() => {
-    if (result && REVIEW_STAGES.includes(result.summary.stage)) {
+    if (result && STAGES_WITH_REVIEW_TAB.includes(result.summary.stage)) {
       fetchReport();
     }
   }, [result, fetchReport]);
@@ -288,6 +291,7 @@ export function WorkflowDetailPage() {
   const reviewHistory: Array<{ user: string; stage: string; action: string; timestamp: string; commitSha?: string }> = wd?.reviewHistory ?? [];
 
   const isReviewStage = REVIEW_STAGES.includes(summary.stage);
+  const hasReviewTab = STAGES_WITH_REVIEW_TAB.includes(summary.stage);
 
   return (
     <Page themeId="tool">
@@ -368,7 +372,7 @@ export function WorkflowDetailPage() {
           style={{ marginBottom: 16, marginTop: 16 }}
         >
           <Tab label="Overview" />
-          {isReviewStage && <Tab label="Review" />}
+          {hasReviewTab && <Tab label="Review" />}
           <Tab label="Timeline" />
         </Tabs>
 
@@ -401,7 +405,7 @@ export function WorkflowDetailPage() {
           </InfoCard>
         )}
 
-        {isReviewStage && activeTab === 1 && (
+        {hasReviewTab && activeTab === 1 && (
           <>
             {/* Spec File Links */}
             {summary.repoUrl && (
@@ -534,23 +538,32 @@ export function WorkflowDetailPage() {
               <InfoCard title="Content Review — Approval Checklist">
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <DetailField
-                      label="Prerequisites Verifiable (Q22)"
-                      value={validationReport.approval_checklist.content.prerequisites_verifiable === null ? 'Not set' : String(validationReport.approval_checklist.content.prerequisites_verifiable)}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography className={classes.label}>Assessment Strategy (Q23)</Typography>
-                    <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 4 }}>
-                      {validationReport.approval_checklist.content.assessment_strategy || '— not set —'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12}>
                     <Typography className={classes.label}>Differentiation (Q24)</Typography>
                     <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 4 }}>
                       {validationReport.approval_checklist.content.differentiation || '— not set —'}
                     </Typography>
                   </Grid>
+                  {validationReport.approval_checklist.content.design_overview && (
+                    <Grid item xs={12}>
+                      <Typography className={classes.label}>Design Overview</Typography>
+                      <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 4, lineHeight: 1.6 }}>
+                        {validationReport.approval_checklist.content.design_overview}
+                      </Typography>
+                    </Grid>
+                  )}
+                  {(validationReport.approval_checklist.content.module_summaries ?? []).length > 0 && (
+                    <Grid item xs={12}>
+                      <Typography className={classes.label}>Module Summaries</Typography>
+                      <div style={{ backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 4 }}>
+                        {validationReport.approval_checklist.content.module_summaries!.map((m, i) => (
+                          <div key={i} style={{ marginBottom: i < validationReport.approval_checklist!.content!.module_summaries!.length - 1 ? 12 : 0 }}>
+                            <Typography variant="subtitle2" style={{ fontWeight: 600 }}>{m.title}</Typography>
+                            <Typography variant="body2" style={{ marginTop: 4, color: 'rgba(255,255,255,0.7)' }}>{m.overview}</Typography>
+                          </div>
+                        ))}
+                      </div>
+                    </Grid>
+                  )}
                   {validationReport.approval_checklist.content.rcars_overlap_pct != null && (
                     <Grid item xs={12}>
                       <Typography className={classes.label}>RCARS Overlap</Typography>
@@ -661,7 +674,7 @@ export function WorkflowDetailPage() {
             )}
 
             {/* Approve / Reject buttons */}
-            {(validationReport || driftReport) && (
+            {isReviewStage && (validationReport || driftReport) && (
               <InfoCard>
                 <div style={{ display: 'flex', gap: 12 }}>
                   <Button
@@ -693,7 +706,7 @@ export function WorkflowDetailPage() {
           </>
         )}
 
-        {activeTab === (isReviewStage ? 2 : 1) && (
+        {activeTab === (hasReviewTab ? 2 : 1) && (
           <InfoCard title="Timeline">
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>

@@ -331,7 +331,9 @@ spec:
           output: |
             . + {
               reviewHistory: ((.reviewHistory // []) + (if .latestAudit then [.latestAudit] else [] end)),
-              auditTrailSha: (.latestAudit.commitSha // .auditTrailSha)
+              auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
+              rejection: { isRejected: false },
+              hasDrift: false
             }
         timeouts:
           stateExecTimeout: PT168H

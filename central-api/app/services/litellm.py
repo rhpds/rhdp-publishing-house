@@ -106,7 +106,7 @@ class LiteLLMService:
                 response = await client.post(
                     f"{self.api_url}/key/delete",
                     headers=self.headers,
-                    json={"key": key_id}
+                    json={"keys": [key_id]}
                 )
 
                 if response.status_code == 200:

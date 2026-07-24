@@ -75,21 +75,30 @@ def main():
             print(json.dumps({"error": "Usage: ph-rcars.py poll <job_id>"}))
             sys.exit(1)
 
+        import time
+
         job_id = sys.argv[2]
-        try:
-            req = urllib.request.Request(
-                f"{central}/api/v1/rcars/advisor/{job_id}",
-                headers=headers,
-            )
-            with urllib.request.urlopen(req, context=ctx, timeout=10) as r:
-                result = json.loads(r.read().decode())
-            status = result.get("status", "unknown")
-            candidates = result.get("result", {}).get("candidates", [])
-            print(f"status:{status}")
-            print(f"candidates:{json.dumps(candidates)}")
-        except Exception as e:
-            print(f"status:error")
-            print(f"candidates:[]")
+        deadline = time.monotonic() + 120
+        while True:
+            try:
+                req = urllib.request.Request(
+                    f"{central}/api/v1/rcars/advisor/{job_id}",
+                    headers=headers,
+                )
+                with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
+                    result = json.loads(r.read().decode())
+                status = result.get("status", "unknown")
+                if status not in ("pending", "running") or time.monotonic() >= deadline:
+                    candidates = result.get("result", {}).get("candidates", [])
+                    print(f"status:{status}")
+                    print(f"candidates:{json.dumps(candidates)}")
+                    break
+            except Exception as e:
+                if time.monotonic() >= deadline:
+                    print(f"status:error")
+                    print(f"candidates:[]")
+                    break
+            time.sleep(10)
 
     else:
         print(json.dumps({"error": f"Unknown action: {action}. Use 'submit' or 'poll'."}))

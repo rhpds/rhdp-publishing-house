@@ -88,13 +88,11 @@ export interface RcarsMatch {
 
 export interface ApprovalChecklist {
   content?: {
-    prerequisites_verifiable?: boolean | null;
-    assessment_strategy?: string;
     differentiation?: string;
+    design_overview?: string;
+    module_summaries?: Array<{ title: string; overview: string }>;
     rcars_overlap_pct?: number | null;
     rcars_top_matches?: RcarsMatch[];
-    decision?: string | null;
-    decision_notes?: string;
     rejections?: any[];
   };
   infra?: {
@@ -102,14 +100,8 @@ export interface ApprovalChecklist {
     cost_per_run_est?: string;
     provisioning_time_est?: string;
     agnosticv_base_ci?: string;
-    decision?: string | null;
-    decision_notes?: string;
     approved_by?: string;
     rejections?: any[];
-  };
-  manager?: {
-    decision?: string | null;
-    decision_notes?: string;
   };
 }
 
