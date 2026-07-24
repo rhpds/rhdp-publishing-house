@@ -21,6 +21,11 @@ spec:
         - content_type
         - deployment_mode
       properties:
+        timestamp:
+          title: Creation Timestamp
+          type: string
+          format: date-time
+          default: "${{ 'now' | date('YYYY-MM-DDTHH:mm:ss.SSS[Z]') }}"
         project_name:
           title: Project Name
           type: string
@@ -69,6 +74,9 @@ spec:
             title: Tag
             ui:placeholder: "e.g. LB1234, openshift, ansible"
           ui:help: "e.g. LB1234, openshift, ansible"
+      uiSchema:
+        timestamp:
+          ui:widget: hidden
 
     - title: GitHub Collaborators
       description: Enter your GitHub username first. You can also add collaborators who will have write access to the project repo.
@@ -104,11 +112,6 @@ spec:
         - initiative_key
         - showroom_type
       properties:
-        timestamp:
-          title: Creation Timestamp
-          type: string
-          format: date-time
-          default: "${{ 'now' | date('YYYY-MM-DDTHH:mm:ss.SSS[Z]') }}"
         initiative_key:
           title: Initiative
           type: string
@@ -134,9 +137,6 @@ spec:
             - Zero Touch (embedded automation)
           default: classic
           ui:help: Classic = standard Showroom lab. Zero Touch = embedded runtime/setup automation.
-      uiSchema:
-        timestamp:
-          ui:widget: hidden
 
   steps:
     # Step 1: Check if project name is already taken
