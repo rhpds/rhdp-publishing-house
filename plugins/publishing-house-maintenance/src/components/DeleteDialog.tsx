@@ -93,7 +93,7 @@ export function DeleteDialog({ open, entity, onClose, onDeleted }: DeleteDialogP
             const locResponse = await fetchApi.fetch(`${proxyUrl}/locations`);
             if (locResponse.ok) {
               const locations = await locResponse.json();
-              const loc = (locations as any[]).find((l: any) => l.data?.target === match[1]);
+              const loc = (locations as any[]).find((l: any) => (l.data?.target ?? l.target) === match[1]);
               if (loc) {
                 await fetchApi.fetch(`${proxyUrl}/locations/${loc.id}`, { method: 'DELETE' });
               }
