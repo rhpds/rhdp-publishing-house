@@ -108,8 +108,7 @@ spec:
           title: Creation Timestamp
           type: string
           format: date-time
-          default: "${{ 'now' | date('YYYY-MM-DDTHH:mm:ssZ') }}"
-          ui:widget: hidden
+          default: "${{ 'now' | date('YYYY-MM-DDTHH:mm:ss.SSS[Z]') }}"
         initiative_key:
           title: Initiative
           type: string
@@ -135,6 +134,9 @@ spec:
             - Zero Touch (embedded automation)
           default: classic
           ui:help: Classic = standard Showroom lab. Zero Touch = embedded runtime/setup automation.
+      uiSchema:
+        timestamp:
+          ui:widget: hidden
 
   steps:
     # Step 1: Check if project name is already taken
