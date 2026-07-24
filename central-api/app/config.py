@@ -49,7 +49,7 @@ class Settings(BaseSettings):
 
     # RHDH catalog API (for location cleanup on project delete)
     rhdh_service_token: str = ""
-    rhdh_internal_url: str = "http://backstage-developer-hub.publishing-house.svc.cluster.local:7007"
+    rhdh_internal_url: str = "http://backstage-developer-hub.publishing-house.svc.cluster.local"
 
     class Config:
         env_file = ".env"

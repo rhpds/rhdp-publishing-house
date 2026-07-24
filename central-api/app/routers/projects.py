@@ -574,9 +574,10 @@ async def delete_project(
         for inst in gql_result.get("data", {}).get("ProcessInstances", []):
             if inst.get("state") == "ACTIVE":
                 active_ids.append(inst["id"])
-            if not epic_key:
-                wd = (inst.get("variables") or {}).get("workflowdata") or {}
-                epic_key = wd.get("epic_key", "")
+            wd = (inst.get("variables") or {}).get("workflowdata") or {}
+            key = wd.get("epic_key", "")
+            if key:
+                epic_key = key
     except Exception as e:
         result.errors.append(f"Workflow query failed: {e}")
 
@@ -620,8 +621,9 @@ async def delete_project(
                 for loc in locations:
                     loc_target = (loc.get("data") or {}).get("target", "") or loc.get("target", "")
                     if loc_target == target_url:
+                        loc_id = loc.get("data", {}).get("id") or loc.get("id")
                         req = urllib.request.Request(
-                            f"{catalog_base}/locations/{loc['id']}",
+                            f"{catalog_base}/locations/{loc_id}",
                             method="DELETE",
                             headers=catalog_headers,
                         )
@@ -665,11 +667,11 @@ async def delete_project(
             headers = _jira_headers(settings)
             keys_to_archive = [epic_key]
 
-            # Find child issues
+            # Find child issues (POST endpoint — GET /search is 410 Gone)
             try:
-                jql = urllib.parse.quote(f"parent={epic_key}")
-                search_url = f"{settings.jira_url}/rest/api/3/search?jql={jql}&fields=key"
-                req = urllib.request.Request(search_url, headers=headers)
+                search_url = f"{settings.jira_url}/rest/api/3/search/jql"
+                search_body = json.dumps({"jql": f"parent={epic_key}", "fields": ["key"]}).encode()
+                req = urllib.request.Request(search_url, data=search_body, headers=headers, method="POST")
                 with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
                     children = json.loads(r.read().decode())
                     for issue in children.get("issues", []):
@@ -690,8 +692,12 @@ async def delete_project(
             logger.info("delete: archived Jira issues %s for %s", keys_to_archive, project_slug)
         except urllib.error.HTTPError as e:
             body = e.read().decode() if e.fp else ""
-            result.errors.append(f"Jira archive failed: {e} — {body}")
-            logger.warning("delete: Jira archive failed for %s: %s — %s", project_slug, e, body)
+            if e.code == 400 and "No valid issue" in body:
+                result.jira_archived = True
+                logger.info("delete: Jira issues already archived for %s", project_slug)
+            else:
+                result.errors.append(f"Jira archive failed: {e} — {body}")
+                logger.warning("delete: Jira archive failed for %s: %s — %s", project_slug, e, body)
         except Exception as e:
             result.errors.append(f"Jira archive failed: {e}")
             logger.warning("delete: Jira archive failed for %s: %s", project_slug, e)

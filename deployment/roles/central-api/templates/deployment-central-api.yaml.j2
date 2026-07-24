@@ -94,7 +94,7 @@ spec:
                   name: ph-developer-hub-env
                   key: RHDH_SERVICE_TOKEN
             - name: RHDH_INTERNAL_URL
-              value: "http://backstage-developer-hub.{{ app_namespace }}.svc.cluster.local:7007"
+              value: "http://backstage-developer-hub.{{ app_namespace }}.svc.cluster.local"
           volumeMounts:
             - name: validation-policy
               mountPath: /etc/ph-policy
