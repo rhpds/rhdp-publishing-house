@@ -6,7 +6,6 @@ metadata:
   description: "${{ values.project_description }}"
   annotations:
     # Publishing House lifecycle annotations (workflow will update these)
-    ph.rhdp.io/stage: intake
     ph.rhdp.io/content-type: ${{ values.content_type }}
     ph.rhdp.io/deployment-mode: ${{ values.deployment_mode }}
     ph.rhdp.io/github-user: ${{ values.github_user }}
