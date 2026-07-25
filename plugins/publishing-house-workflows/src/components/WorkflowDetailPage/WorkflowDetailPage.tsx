@@ -25,12 +25,14 @@ import {
   Snackbar,
   Tabs,
   Tab,
+  Tooltip,
 } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
 import GitHubIcon from '@material-ui/icons/GitHub';
 import BugReportIcon from '@material-ui/icons/BugReport';
 import RefreshIcon from '@material-ui/icons/Refresh';
 import ReplayIcon from '@material-ui/icons/Replay';
+import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 import { createPhWorkflowsClient } from '../../api/client';
 import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
@@ -777,14 +779,25 @@ export function WorkflowDetailPage() {
                         <td style={{ padding: '6px 8px' }}>{entry.user || '—'}</td>
                         <td style={{ padding: '6px 8px' }}>{STAGE_LABELS[entry.stage as WorkflowStage] || entry.stage}</td>
                         <td style={{ padding: '6px 8px' }}>
-                          <Chip
-                            label={entry.action}
-                            size="small"
-                            style={{
-                              backgroundColor: entry.action === 'approved' ? '#e8f5e9' : entry.action === 'rejected' ? '#ffebee' : '#e3f2fd',
-                              color: entry.action === 'approved' ? '#2e7d32' : entry.action === 'rejected' ? '#c62828' : '#1565c0',
-                            }}
-                          />
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <Chip
+                              label={entry.action}
+                              size="small"
+                              style={{
+                                backgroundColor: entry.action === 'approved' ? '#e8f5e9' : entry.action === 'rejected' ? '#ffebee' : '#e3f2fd',
+                                color: entry.action === 'approved' ? '#2e7d32' : entry.action === 'rejected' ? '#c62828' : '#1565c0',
+                              }}
+                            />
+                            {entry.action === 'rejected' && (entry as any).reasons?.length > 0 && (
+                              <Tooltip
+                                title={(entry as any).reasons.map((r: any) => r.text).join(' · ')}
+                                arrow
+                                interactive
+                              >
+                                <InfoOutlinedIcon style={{ fontSize: 16, color: '#c62828', cursor: 'pointer' }} />
+                              </Tooltip>
+                            )}
+                          </span>
                         </td>
                         <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>
                           {entry.commitSha ? entry.commitSha.substring(0, 7) : '—'}
