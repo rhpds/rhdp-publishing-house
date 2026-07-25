@@ -159,7 +159,7 @@ spec:
                 else ""
                 end
               )
-            }
+            } | del(.epicResponse)
         transition:
           nextState: Intake
       - name: Intake
@@ -229,7 +229,7 @@ spec:
               reviewHistory: ((.reviewHistory // []) + (if .latestAudit then [.latestAudit] else [] end)),
               auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
               approvedSha: (if .latestAudit then (if .latestAudit.action == "approved" then .latestAudit.commitSha else .approvedSha end) else .approvedSha end),
-              rejection: (if .latestAudit then (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else .rejection end) else .rejection end)
+              rejection: (if .latestAudit then (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else { isRejected: false } end) else { isRejected: false } end)
             }
         timeouts:
           stateExecTimeout: PT168H
@@ -279,7 +279,7 @@ spec:
               reviewHistory: ((.reviewHistory // []) + (if .latestAudit then [.latestAudit] else [] end)),
               auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
               approvedSha: (if .latestAudit then (if .latestAudit.action == "approved" then .latestAudit.commitSha else .approvedSha end) else .approvedSha end),
-              rejection: (if .latestAudit then (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else .rejection end) else .rejection end)
+              rejection: (if .latestAudit then (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else { isRejected: false } end) else { isRejected: false } end)
             }
         timeouts:
           stateExecTimeout: PT168H
@@ -290,7 +290,7 @@ spec:
         dataConditions:
           - condition: "${ .rejection.isRejected == true }"
             transition:
-              nextState: Intake
+              nextState: ContentReview
         defaultCondition:
           transition:
             nextState: JiraSync
@@ -306,6 +306,8 @@ spec:
                 epic_key: .epic_key
             actionDataFilter:
               toStateData: .jiraSyncResponse
+        stateDataFilter:
+          output: ". | del(.jiraSyncResponse)"
         transition:
           nextState: Development
       - name: Development
@@ -356,7 +358,7 @@ spec:
           output: |
             . + {
               hasDrift: (if .driftResponse then .driftResponse.has_drift else false end)
-            }
+            } | del(.driftResponse)
         transition:
           nextState: DriftDecision
       - name: DriftDecision
@@ -402,7 +404,7 @@ spec:
             . + {
               reviewHistory: ((.reviewHistory // []) + (if .latestAudit then [.latestAudit] else [] end)),
               auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
-              rejection: (if .latestAudit then (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else .rejection end) else .rejection end)
+              rejection: (if .latestAudit then (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else { isRejected: false } end) else { isRejected: false } end)
             }
         timeouts:
           stateExecTimeout: PT168H
