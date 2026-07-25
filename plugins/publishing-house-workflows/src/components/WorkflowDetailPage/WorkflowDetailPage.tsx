@@ -25,7 +25,7 @@ import {
   Snackbar,
   Tabs,
   Tab,
-  Tooltip,
+  Popover,
 } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
 import GitHubIcon from '@material-ui/icons/GitHub';
@@ -173,6 +173,7 @@ export function WorkflowDetailPage() {
     severity: 'success' | 'error';
     message: string;
   }>({ open: false, severity: 'success', message: '' });
+  const [reasonsPopover, setReasonsPopover] = useState<{ anchorEl: HTMLElement | null; reasons: { id: number; text: string }[] }>({ anchorEl: null, reasons: [] });
 
   const handleApprove = async (stage: WorkflowStage) => {
     if (!result) return;
@@ -789,13 +790,10 @@ export function WorkflowDetailPage() {
                               }}
                             />
                             {entry.action === 'rejected' && (entry as any).reasons?.length > 0 && (
-                              <Tooltip
-                                title={(entry as any).reasons.map((r: any) => r.text).join(' · ')}
-                                arrow
-                                interactive
-                              >
-                                <InfoOutlinedIcon style={{ fontSize: 16, color: '#c62828', cursor: 'pointer' }} />
-                              </Tooltip>
+                              <InfoOutlinedIcon
+                                style={{ fontSize: 16, color: '#c62828', cursor: 'pointer' }}
+                                onClick={(e) => setReasonsPopover({ anchorEl: e.currentTarget, reasons: (entry as any).reasons })}
+                              />
                             )}
                           </span>
                         </td>
@@ -810,6 +808,25 @@ export function WorkflowDetailPage() {
             )}
           </InfoCard>
         )}
+
+        <Popover
+          open={Boolean(reasonsPopover.anchorEl)}
+          anchorEl={reasonsPopover.anchorEl}
+          onClose={() => setReasonsPopover({ anchorEl: null, reasons: [] })}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        >
+          <div style={{ padding: '12px 16px', maxWidth: 320 }}>
+            <Typography variant="subtitle2" style={{ marginBottom: 8, color: '#c62828' }}>Rejection Reasons</Typography>
+            <ul style={{ margin: 0, paddingLeft: 20 }}>
+              {reasonsPopover.reasons.map((r) => (
+                <li key={r.id} style={{ marginBottom: 4 }}>
+                  <Typography variant="body2">{r.text}</Typography>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Popover>
 
         <RejectionDialog
           open={rejectionDialogOpen}
