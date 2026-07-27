@@ -11,7 +11,7 @@ from .github import GitHubService
 
 logger = logging.getLogger(__name__)
 
-SPEC_PATH = "publishing-house/spec/spec.yaml"
+SPEC_PATH = "publishing-house/spec.yaml"
 DESIGN_PATH = "publishing-house/spec/design.md"
 LITELLM_MODEL = "claude-haiku-4-5"
 
@@ -90,9 +90,11 @@ def _format_value(val) -> str:
     if val is None:
         return "<not set>"
     if isinstance(val, list):
-        if val and isinstance(val[0], dict) and "title" in val[0]:
-            return f"{len(val)} modules: " + ", ".join(m.get("title", "?") for m in val)
-        return str(val)
+        if not val:
+            return "<empty>"
+        if isinstance(val[0], dict) and "title" in val[0]:
+            return ", ".join(m.get("title", "?") for m in val)
+        return ", ".join(str(v) for v in val)
     return str(val)
 
 

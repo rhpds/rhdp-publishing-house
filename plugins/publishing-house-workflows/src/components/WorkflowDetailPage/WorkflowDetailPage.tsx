@@ -453,7 +453,7 @@ export function WorkflowDetailPage() {
                 </div>
                 <Typography variant="body2" style={{ marginBottom: 8, color: '#757575' }}>
                   Baseline: <code>{driftReport.baseline_sha.substring(0, 7)}</code>
-                  {' → Current: '}
+                  {' → HEAD: '}
                   <code>{driftReport.current_sha.substring(0, 7)}</code>
                 </Typography>
                 <Typography variant="body2" style={{ marginBottom: 12 }}>
@@ -829,12 +829,14 @@ export function WorkflowDetailPage() {
 
         <Snackbar
           open={snackbar.open}
-          autoHideDuration={5000}
+          autoHideDuration={snackbar.severity === 'error' ? null : 6000}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
           onClose={() => setSnackbar(s => ({ ...s, open: false }))}
         >
           <Alert
             onClose={() => setSnackbar(s => ({ ...s, open: false }))}
             severity={snackbar.severity}
+            variant="filled"
           >
             {snackbar.message}
           </Alert>

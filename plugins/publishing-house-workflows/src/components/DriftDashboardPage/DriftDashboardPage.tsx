@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAsync } from 'react-use';
 import {
   Content,
@@ -73,12 +73,112 @@ interface DriftRowState {
   approved?: boolean;
 }
 
+function DriftDetailPanel({
+  slug,
+  state,
+  onFetch,
+  onApprove,
+  classes,
+}: {
+  slug: string;
+  state: DriftRowState | undefined;
+  onFetch: (slug: string) => void;
+  onApprove: (slug: string) => void;
+  classes: ReturnType<typeof useStyles>;
+}) {
+  const fetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!state && !fetchedRef.current) {
+      fetchedRef.current = true;
+      onFetch(slug);
+    }
+  }, [slug, state, onFetch]);
+
+  const reportLoaded = state && !state.loading && !state.error && state.report;
+
+  return (
+    <Box className={classes.driftDetails}>
+      {!state || state.loading ? (
+        <Box display="flex" alignItems="center" style={{ gap: 8 }}>
+          <CircularProgress size={20} />
+          <Typography variant="body2">Loading drift report...</Typography>
+        </Box>
+      ) : state.error ? (
+        <Alert severity="error">{state.error}</Alert>
+      ) : state.report && !state.report.has_drift ? (
+        <Alert severity="success" className={classes.resolvedBanner}>
+          Drift has been resolved. The current HEAD matches the baseline.
+        </Alert>
+      ) : state.report ? (
+        <>
+          <div style={{
+            padding: '8px 16px',
+            marginBottom: 16,
+            borderRadius: 4,
+            backgroundColor: '#fff3e0',
+            color: '#e65100',
+            fontWeight: 600,
+          }}>
+            Changes detected since last approval
+          </div>
+          <Typography variant="body2" style={{ marginBottom: 8, color: '#757575' }}>
+            Baseline: <code>{state.report.baseline_sha.substring(0, 7)}</code>
+            {' → HEAD: '}
+            <code>{state.report.current_sha.substring(0, 7)}</code>
+          </Typography>
+          {state.report.changes.length > 0 && (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+                  <th style={{ padding: '6px 8px' }}>File</th>
+                  <th style={{ padding: '6px 8px' }}>Field / Section</th>
+                  <th style={{ padding: '6px 8px' }}>Difference</th>
+                </tr>
+              </thead>
+              <tbody>
+                {state.report.changes.map((c, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{c.file}</td>
+                    <td style={{ padding: '6px 8px' }}>{c.comparing}</td>
+                    <td style={{ padding: '6px 8px' }}>{c.difference}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      ) : null}
+      {reportLoaded && !state?.approved && (
+        <Box className={classes.approveButton}>
+          <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginBottom: 4 }}>
+            Approving updates the baseline SHA to the latest commit.
+          </Typography>
+          <Button
+            variant="contained"
+            size="small"
+            disabled={state?.approving}
+            style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
+            onClick={() => onApprove(slug)}
+          >
+            {state?.approving ? <CircularProgress size={16} color="inherit" /> : 'Approve'}
+          </Button>
+        </Box>
+      )}
+      {state?.approved && (
+        <Alert severity="success" className={classes.approveButton}>
+          Baseline updated to latest commit.
+        </Alert>
+      )}
+    </Box>
+  );
+}
+
 export function DriftDashboardPage() {
   const classes = useStyles();
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
   const [rowStates, setRowStates] = useState<Record<string, DriftRowState>>({});
 
   const client = createPhWorkflowsClient({ discoveryApi, fetchApi });
@@ -90,18 +190,10 @@ export function DriftDashboardPage() {
 
   const handleRefresh = useCallback(() => {
     setRefreshKey(k => k + 1);
-    setExpandedSlug(null);
     setRowStates({});
   }, []);
 
-  const handleExpand = useCallback(async (slug: string) => {
-    if (expandedSlug === slug) {
-      setExpandedSlug(null);
-      return;
-    }
-
-    setExpandedSlug(slug);
-
+  const fetchDrift = useCallback(async (slug: string) => {
     if (rowStates[slug]?.report || rowStates[slug]?.loading) return;
 
     setRowStates(prev => ({ ...prev, [slug]: { loading: true } }));
@@ -115,7 +207,7 @@ export function DriftDashboardPage() {
         [slug]: { loading: false, error: e.message || 'Failed to load drift report' },
       }));
     }
-  }, [expandedSlug, rowStates, client]);
+  }, [rowStates, client]);
 
   const handleApprove = useCallback(async (slug: string) => {
     setRowStates(prev => ({
@@ -184,38 +276,6 @@ export function DriftDashboardPage() {
           : '—',
       defaultSort: 'desc' as const,
     },
-    {
-      title: 'Actions',
-      field: 'id',
-      sorting: false,
-      render: (row: WorkflowSummary) => {
-        const state = rowStates[row.projectId];
-        if (state?.approved) {
-          return (
-            <Chip
-              icon={<CheckCircleIcon />}
-              label="Approved"
-              size="small"
-              style={{ backgroundColor: '#4caf50', color: '#fff' }}
-            />
-          );
-        }
-        return (
-          <Button
-            variant="outlined"
-            size="small"
-            color="primary"
-            disabled={state?.approving}
-            onClick={e => {
-              e.stopPropagation();
-              handleApprove(row.projectId);
-            }}
-          >
-            {state?.approving ? <CircularProgress size={16} /> : 'Approve'}
-          </Button>
-        );
-      },
-    },
   ];
 
   return (
@@ -260,62 +320,21 @@ export function DriftDashboardPage() {
           }
           onRowClick={(_event, rowData) => {
             if (rowData) {
-              handleExpand(rowData.projectId);
+              fetchDrift(rowData.projectId);
             }
           }}
           detailPanel={[
             {
               tooltip: 'Show drift details',
-              render: ({ rowData }) => {
-                const slug = rowData.projectId;
-                const state = rowStates[slug];
-
-                return (
-                  <Box className={classes.driftDetails}>
-                    {!state || state.loading ? (
-                      <Box display="flex" alignItems="center" style={{ gap: 8 }}>
-                        <CircularProgress size={20} />
-                        <Typography variant="body2">Loading drift report...</Typography>
-                      </Box>
-                    ) : state.error ? (
-                      <Alert severity="error">{state.error}</Alert>
-                    ) : state.report && !state.report.has_drift ? (
-                      <Alert severity="success" className={classes.resolvedBanner}>
-                        Drift has been resolved. The current HEAD matches the baseline.
-                      </Alert>
-                    ) : state.report ? (
-                      <>
-                        <Typography variant="subtitle2" gutterBottom>
-                          {state.report.summary}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          Baseline: {state.report.baseline_sha.substring(0, 8)} &rarr; Current: {state.report.current_sha.substring(0, 8)}
-                        </Typography>
-                        {state.report.changes.length > 0 && (
-                          <table className={classes.changesTable}>
-                            <thead>
-                              <tr>
-                                <th>File</th>
-                                <th>Section</th>
-                                <th>Difference</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {state.report.changes.map((c, i) => (
-                                <tr key={i}>
-                                  <td>{c.file}</td>
-                                  <td>{c.comparing}</td>
-                                  <td>{c.difference}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        )}
-                      </>
-                    ) : null}
-                  </Box>
-                );
-              },
+              render: ({ rowData }) => (
+                <DriftDetailPanel
+                  slug={rowData.projectId}
+                  state={rowStates[rowData.projectId]}
+                  onFetch={fetchDrift}
+                  onApprove={handleApprove}
+                  classes={classes}
+                />
+              ),
             },
           ]}
         />
