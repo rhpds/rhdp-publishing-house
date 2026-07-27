@@ -7,6 +7,7 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
     project = spec_data.get("project", {})
     spec = spec_data.get("spec", {})
     env = spec.get("environment", {})
+    platform = env.get("platform", "")
 
     required = [
         ("A-01", "spec.title", spec.get("title")),
@@ -17,7 +18,6 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
         ("A-06", "spec.learning_objectives", spec.get("learning_objectives")),
         ("A-07", "spec.environment.topology", env.get("topology")),
         ("A-09", "spec.environment.cloud_provider", env.get("cloud_provider")),
-        ("A-10", "spec.environment.cluster_type", env.get("cluster_type")),
     ]
 
     for check_id, field, value in required:
@@ -34,14 +34,13 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
                 field=field,
             ))
 
-    # A-08: ocp_version — only required when the lab involves OpenShift.
-    # If empty, SKIP (infra reviewer sets it if needed). If set, validate minimum.
+    # A-08: ocp_version — only required when platform = ocp
     ocp_version = env.get("ocp_version", "")
     minimum = policy.get("ocp_version_minimum", "4.20")
-    if not ocp_version:
+    if platform == "rhel-vms" or not ocp_version:
         results.append(CheckResult(
             check_id="A-08", group="A", status=CheckStatus.SKIP,
-            message="ocp_version not set — not required for non-OCP labs",
+            message="ocp_version not required for this platform",
             field="spec.environment.ocp_version",
         ))
     else:
@@ -66,5 +65,40 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
                 message=f"ocp_version '{ocp_version}' is not a valid version number",
                 field="spec.environment.ocp_version",
             ))
+
+    # A-10: cluster_type — only required when platform = ocp
+    cluster_type = env.get("cluster_type", "")
+    if platform == "rhel-vms":
+        results.append(CheckResult(
+            check_id="A-10", group="A", status=CheckStatus.SKIP,
+            message="cluster_type not required for rhel-vms platform",
+            field="spec.environment.cluster_type",
+        ))
+    elif not cluster_type:
+        results.append(CheckResult(
+            check_id="A-10", group="A", status=CheckStatus.FAIL,
+            message="spec.environment.cluster_type is required for OCP labs",
+            field="spec.environment.cluster_type",
+        ))
+    else:
+        results.append(CheckResult(
+            check_id="A-10", group="A", status=CheckStatus.PASS,
+            message=f"cluster_type is set",
+            field="spec.environment.cluster_type",
+        ))
+
+    # A-11: platform — must be set
+    if not platform:
+        results.append(CheckResult(
+            check_id="A-11", group="A", status=CheckStatus.FAIL,
+            message="spec.environment.platform is required (ocp or rhel-vms)",
+            field="spec.environment.platform",
+        ))
+    else:
+        results.append(CheckResult(
+            check_id="A-11", group="A", status=CheckStatus.PASS,
+            message=f"platform is set to {platform}",
+            field="spec.environment.platform",
+        ))
 
     return results
