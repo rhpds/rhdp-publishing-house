@@ -18,25 +18,55 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
     ai_keywords = policy.get("ai_keywords", [])
     vague_egress = policy.get("vague_egress_terms", [])
 
-    # B-01: Sizing consistency — if worker_count > 0, cpu/ram/disk must be set
-    worker_count = env.get("worker_count")
-    sizing_detail = ["worker_cpu", "worker_ram_gb", "worker_disk_gb"]
-    detail_values = {f: env.get(f) for f in sizing_detail}
-    details_set = all(v is not None and v != "" for v in detail_values.values())
+    # B-01: Sizing consistency — platform-aware
+    platform = env.get("platform", "")
 
-    if worker_count is not None and int(worker_count) > 0 and not details_set:
-        missing = [f for f, v in detail_values.items() if v is None or v == ""]
-        results.append(CheckResult(
-            check_id="B-01", group="B", status=CheckStatus.FAIL,
-            message=f"worker_count={worker_count} but missing: {', '.join(missing)}",
-            field="spec.environment.worker_*",
-        ))
+    if platform == "rhel-vms":
+        vms = env.get("vms_per_student", [])
+        if not vms:
+            results.append(CheckResult(
+                check_id="B-01", group="B", status=CheckStatus.FAIL,
+                message="platform=rhel-vms but vms_per_student is empty — list the VMs each student gets",
+                field="spec.environment.vms_per_student",
+            ))
+        else:
+            incomplete = []
+            for i, vm in enumerate(vms):
+                role = vm.get("role", f"vm-{i}")
+                missing = [f for f in ["cpu", "ram_gb"] if not vm.get(f)]
+                if missing:
+                    incomplete.append(f"{role}: missing {', '.join(missing)}")
+            if incomplete:
+                results.append(CheckResult(
+                    check_id="B-01", group="B", status=CheckStatus.FAIL,
+                    message=f"VM sizing incomplete: {'; '.join(incomplete)}",
+                    field="spec.environment.vms_per_student",
+                ))
+            else:
+                results.append(CheckResult(
+                    check_id="B-01", group="B", status=CheckStatus.PASS,
+                    message=f"{len(vms)} VM role(s) defined with sizing",
+                    field="spec.environment.vms_per_student",
+                ))
     else:
-        results.append(CheckResult(
-            check_id="B-01", group="B", status=CheckStatus.PASS,
-            message="Sizing fields consistent",
-            field="spec.environment.worker_*",
-        ))
+        worker_count = env.get("worker_count")
+        sizing_detail = ["worker_cpu", "worker_ram_gb", "worker_disk_gb"]
+        detail_values = {f: env.get(f) for f in sizing_detail}
+        details_set = all(v is not None and v != "" for v in detail_values.values())
+
+        if worker_count is not None and int(worker_count) > 0 and not details_set:
+            missing = [f for f, v in detail_values.items() if v is None or v == ""]
+            results.append(CheckResult(
+                check_id="B-01", group="B", status=CheckStatus.FAIL,
+                message=f"worker_count={worker_count} but missing: {', '.join(missing)}",
+                field="spec.environment.worker_*",
+            ))
+        else:
+            results.append(CheckResult(
+                check_id="B-01", group="B", status=CheckStatus.PASS,
+                message="Sizing fields consistent",
+                field="spec.environment.worker_*",
+            ))
 
     # B-02: Concurrent users required for shared-cluster (sizing for simultaneous users)
     topology = env.get("topology", "")
