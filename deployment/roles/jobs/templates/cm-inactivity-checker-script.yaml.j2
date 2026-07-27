@@ -62,6 +62,7 @@ data:
 
 
     def derive_stage(nodes):
+        """Return (stage_name, enter_datetime) for the current active stage."""
         stage = "intake"
         latest = ""
         for n in nodes:
@@ -73,7 +74,10 @@ data:
             if candidate and n["enter"] > latest:
                 stage = candidate
                 latest = n["enter"]
-        return stage
+        entered_at = None
+        if latest:
+            entered_at = datetime.fromisoformat(latest.replace("Z", "+00:00"))
+        return stage, entered_at
 
 
     def get_active_workflows():
@@ -284,9 +288,14 @@ data:
 
         for inst in instances:
             slug = inst.get("businessKey", "")
-            stage = derive_stage(inst.get("nodes", []))
+            stage, entered_at = derive_stage(inst.get("nodes", []))
 
             if stage not in TARGET_STAGES:
+                continue
+
+            if entered_at and entered_at > cutoff:
+                days_in_stage = (datetime.now(timezone.utc) - entered_at).days
+                print(f"  [{slug}] SKIP — entered {stage} {days_in_stage} day(s) ago (< {INACTIVITY_DAYS})")
                 continue
 
             variables = inst.get("variables", {})
