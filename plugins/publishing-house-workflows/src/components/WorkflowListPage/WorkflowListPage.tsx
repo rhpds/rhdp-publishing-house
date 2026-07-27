@@ -65,7 +65,7 @@ function StageChip({ stage }: { stage: WorkflowStage }) {
     <Chip
       label={label}
       size="small"
-      color={stage === 'review' || stage === 'ready' ? 'primary' : stage === 'development' ? 'secondary' : 'default'}
+      color={stage === 'review' || (stage as string) === 'ready' ? 'primary' : stage === 'development' ? 'secondary' : 'default'}
       className={classes.chip}
       style={chipStyle}
     />

@@ -1,0 +1,342 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inactivity-checker-script
+  namespace: "{{ app_namespace }}"
+data:
+  inactivity-checker.py: |
+    #!/usr/bin/env python3
+    """Inactivity checker — scans active workflows in development/testing,
+    flags Jira epics when no git commits in INACTIVITY_DAYS days,
+    and @-mentions RHDH group members in the comment."""
+
+    import base64
+    import json
+    import os
+    import ssl
+    import sys
+    import urllib.request
+    import urllib.parse
+    from datetime import datetime, timezone, timedelta
+
+    GRAPHQL_URL = os.environ["SONATAFLOW_GRAPHQL_URL"].rstrip("/") + "/graphql"
+    GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
+    JIRA_URL = os.environ["JIRA_URL"].rstrip("/")
+    JIRA_EMAIL = os.environ["JIRA_EMAIL"]
+    JIRA_API_TOKEN = os.environ["JIRA_API_TOKEN"]
+    RHDH_URL = os.environ["RHDH_URL"].rstrip("/")
+    RHDH_TOKEN = os.environ["RHDH_SERVICE_TOKEN"]
+    REVIEW_GROUP = os.environ.get("REVIEW_GROUP", "rhdp-content-review")
+    INACTIVITY_DAYS = int(os.environ.get("INACTIVITY_DAYS", "7"))
+
+    SSL_CTX = ssl.create_default_context()
+    SSL_CTX.check_hostname = False
+    SSL_CTX.verify_mode = ssl.CERT_NONE
+
+    STATE_MAP = {
+        "createepic": "intake",
+        "intake": "intake",
+        "contentreview": "content_review",
+        "contentreviewdecision": "content_review",
+        "infrareview": "infra_review",
+        "infrareviewdecision": "infra_review",
+        "jirasync": "jira_sync",
+        "development": "development",
+        "testing": "testing",
+        "published": "published",
+    }
+
+    TARGET_STAGES = {"development", "testing"}
+
+
+    def _request(url, body=None, headers=None, method=None):
+        hdrs = {"Content-Type": "application/json"}
+        if headers:
+            hdrs.update(headers)
+        data = json.dumps(body).encode() if body else None
+        if method is None:
+            method = "POST" if data else "GET"
+        req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
+        with urllib.request.urlopen(req, context=SSL_CTX, timeout=30) as r:
+            return json.loads(r.read().decode())
+
+
+    def derive_stage(nodes):
+        stage = "intake"
+        latest = ""
+        for n in nodes:
+            if n.get("type") != "CompositeContextNode":
+                continue
+            if not n.get("enter") or n.get("exit"):
+                continue
+            candidate = STATE_MAP.get(n.get("name", "").lower())
+            if candidate and n["enter"] > latest:
+                stage = candidate
+                latest = n["enter"]
+        return stage
+
+
+    def get_active_workflows():
+        query = {
+            "query": """
+                query {
+                    ProcessInstances(where: { state: { equal: ACTIVE } }) {
+                        id
+                        businessKey
+                        variables
+                        nodes { name type enter exit }
+                    }
+                }
+            """
+        }
+        result = _request(GRAPHQL_URL, query)
+        return result.get("data", {}).get("ProcessInstances", [])
+
+
+    def parse_repo_owner_name(repo_url):
+        """Extract owner/repo from a GitHub URL."""
+        repo_url = repo_url.rstrip("/")
+        if repo_url.endswith(".git"):
+            repo_url = repo_url[:-4]
+        parts = repo_url.split("/")
+        if len(parts) >= 2:
+            return parts[-2], parts[-1]
+        return None, None
+
+
+    def get_last_commit_date(owner, repo):
+        """Get the date of the most recent commit on main."""
+        url = f"https://api.github.com/repos/{owner}/{repo}/commits?sha=main&per_page=1"
+        hdrs = {
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github+json",
+        }
+        req = urllib.request.Request(url, headers=hdrs)
+        with urllib.request.urlopen(req, timeout=15) as r:
+            commits = json.loads(r.read().decode())
+        if not commits:
+            return None
+        date_str = commits[0]["commit"]["committer"]["date"]
+        return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+
+
+    def get_group_members():
+        """Fetch members of the review group from the RHDH catalog API."""
+        filter_str = urllib.parse.quote(f"kind=Group,metadata.name={REVIEW_GROUP}")
+        url = f"{RHDH_URL}/api/catalog/entities/by-query?filter={filter_str}"
+        hdrs = {"Accept": "application/json", "Authorization": f"Bearer {RHDH_TOKEN}"}
+        req = urllib.request.Request(url, headers=hdrs)
+        with urllib.request.urlopen(req, context=SSL_CTX, timeout=15) as r:
+            result = json.loads(r.read().decode())
+
+        items = result.get("items", [])
+        if not items:
+            print(f"  WARNING: group '{REVIEW_GROUP}' not found in RHDH catalog")
+            return []
+
+        group = items[0]
+        members = group.get("spec", {}).get("members", [])
+        if not members:
+            relations = group.get("relations", [])
+            members = [
+                r["targetRef"].split("/")[-1]
+                for r in relations
+                if r.get("type") == "hasMember"
+            ]
+
+        if not members:
+            print(f"  WARNING: group '{REVIEW_GROUP}' has no members")
+            return []
+
+        member_details = []
+        for member_ref in members:
+            username = member_ref.split("/")[-1] if "/" in member_ref else member_ref
+            user_filter = urllib.parse.quote(f"kind=User,metadata.name={username}")
+            user_url = f"{RHDH_URL}/api/catalog/entities/by-query?filter={user_filter}"
+            user_hdrs = {"Accept": "application/json", "Authorization": f"Bearer {RHDH_TOKEN}"}
+            user_req = urllib.request.Request(user_url, headers=user_hdrs)
+            try:
+                with urllib.request.urlopen(user_req, context=SSL_CTX, timeout=10) as r:
+                    user_result = json.loads(r.read().decode())
+                user_items = user_result.get("items", [])
+                if user_items:
+                    user = user_items[0]
+                    profile = user.get("spec", {}).get("profile", {})
+                    email = profile.get("email", "")
+                    display = profile.get("displayName", username)
+                    if email:
+                        member_details.append({"username": username, "email": email, "displayName": display})
+                    else:
+                        print(f"  WARNING: user '{username}' has no email in RHDH")
+            except Exception as e:
+                print(f"  WARNING: failed to fetch user '{username}' from RHDH: {e}")
+
+        return member_details
+
+
+    _jira_account_cache = {}
+
+    def lookup_jira_account_id(email):
+        """Look up a Jira account ID by email address."""
+        if email in _jira_account_cache:
+            return _jira_account_cache[email]
+
+        creds = base64.b64encode(f"{JIRA_EMAIL}:{JIRA_API_TOKEN}".encode()).decode()
+        url = f"{JIRA_URL}/rest/api/3/user/search?query={urllib.parse.quote(email)}"
+        hdrs = {
+            "Authorization": f"Basic {creds}",
+            "Accept": "application/json",
+        }
+        req = urllib.request.Request(url, headers=hdrs)
+        try:
+            with urllib.request.urlopen(req, context=SSL_CTX, timeout=10) as r:
+                users = json.loads(r.read().decode())
+            if users:
+                account_id = users[0]["accountId"]
+                display_name = users[0].get("displayName", email)
+                _jira_account_cache[email] = (account_id, display_name)
+                return account_id, display_name
+        except Exception as e:
+            print(f"  WARNING: Jira lookup failed for {email}: {e}")
+
+        _jira_account_cache[email] = None
+        return None
+
+
+    def post_jira_comment(epic_key, slug, repo_url, last_commit_date, reviewers):
+        """Post an inactivity alert comment on the Jira epic with @mentions."""
+        days_ago = (datetime.now(timezone.utc) - last_commit_date).days
+        date_str = last_commit_date.strftime("%Y-%m-%d")
+
+        mention_nodes = []
+        for account_id, display_name in reviewers:
+            if mention_nodes:
+                mention_nodes.append({"type": "text", "text": " "})
+            mention_nodes.append({
+                "type": "mention",
+                "attrs": {"id": account_id, "text": f"@{display_name}"},
+            })
+
+        body = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {"type": "paragraph", "content": [
+                    {"type": "text", "text": "Inactivity alert: ", "marks": [{"type": "strong"}]},
+                    {"type": "text", "text": f"No commits in {days_ago} days for project "},
+                    {"type": "text", "text": slug, "marks": [{"type": "strong"}]},
+                    {"type": "text", "text": f". Last commit: {date_str}."},
+                ]},
+                {"type": "paragraph", "content": [
+                    {"type": "text", "text": "Repository: "},
+                    {"type": "text", "text": repo_url, "marks": [
+                        {"type": "link", "attrs": {"href": repo_url}},
+                    ]},
+                ]},
+                {"type": "paragraph", "content":
+                    [{"type": "text", "text": "Reviewers: "}] + mention_nodes
+                },
+            ],
+        }
+
+        creds = base64.b64encode(f"{JIRA_EMAIL}:{JIRA_API_TOKEN}".encode()).decode()
+        url = f"{JIRA_URL}/rest/api/3/issue/{epic_key}/comment"
+        hdrs = {
+            "Authorization": f"Basic {creds}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        data = json.dumps({"body": body}).encode()
+        req = urllib.request.Request(url, data=data, headers=hdrs, method="POST")
+        with urllib.request.urlopen(req, context=SSL_CTX, timeout=15) as r:
+            return r.status
+
+
+    def main():
+        print("=== Inactivity Checker Job ===")
+        print(f"Threshold: {INACTIVITY_DAYS} days")
+        cutoff = datetime.now(timezone.utc) - timedelta(days=INACTIVITY_DAYS)
+
+        instances = get_active_workflows()
+        print(f"Found {len(instances)} active workflow(s)")
+
+        print(f"\nFetching '{REVIEW_GROUP}' group members from RHDH...")
+        members = get_group_members()
+        print(f"Found {len(members)} group member(s)")
+
+        reviewers = []
+        for m in members:
+            result = lookup_jira_account_id(m["email"])
+            if result:
+                reviewers.append(result)
+                print(f"  {m['displayName']} ({m['email']}) -> Jira {result[0][:12]}...")
+            else:
+                print(f"  WARNING: {m['email']} not found in Jira, skipping")
+
+        if not reviewers:
+            print("\nERROR: No reviewers found — cannot post alerts")
+            sys.exit(1)
+
+        checked = 0
+        stale = 0
+        alerted = 0
+        errors = 0
+
+        for inst in instances:
+            slug = inst.get("businessKey", "")
+            stage = derive_stage(inst.get("nodes", []))
+
+            if stage not in TARGET_STAGES:
+                continue
+
+            variables = inst.get("variables", {})
+            if isinstance(variables, str):
+                variables = json.loads(variables)
+            wd = variables.get("workflowdata", {})
+            repo_url = wd.get("repoUrl", "")
+            epic_key = wd.get("epic_key", "")
+
+            if not repo_url or not epic_key:
+                print(f"  [{slug}] SKIP — missing repoUrl or epic_key")
+                continue
+
+            owner, repo = parse_repo_owner_name(repo_url)
+            if not owner or not repo:
+                print(f"  [{slug}] SKIP — cannot parse repo URL: {repo_url}")
+                continue
+
+            try:
+                last_commit = get_last_commit_date(owner, repo)
+                checked += 1
+
+                if last_commit is None:
+                    print(f"  [{slug}] SKIP — no commits found")
+                    continue
+
+                if last_commit < cutoff:
+                    stale += 1
+                    days_ago = (datetime.now(timezone.utc) - last_commit).days
+                    print(f"  [{slug}] STALE — last commit {days_ago} days ago")
+
+                    try:
+                        post_jira_comment(epic_key, slug, repo_url, last_commit, reviewers)
+                        alerted += 1
+                        print(f"  [{slug}] ALERTED — commented on {epic_key}")
+                    except Exception as e:
+                        errors += 1
+                        print(f"  [{slug}] ERROR posting Jira comment: {e}", file=sys.stderr)
+                else:
+                    days_ago = (datetime.now(timezone.utc) - last_commit).days
+                    print(f"  [{slug}] active — last commit {days_ago} day(s) ago")
+
+            except Exception as e:
+                errors += 1
+                print(f"  [{slug}] ERROR checking GitHub: {e}", file=sys.stderr)
+
+        print(f"\n=== Summary: checked={checked} stale={stale} alerted={alerted} errors={errors} ===")
+        if errors:
+            sys.exit(1)
+
+
+    if __name__ == "__main__":
+        main()

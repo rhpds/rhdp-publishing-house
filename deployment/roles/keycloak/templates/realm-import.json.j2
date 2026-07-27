@@ -154,6 +154,24 @@
       "roles": ["offline_access"]
     }
   ],
+  "groups": [
+    {
+      "name": "rhdp-content-review",
+      "path": "/rhdp-content-review"
+    },
+    {
+      "name": "rhdp-infra-review",
+      "path": "/rhdp-infra-review"
+    },
+    {
+      "name": "rhdp-developers",
+      "path": "/rhdp-developers"
+    },
+    {
+      "name": "rhdp-administrators",
+      "path": "/rhdp-administrators"
+    }
+  ],
   "users": [
     {
       "username": "service-account-rhdh",
@@ -180,6 +198,48 @@
           "value": "{{ keycloak_admin_password | default('admin') }}",
           "temporary": false
         }
+      ],
+      "realmRoles": ["default-roles-{{ keycloak_realm }}"]
+    },
+    {
+      "username": "treddy",
+      "enabled": true,
+      "email": "treddy@redhat.com",
+      "firstName": "Tyrell",
+      "lastName": "Reddy",
+      "groups": [
+        "/rhdp-content-review",
+        "/rhdp-infra-review",
+        "/rhdp-developers",
+        "/rhdp-administrators"
+      ],
+      "realmRoles": ["default-roles-{{ keycloak_realm }}"]
+    },
+    {
+      "username": "nstephan",
+      "enabled": true,
+      "email": "nstephan@redhat.com",
+      "firstName": "Noel",
+      "lastName": "Stephan",
+      "groups": [
+        "/rhdp-content-review",
+        "/rhdp-infra-review",
+        "/rhdp-developers",
+        "/rhdp-administrators"
+      ],
+      "realmRoles": ["default-roles-{{ keycloak_realm }}"]
+    },
+    {
+      "username": "psrivast",
+      "enabled": true,
+      "email": "psrivast@redhat.com",
+      "firstName": "Prakhar",
+      "lastName": "Srivastava",
+      "groups": [
+        "/rhdp-content-review",
+        "/rhdp-infra-review",
+        "/rhdp-developers",
+        "/rhdp-administrators"
       ],
       "realmRoles": ["default-roles-{{ keycloak_realm }}"]
     }

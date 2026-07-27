@@ -9,3 +9,11 @@ export const detailRouteRef = createSubRouteRef({
   parent: rootRouteRef,
   path: '/:workflowId',
 });
+
+export const driftRouteRef = createRouteRef({
+  id: 'ph-drift',
+});
+
+export const maintenanceRouteRef = createRouteRef({
+  id: 'ph-maintenance',
+});

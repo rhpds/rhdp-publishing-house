@@ -200,30 +200,22 @@ paths:
   /spec/drift/{slug}:
     post:
       operationId: checkDrift
-      summary: Check for spec contract drift between approved SHA and HEAD
+      summary: Check for drift between baseline SHA and HEAD (structural or semantic). Looks up repoUrl and baselineSha from the workflow.
       parameters:
         - name: slug
           in: path
           required: true
           schema:
             type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - repo_url
-                - approved_sha
-              properties:
-                repo_url:
-                  type: string
-                branch:
-                  type: string
-                  default: main
-                approved_sha:
-                  type: string
+        - name: mode
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - structural
+              - semantic
+            default: semantic
       responses:
         '200':
           description: Drift check completed
@@ -234,21 +226,49 @@ paths:
                 properties:
                   has_drift:
                     type: boolean
-                  approved_sha:
+                  baseline_sha:
                     type: string
                   current_sha:
                     type: string
-                  fields:
+                  summary:
+                    type: string
+                  changes:
                     type: array
                     items:
                       type: object
                       properties:
-                        field:
+                        file:
                           type: string
-                        approved_value: {}
-                        current_value: {}
-                        changed:
-                          type: boolean
+                        comparing:
+                          type: string
+                        difference:
+                          type: string
+      security:
+        - bearerAuth: []
+  /spec/drift/{slug}/approve:
+    post:
+      operationId: approveDrift
+      summary: Clear hasDrift and advance baselineSha to current HEAD
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Drift approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  slug:
+                    type: string
+                  baselineSha:
+                    type: string
+                  cleared:
+                    type: boolean
       security:
         - bearerAuth: []
   /projects/{project_id}/workflow-data:

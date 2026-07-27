@@ -1,0 +1,151 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: drift-checker-script
+  namespace: "{{ app_namespace }}"
+data:
+  drift-checker.py: |
+    #!/usr/bin/env python3
+    """Proactive drift checker — scans active workflows in development/testing
+    and sets hasDrift via the semantic drift endpoint."""
+
+    import json
+    import os
+    import ssl
+    import sys
+    import urllib.request
+
+    GRAPHQL_URL = os.environ["SONATAFLOW_GRAPHQL_URL"].rstrip("/") + "/graphql"
+    SONATAFLOW_URL = os.environ["SONATAFLOW_URL"].rstrip("/")
+    CENTRAL_API_URL = os.environ["CENTRAL_API_URL"].rstrip("/")
+    API_KEY = os.environ["PH_API_KEY"]
+
+    SSL_CTX = ssl.create_default_context()
+    SSL_CTX.check_hostname = False
+    SSL_CTX.verify_mode = ssl.CERT_NONE
+
+    STATE_MAP = {
+        "createepic": "intake",
+        "intake": "intake",
+        "contentreview": "content_review",
+        "contentreviewdecision": "content_review",
+        "infrareview": "infra_review",
+        "infrareviewdecision": "infra_review",
+        "jirasync": "jira_sync",
+        "development": "development",
+        "testing": "testing",
+        "published": "published",
+    }
+
+    TARGET_STAGES = {"development", "testing"}
+
+
+    def _request(url, body=None, headers=None, method="POST"):
+        hdrs = {"Content-Type": "application/json"}
+        if headers:
+            hdrs.update(headers)
+        data = json.dumps(body).encode() if body else b""
+        req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
+        with urllib.request.urlopen(req, context=SSL_CTX, timeout=30) as r:
+            return json.loads(r.read().decode())
+
+
+    def derive_stage(nodes):
+        stage = "intake"
+        latest = ""
+        for n in nodes:
+            if n.get("type") != "CompositeContextNode":
+                continue
+            if not n.get("enter") or n.get("exit"):
+                continue
+            candidate = STATE_MAP.get(n.get("name", "").lower())
+            if candidate and n["enter"] > latest:
+                stage = candidate
+                latest = n["enter"]
+        return stage
+
+
+    def get_active_workflows():
+        query = {
+            "query": """
+                query {
+                    ProcessInstances(where: { state: { equal: ACTIVE } }) {
+                        id
+                        businessKey
+                        variables
+                        nodes { name type enter exit }
+                    }
+                }
+            """
+        }
+        result = _request(GRAPHQL_URL, query)
+        return result.get("data", {}).get("ProcessInstances", [])
+
+
+    def check_drift(slug):
+        url = f"{CENTRAL_API_URL}/api/v1/spec/drift/{slug}?mode=semantic"
+        return _request(url, headers={"Authorization": f"Bearer {API_KEY}"})
+
+
+    def patch_workflow(instance_id, has_drift):
+        url = f"{SONATAFLOW_URL}/publishinghouseworkflow/{instance_id}"
+        hdrs = {"Content-Type": "application/merge-patch+json"}
+        data = json.dumps({"workflowdata": {"hasDrift": has_drift}}).encode()
+        req = urllib.request.Request(url, data=data, headers=hdrs, method="PATCH")
+        with urllib.request.urlopen(req, context=SSL_CTX, timeout=10) as r:
+            return r.status
+
+
+    def main():
+        print("=== Drift Checker Job ===")
+
+        instances = get_active_workflows()
+        print(f"Found {len(instances)} active workflow(s)")
+
+        checked = 0
+        drifted = 0
+        cleared = 0
+        errors = 0
+
+        for inst in instances:
+            slug = inst.get("businessKey", "")
+            instance_id = inst["id"]
+            stage = derive_stage(inst.get("nodes", []))
+
+            if stage not in TARGET_STAGES:
+                continue
+
+            variables = inst.get("variables", {})
+            if isinstance(variables, str):
+                variables = json.loads(variables)
+            wd = variables.get("workflowdata", {})
+            current_has_drift = wd.get("hasDrift", False)
+
+            try:
+                result = check_drift(slug)
+                new_has_drift = result.get("has_drift", False)
+                checked += 1
+
+                if new_has_drift != current_has_drift:
+                    patch_workflow(instance_id, new_has_drift)
+                    if new_has_drift:
+                        drifted += 1
+                        print(f"  [{slug}] DRIFT DETECTED — set hasDrift=true")
+                    else:
+                        cleared += 1
+                        print(f"  [{slug}] DRIFT CLEARED — set hasDrift=false")
+                else:
+                    status = "drifted" if current_has_drift else "clean"
+                    print(f"  [{slug}] unchanged ({status})")
+
+            except Exception as e:
+                errors += 1
+                print(f"  [{slug}] ERROR — {e}", file=sys.stderr)
+
+        print(f"\n=== Summary: checked={checked} drifted={drifted} cleared={cleared} errors={errors} ===")
+        if errors:
+            sys.exit(1)
+
+
+    if __name__ == "__main__":
+        main()

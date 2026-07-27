@@ -1,0 +1,10 @@
+---
+app_namespace: publishing-house
+drift_checker_schedule: "0 6 * * *"
+inactivity_checker_schedule: "0 7 * * *"
+inactivity_threshold_days: 7
+inactivity_review_group: rhdp-content-review
+jobs_image: python:3.11-slim
+# dev mode: workflow pod has embedded /graphql
+# preview/test mode: use sonataflow-platform-data-index-service
+sonataflow_graphql_url: "http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local:80"

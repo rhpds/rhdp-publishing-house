@@ -62,7 +62,7 @@ plugins:
         frontend:
           red-hat-developer-hub.backstage-plugin-orchestrator-form-widgets: {}
   - disabled: false
-    package: 'oci://quay.io/rhpds/backstage-plugin-ph-workflows:1.5.9!backstage-plugin-ph-workflows'
+    package: 'oci://quay.io/rhpds/backstage-plugin-ph-workflows:1.7.0!backstage-plugin-ph-workflows'
     pluginConfig:
       dynamicPlugins:
         frontend:
@@ -70,38 +70,35 @@ plugins:
             appIcons:
               - importName: PhWorkflowIcon
                 name: phWorkflowIcon
+              - importName: PhDriftIcon
+                name: phDriftIcon
+              - importName: PhMaintenanceIcon
+                name: phMaintenanceIcon
             dynamicRoutes:
               - importName: PhWorkflowsPage
                 menuItem:
                   icon: phWorkflowIcon
                   text: Workflows
                 path: /publishing-house-workflows
-            menuItems:
-              publishing-house-workflows:
-                priority: 10
-                parent: publishing-house
-              publishing-house:
-                icon: phWorkflowIcon
-                title: Publishing House
-                priority: 100
-  - disabled: false
-    package: 'oci://quay.io/rhpds/backstage-plugin-ph-maintenance:1.0.7!backstage-plugin-ph-maintenance'
-    pluginConfig:
-      dynamicPlugins:
-        frontend:
-          backstage-plugin-ph-maintenance:
-            appIcons:
-              - importName: PhMaintenanceIcon
-                name: phMaintenanceIcon
-            dynamicRoutes:
+              - importName: PhDriftDashboardPage
+                menuItem:
+                  icon: phDriftIcon
+                  text: Spec Drift
+                path: /publishing-house-drift
               - importName: PhMaintenancePage
                 menuItem:
                   icon: phMaintenanceIcon
                   text: Maintenance
                 path: /publishing-house-maintenance
             menuItems:
-              publishing-house-maintenance:
+              publishing-house-workflows:
+                priority: 30
+                parent: publishing-house
+              publishing-house-drift:
                 priority: 20
+                parent: publishing-house
+              publishing-house-maintenance:
+                priority: 10
                 parent: publishing-house
               publishing-house:
                 icon: phWorkflowIcon

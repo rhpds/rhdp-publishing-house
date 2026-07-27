@@ -7,7 +7,7 @@ import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
 import FiberManualRecordIcon from '@material-ui/icons/FiberManualRecord';
 import ErrorIcon from '@material-ui/icons/Error';
-import RemoveCircleOutlineIcon from '@material-ui/icons/RemoveCircleOutline';
+import WarningIcon from '@material-ui/icons/Warning';
 import { WorkflowStage } from '../../api/types';
 import { STAGE_ORDER, STAGE_LABELS, stageIndex } from '../../utils/stageMapping';
 
@@ -42,12 +42,12 @@ const useStyles = makeStyles(theme => ({
   },
   completed: { color: '#4caf50' },
   active: { color: '#4caf50' },
+  warning: { color: '#ff9800' },
   error: { color: '#f44336' },
-  skipped: { color: theme.palette.text.disabled },
   iconLarge: { fontSize: '1.3rem' },
 }));
 
-type NodeState = 'completed' | 'active' | 'pending' | 'error' | 'skipped';
+type NodeState = 'completed' | 'active' | 'pending' | 'error' | 'warning';
 
 function NodeIcon({ state }: { state: NodeState }) {
   const classes = useStyles();
@@ -57,10 +57,10 @@ function NodeIcon({ state }: { state: NodeState }) {
       return <CheckCircleIcon className={`${classes.completed} ${cls}`} />;
     case 'active':
       return <FiberManualRecordIcon className={`${classes.active} ${cls}`} />;
+    case 'warning':
+      return <WarningIcon className={`${classes.warning} ${cls}`} />;
     case 'error':
       return <ErrorIcon className={`${classes.error} ${cls}`} />;
-    case 'skipped':
-      return <RemoveCircleOutlineIcon className={`${classes.skipped} ${cls}`} />;
     default:
       return <RadioButtonUncheckedIcon className={cls} />;
   }
@@ -69,20 +69,18 @@ function NodeIcon({ state }: { state: NodeState }) {
 function getNodeState(
   s: WorkflowStage,
   currentStage: WorkflowStage,
-  driftSkipped?: boolean,
+  hasDrift?: boolean,
 ): NodeState {
   if (currentStage === 'error') return 'error';
-  if (currentStage === 'published') {
-    if (s === 'drift_review' && driftSkipped) return 'skipped';
-    return 'completed';
-  }
+  if (currentStage === 'published') return 'completed';
+
   const cur = stageIndex(currentStage);
   const idx = stageIndex(s);
-  if (idx < cur) {
-    if (s === 'drift_review' && driftSkipped) return 'skipped';
-    return 'completed';
+  if (idx < cur) return 'completed';
+  if (idx === cur) {
+    if ((s === 'development' || s === 'testing') && hasDrift) return 'warning';
+    return 'active';
   }
-  if (idx === cur) return 'active';
   return 'pending';
 }
 
@@ -94,28 +92,23 @@ interface WorkflowProgressProps {
 
 export function WorkflowProgress({ stage, hasDrift }: WorkflowProgressProps) {
   const classes = useStyles();
-  const pastDrift = stageIndex(stage) > stageIndex('drift_review');
-  const driftSkipped = pastDrift && hasDrift === false;
-
-  const lineCls = () => classes.line;
 
   return (
     <div className={classes.root}>
       <div className={classes.pipeline}>
         {STAGE_ORDER.map((s, i) => {
-          const st = getNodeState(s, stage, driftSkipped);
+          const st = getNodeState(s, stage, hasDrift);
           return (
             <React.Fragment key={s}>
               <div className={classes.node}>
                 <NodeIcon state={st} />
                 <Typography className={classes.nodeLabel}>{STAGE_LABELS[s]}</Typography>
               </div>
-              {i < STAGE_ORDER.length - 1 && <div className={lineCls()} />}
+              {i < STAGE_ORDER.length - 1 && <div className={classes.line} />}
             </React.Fragment>
           );
         })}
       </div>
-
     </div>
   );
 }

@@ -1,0 +1,29 @@
+---
+# Drift checker job
+- name: Create drift-checker script ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cm-drift-checker-script.yaml.j2') | from_yaml }}"
+
+- name: Create drift-checker CronJob
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cronjob-drift-checker.yaml.j2') | from_yaml }}"
+
+# Inactivity checker job
+- name: Create inactivity-checker script ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cm-inactivity-checker-script.yaml.j2') | from_yaml }}"
+
+- name: Create inactivity-checker CronJob
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cronjob-inactivity-checker.yaml.j2') | from_yaml }}"
+
+- name: Display jobs summary
+  ansible.builtin.debug:
+    msg:
+      - "Jobs deployed in {{ app_namespace }}"
+      - "  drift-checker: {{ drift_checker_schedule }}"
+      - "  inactivity-checker: {{ inactivity_checker_schedule }}"

@@ -1,5 +1,5 @@
 import { DiscoveryApi, FetchApi } from '@backstage/core-plugin-api';
-import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport } from './types';
+import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult } from './types';
 import { deriveStage } from '../utils/stageMapping';
 
 const GRAPHQL_QUERY = `
@@ -36,6 +36,8 @@ function toSummary(inst: ProcessInstance): WorkflowSummary {
     projectDescription: wd.projectDescription || '',
     startedAt: inst.start,
     lastUpdate: inst.lastUpdate,
+    hasDrift: wd.hasDrift ?? false,
+    baselineSha: wd.baselineSha || '',
   };
 }
 
@@ -167,7 +169,6 @@ export function createPhWorkflowsClient(options: {
       content_review: 'ph.content-review.complete',
       infra_review: 'ph.infra-review.complete',
       development: 'ph.development.complete',
-      drift_review: 'ph.drift-review.approved',
       testing: 'ph.testing.complete',
     };
     const eventType = typeMap[stage];
@@ -214,7 +215,6 @@ export function createPhWorkflowsClient(options: {
     const typeMap: Partial<Record<WorkflowStage, string>> = {
       content_review: 'ph.content-review.rejected',
       infra_review: 'ph.infra-review.rejected',
-      drift_review: 'ph.drift-review.rejected',
     };
     const eventType = typeMap[stage];
     if (!eventType) {
@@ -256,12 +256,12 @@ export function createPhWorkflowsClient(options: {
     slug: string,
     repoUrl: string,
     branch: string = 'main',
-    approvedSha?: string,
+    baselineSha?: string,
   ): Promise<ValidationReport> {
     const proxyUrl = await discoveryApi.getBaseUrl('proxy');
     const params = new URLSearchParams({ stage: 'review' });
-    if (approvedSha) {
-      params.set('approved_sha', approvedSha);
+    if (baselineSha) {
+      params.set('baseline_sha', baselineSha);
     }
     const response = await fetchApi.fetch(
       `${proxyUrl}/central-api/spec/validation/${slug}?${params}`,
@@ -278,18 +278,12 @@ export function createPhWorkflowsClient(options: {
 
   async function fetchDriftReport(
     slug: string,
-    repoUrl: string,
-    branch: string = 'main',
-    approvedSha: string,
+    mode: 'structural' | 'semantic' = 'semantic',
   ): Promise<DriftReport> {
     const proxyUrl = await discoveryApi.getBaseUrl('proxy');
     const response = await fetchApi.fetch(
-      `${proxyUrl}/central-api/spec/drift/${slug}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo_url: repoUrl, branch, approved_sha: approvedSha }),
-      },
+      `${proxyUrl}/central-api/spec/drift/${slug}?mode=${mode}`,
+      { method: 'POST' },
     );
 
     if (!response.ok) {
@@ -297,6 +291,22 @@ export function createPhWorkflowsClient(options: {
     }
 
     return await response.json() as DriftReport;
+  }
+
+  async function approveDrift(
+    slug: string,
+  ): Promise<{ slug: string; baselineSha: string; cleared: boolean }> {
+    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
+    const response = await fetchApi.fetch(
+      `${proxyUrl}/central-api/spec/drift/${slug}/approve`,
+      { method: 'POST' },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Drift approval failed: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
   }
 
   async function fetchHeadCommitSha(
@@ -317,6 +327,24 @@ export function createPhWorkflowsClient(options: {
     return (await response.text()).trim();
   }
 
+  async function deleteProject(
+    slug: string,
+    deleteRepo: boolean,
+  ): Promise<DeleteProjectResult> {
+    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
+    const response = await fetchApi.fetch(
+      `${proxyUrl}/central-api/projects/${slug}?delete_repo=${deleteRepo}`,
+      { method: 'DELETE' },
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Delete failed (${response.status}): ${text}`);
+    }
+
+    return await response.json();
+  }
+
   return {
     getWorkflows,
     getWorkflow,
@@ -325,6 +353,8 @@ export function createPhWorkflowsClient(options: {
     sendRejectionEvent,
     fetchValidationReport,
     fetchDriftReport,
+    approveDrift,
     fetchHeadCommitSha,
+    deleteProject,
   };
 }

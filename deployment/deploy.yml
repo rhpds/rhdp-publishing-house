@@ -64,3 +64,8 @@
       ansible.builtin.import_role:
         name: sonataflow
       tags: [sonataflow]
+
+    - name: Deploy Jobs
+      ansible.builtin.import_role:
+        name: jobs
+      tags: [jobs]

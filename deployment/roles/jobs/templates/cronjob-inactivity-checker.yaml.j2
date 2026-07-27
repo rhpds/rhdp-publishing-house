@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: inactivity-checker
+  namespace: "{{ app_namespace }}"
+  labels:
+    app: publishing-house
+    component: jobs
+spec:
+  schedule: "{{ inactivity_checker_schedule }}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: publishing-house
+            job: inactivity-checker
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: inactivity-checker
+              image: "{{ jobs_image }}"
+              command: ["python", "/scripts/inactivity-checker.py"]
+              env:
+                - name: SONATAFLOW_GRAPHQL_URL
+                  value: "{{ sonataflow_graphql_url }}"
+                - name: GITHUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: publishing-house-credentials
+                      key: github-token
+                - name: JIRA_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: publishing-house-credentials
+                      key: jira-url
+                - name: JIRA_EMAIL
+                  valueFrom:
+                    secretKeyRef:
+                      name: publishing-house-credentials
+                      key: jira-email
+                - name: JIRA_API_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: publishing-house-credentials
+                      key: jira-api-token
+                - name: RHDH_URL
+                  value: "http://backstage-developer-hub.{{ app_namespace }}.svc.cluster.local"
+                - name: RHDH_SERVICE_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: ph-developer-hub-env
+                      key: RHDH_SERVICE_TOKEN
+                - name: REVIEW_GROUP
+                  value: "{{ inactivity_review_group }}"
+                - name: INACTIVITY_DAYS
+                  value: "{{ inactivity_threshold_days }}"
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                  readOnly: true
+              resources:
+                requests:
+                  memory: 64Mi
+                  cpu: 50m
+                limits:
+                  memory: 128Mi
+                  cpu: 200m
+          volumes:
+            - name: script
+              configMap:
+                name: inactivity-checker-script

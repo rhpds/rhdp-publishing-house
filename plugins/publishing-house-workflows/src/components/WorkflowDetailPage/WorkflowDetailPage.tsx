@@ -37,9 +37,9 @@ import { createPhWorkflowsClient } from '../../api/client';
 import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
 
-const REVIEW_STAGES: WorkflowStage[] = ['content_review', 'infra_review', 'drift_review'];
+const REVIEW_STAGES: WorkflowStage[] = ['content_review', 'infra_review'];
 const STAGES_WITH_REVIEW_TAB: WorkflowStage[] = [
-  'content_review', 'infra_review', 'development', 'drift_review', 'testing',
+  'content_review', 'infra_review', 'development', 'testing',
 ];
 
 const CHECK_GROUP_LABELS: Record<string, string> = {
@@ -131,25 +131,23 @@ export function WorkflowDetailPage() {
 
     const repoUrl = result.summary.repoUrl;
     const wd = result.instance?.variables?.workflowdata as any;
-    const approvedSha = wd?.approvedSha;
+    const baselineSha = wd?.baselineSha;
     if (!repoUrl) return;
 
     const slug = result.summary.projectId;
+    const isReview = REVIEW_STAGES.includes(stage);
 
-    const isDriftReview = stage === 'drift_review';
+    setValidationLoading(true);
+    if (baselineSha) setDriftLoading(true);
 
-    if (!isDriftReview) setValidationLoading(true);
-    if (approvedSha) setDriftLoading(true);
+    const validationPromise = client.fetchValidationReport(slug, repoUrl, 'main', baselineSha)
+        .then(report => setValidationReport(report))
+        .catch((err: any) => setSnackbar({ open: true, severity: 'error', message: `Validation report failed: ${err.message}` }))
+        .finally(() => setValidationLoading(false));
 
-    const validationPromise = isDriftReview
-      ? Promise.resolve()
-      : client.fetchValidationReport(slug, repoUrl, 'main', approvedSha)
-          .then(report => setValidationReport(report))
-          .catch((err: any) => setSnackbar({ open: true, severity: 'error', message: `Validation report failed: ${err.message}` }))
-          .finally(() => setValidationLoading(false));
-
-    const driftPromise = approvedSha
-      ? client.fetchDriftReport(slug, repoUrl, 'main', approvedSha)
+    const driftMode = isReview ? 'structural' : 'semantic';
+    const driftPromise = baselineSha
+      ? client.fetchDriftReport(slug, driftMode)
           .then(report => setDriftReport(report))
           .catch((err: any) => setSnackbar({ open: true, severity: 'error', message: `Drift check failed: ${err.message}` }))
           .finally(() => setDriftLoading(false))
@@ -436,55 +434,52 @@ export function WorkflowDetailPage() {
               </InfoCard>
             )}
 
-            {(driftLoading || driftReport) && (
+            {driftLoading && (
+              <InfoCard title="Drift Check">
+                <Progress />
+              </InfoCard>
+            )}
+            {!driftLoading && driftReport?.has_drift && (
               <InfoCard title="Changes Since Last Approval">
-                {driftLoading ? (
-                  <Progress />
-                ) : driftReport ? (
-                  <div>
-                    <div style={{
-                      padding: '8px 16px',
-                      marginBottom: 16,
-                      borderRadius: 4,
-                      backgroundColor: driftReport.has_drift ? '#fff3e0' : '#e8f5e9',
-                      color: driftReport.has_drift ? '#e65100' : '#2e7d32',
-                      fontWeight: 600,
-                    }}>
-                      {driftReport.has_drift ? 'Design changes detected since last approval' : 'No design changes since last approval'}
-                    </div>
-                    <Typography variant="body2" style={{ marginBottom: 8, color: '#757575' }}>
-                      Approved: <code>{driftReport.approved_sha.substring(0, 7)}</code>
-                      {' → Current: '}
-                      <code>{driftReport.current_sha.substring(0, 7)}</code>
-                    </Typography>
-                    <Typography variant="body2" style={{ marginBottom: 12 }}>
-                      {driftReport.summary}
-                    </Typography>
-                    {driftReport.has_drift && driftReport.changes.map((fileChange, fi) => (
-                      <div key={fi} style={{ marginBottom: 16 }}>
-                        <Typography variant="subtitle2" style={{ marginBottom: 8, fontFamily: 'monospace' }}>
-                          {fileChange.file}
-                        </Typography>
-                        {fileChange.sections.map((sec, si) => (
-                          <div key={si} style={{ marginBottom: 8, marginLeft: 8 }}>
-                            <Typography variant="body2" style={{ fontWeight: 600, marginBottom: 4 }}>
-                              {sec.section}
-                            </Typography>
-                            <ul style={{ margin: 0, paddingLeft: 20 }}>
-                              {sec.changes.map((c, ci) => (
-                                <li key={ci} style={{ marginBottom: 2 }}>{c}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
-                      </div>
+                <div style={{
+                  padding: '8px 16px',
+                  marginBottom: 16,
+                  borderRadius: 4,
+                  backgroundColor: '#fff3e0',
+                  color: '#e65100',
+                  fontWeight: 600,
+                }}>
+                  Changes detected since last approval
+                </div>
+                <Typography variant="body2" style={{ marginBottom: 8, color: '#757575' }}>
+                  Baseline: <code>{driftReport.baseline_sha.substring(0, 7)}</code>
+                  {' → Current: '}
+                  <code>{driftReport.current_sha.substring(0, 7)}</code>
+                </Typography>
+                <Typography variant="body2" style={{ marginBottom: 12 }}>
+                  {driftReport.summary}
+                </Typography>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+                      <th style={{ padding: '6px 8px' }}>File</th>
+                      <th style={{ padding: '6px 8px' }}>Field / Section</th>
+                      <th style={{ padding: '6px 8px' }}>Difference</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {driftReport.changes.map((change, ci) => (
+                      <tr key={ci} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                        <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{change.file}</td>
+                        <td style={{ padding: '6px 8px' }}>{change.comparing}</td>
+                        <td style={{ padding: '6px 8px' }}>{change.difference}</td>
+                      </tr>
                     ))}
-                  </div>
-                ) : null}
+                  </tbody>
+                </table>
               </InfoCard>
             )}
 
-            {summary.stage !== 'drift_review' && (
             <InfoCard title="Validation Report">
               {validationLoading ? (
                 <Progress />
@@ -532,10 +527,7 @@ export function WorkflowDetailPage() {
                 <Typography variant="body2">No validation report available</Typography>
               )}
             </InfoCard>
-            )}
 
-            {summary.stage !== 'drift_review' && (
-            <>
             {/* Approval Checklist Answers */}
             {validationReport?.approval_checklist?.content && (
               <InfoCard title="Content Review — Approval Checklist">
@@ -687,8 +679,6 @@ export function WorkflowDetailPage() {
                 </InfoCard>
               );
             })()}
-            </>
-            )}
 
             {/* Approve / Reject buttons */}
             {isReviewStage && (validationReport || driftReport) && (
@@ -741,8 +731,8 @@ export function WorkflowDetailPage() {
                 )}
               </Grid>
               <Grid item xs={12} md={6}>
-                {wd?.approvedSha && (
-                  <DetailField label="Approved Commit" value={wd.approvedSha.substring(0, 7)} />
+                {wd?.baselineSha && (
+                  <DetailField label="Baseline Commit" value={wd.baselineSha.substring(0, 7)} />
                 )}
                 {wd?.auditTrailSha && (
                   <DetailField label="Last Known Commit" value={wd.auditTrailSha.substring(0, 7)} />
@@ -792,7 +782,7 @@ export function WorkflowDetailPage() {
                             {entry.action === 'rejected' && (entry as any).reasons?.length > 0 && (
                               <InfoOutlinedIcon
                                 style={{ fontSize: 16, color: '#c62828', cursor: 'pointer' }}
-                                onClick={(e) => setReasonsPopover({ anchorEl: e.currentTarget, reasons: (entry as any).reasons })}
+                                onClick={(e) => setReasonsPopover({ anchorEl: e.currentTarget as unknown as HTMLElement, reasons: (entry as any).reasons })}
                               />
                             )}
                           </span>

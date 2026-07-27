@@ -20,7 +20,8 @@ export interface WorkflowVariables {
     jira_url?: string;
     tags?: string[];
     projectDescription?: string;
-    approvedSha?: string;
+    baselineSha?: string;
+    hasDrift?: boolean;
     auditTrailSha?: string;
     reviewHistory?: AuditEntry[];
   };
@@ -46,7 +47,6 @@ export type WorkflowStage =
   | 'infra_review'
   | 'jira_sync'
   | 'development'
-  | 'drift_review'
   | 'testing'
   | 'published'
   | 'error';
@@ -84,6 +84,9 @@ export interface RcarsMatch {
   ci_name: string;
   display_name: string;
   url: string;
+  title?: string;
+  relevance_score?: number;
+  why_it_fits?: string;
 }
 
 export interface ApprovalChecklist {
@@ -150,22 +153,28 @@ export interface AuditEntry {
   commitSha?: string;
 }
 
-export interface DriftSectionChanges {
-  section: string;
-  changes: string[];
+export interface DeleteProjectResult {
+  slug: string;
+  workflow_aborted: boolean;
+  catalog_cleaned: boolean;
+  litellm_keys_deleted: number;
+  jira_archived: boolean;
+  repo_deleted: boolean;
+  errors: string[];
 }
 
-export interface DriftFileChanges {
+export interface DriftChange {
   file: string;
-  sections: DriftSectionChanges[];
+  comparing: string;
+  difference: string;
 }
 
 export interface DriftReport {
   has_drift: boolean;
-  approved_sha: string;
+  baseline_sha: string;
   current_sha: string;
   summary: string;
-  changes: DriftFileChanges[];
+  changes: DriftChange[];
 }
 
 export interface WorkflowSummary {
@@ -185,4 +194,6 @@ export interface WorkflowSummary {
   projectDescription: string;
   startedAt: string;
   lastUpdate: string;
+  hasDrift?: boolean;
+  baselineSha?: string;
 }

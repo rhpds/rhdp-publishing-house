@@ -178,6 +178,25 @@ def _advance_workflow(
         raise HTTPException(status_code=502, detail=f"CloudEvent send failed: {e}")
 
 
+def _patch_workflow_data(wf_uuid: str, data: dict, settings=None) -> None:
+    """PATCH SonataFlow workflow instance data (merge, no state transition)."""
+    if not settings:
+        settings = get_settings()
+    try:
+        req = urllib.request.Request(
+            f"{settings.sonataflow_url.rstrip('/')}/publishinghouseworkflow/{wf_uuid}",
+            data=json.dumps({"workflowdata": data}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="PATCH",
+        )
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+            pass
+        logger.info("patched workflow %s with %s", wf_uuid, data)
+    except Exception as e:
+        logger.warning("workflow PATCH failed for %s: %s", wf_uuid, e)
+        raise HTTPException(status_code=502, detail=f"Workflow PATCH failed: {e}")
+
+
 # ── Auth Endpoints (Portal key management) ────────────────────────────────────
 
 @router.get("/keys", response_model=list[KeyResponse])
@@ -253,6 +272,9 @@ def _get_workflow_data(project_id: str):
             "project_id": project_id,
             "workflow_id": inst.get("id", ""),
             "epic_key": wd.get("epic_key", ""),
+            "baselineSha": wd.get("baselineSha", ""),
+            "hasDrift": wd.get("hasDrift", False),
+            "repoUrl": wd.get("repoUrl", ""),
         }
         if rejection:
             result["rejection"] = rejection
@@ -447,11 +469,11 @@ async def submit_development(
     body: DevelopmentRequest,
     owner: str = Depends(_require_auth),
 ):
-    """Validate development artifacts, then advance workflow past development.
+    """Validate development artifacts, run semantic drift check, then advance workflow.
 
     Returns a unified response shape for all outcomes:
-    201 — validation passed, workflow advanced
-    422 — validation failed
+    201 — validation passed, no drift, workflow advanced
+    422 — validation failed OR design drift detected
     409 — workflow not in development stage
     404 — no workflow found
     500 — unexpected server error
@@ -459,8 +481,10 @@ async def submit_development(
     from fastapi.responses import JSONResponse
     from ..services.github import GitHubService
     from ..services.validation.runner import run_validation
+    from ..services.drift import check_drift_semantic
 
     stage = None
+    drift_msg = "Design drift detected. Your submission has been referred for additional review."
 
     try:
         try:
@@ -486,6 +510,12 @@ async def submit_development(
                 error=f"Workflow is in '{current}' stage. Development requires 'development'.",
             ).model_dump())
 
+        # If hasDrift is already set, return immediately without re-checking
+        if wd.get("hasDrift"):
+            return JSONResponse(status_code=422, content=DevelopmentResponse(
+                status=422, stage=stage, error=drift_msg,
+            ).model_dump())
+
         settings = get_settings()
         if not settings.github_token:
             return JSONResponse(status_code=500, content=DevelopmentResponse(
@@ -500,6 +530,20 @@ async def submit_development(
                 status=422, stage=stage, error="Validation failed",
                 validation=result.model_dump(),
             ).model_dump())
+
+        # Semantic drift check against baselineSha
+        baseline_sha = wd.get("baselineSha", "")
+        if baseline_sha and settings.ph_internal_ai_api_key:
+            drift_result = await check_drift_semantic(
+                github, body.repo_url, body.branch, baseline_sha,
+                settings.litellm_api_url, settings.ph_internal_ai_api_key,
+            )
+            if drift_result.has_drift:
+                _patch_workflow_data(wf_uuid, {"hasDrift": True}, settings=settings)
+                logger.info("development: drift detected for %s, set hasDrift", project_slug)
+                return JSONResponse(status_code=422, content=DevelopmentResponse(
+                    status=422, stage=stage, error=drift_msg,
+                ).model_dump())
 
         _advance_workflow(
             project_slug, wf_uuid, owner, stage="development",
