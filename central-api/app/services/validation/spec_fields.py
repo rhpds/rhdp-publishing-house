@@ -16,7 +16,6 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
         ("A-05", "spec.modules", spec.get("modules")),
         ("A-06", "spec.learning_objectives", spec.get("learning_objectives")),
         ("A-07", "spec.environment.topology", env.get("topology")),
-        ("A-08", "spec.environment.ocp_version", env.get("ocp_version")),
         ("A-09", "spec.environment.cloud_provider", env.get("cloud_provider")),
         ("A-10", "spec.environment.cluster_type", env.get("cluster_type")),
     ]
@@ -35,18 +34,37 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
                 field=field,
             ))
 
+    # A-08: ocp_version — only required when the lab involves OpenShift.
+    # If empty, SKIP (infra reviewer sets it if needed). If set, validate minimum.
     ocp_version = env.get("ocp_version", "")
     minimum = policy.get("ocp_version_minimum", "4.20")
-    if ocp_version and minimum:
+    if not ocp_version:
+        results.append(CheckResult(
+            check_id="A-08", group="A", status=CheckStatus.SKIP,
+            message="ocp_version not set — not required for non-OCP labs",
+            field="spec.environment.ocp_version",
+        ))
+    else:
         try:
             current = [int(x) for x in str(ocp_version).split(".")]
             min_ver = [int(x) for x in minimum.split(".")]
             if current < min_ver:
-                for r in results:
-                    if r.check_id == "A-08":
-                        r.status = CheckStatus.FAIL
-                        r.message = f"OCP {ocp_version} is below minimum {minimum}"
+                results.append(CheckResult(
+                    check_id="A-08", group="A", status=CheckStatus.FAIL,
+                    message=f"OCP {ocp_version} is below minimum {minimum}",
+                    field="spec.environment.ocp_version",
+                ))
+            else:
+                results.append(CheckResult(
+                    check_id="A-08", group="A", status=CheckStatus.PASS,
+                    message=f"ocp_version {ocp_version} meets minimum {minimum}",
+                    field="spec.environment.ocp_version",
+                ))
         except ValueError:
-            pass
+            results.append(CheckResult(
+                check_id="A-08", group="A", status=CheckStatus.FAIL,
+                message=f"ocp_version '{ocp_version}' is not a valid version number",
+                field="spec.environment.ocp_version",
+            ))
 
     return results
