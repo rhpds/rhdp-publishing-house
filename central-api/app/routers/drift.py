@@ -154,4 +154,25 @@ async def approve_drift(
     )
     logger.info("drift approved for %s by %s — baselineSha=%s", slug, owner, head_sha[:8])
 
-    return {"slug": slug, "baselineSha": head_sha, "cleared": True}
+    # Sync Jira tasks to reflect any module changes
+    jira_synced = None
+    epic_key = wd.get("epic_key", "")
+    if epic_key and repo_url:
+        from .jira import sync_jira_tasks, SyncRequest
+        try:
+            result = sync_jira_tasks(
+                body=SyncRequest(repo_url=repo_url, epic_key=epic_key),
+                _caller=owner,
+                settings=settings,
+            )
+            jira_synced = {
+                "tasks_created": result.tasks_created,
+                "tasks_updated": result.tasks_updated,
+                "tasks_closed": result.tasks_closed,
+            }
+            logger.info("drift approve: jira sync complete for %s — %s", slug, jira_synced)
+        except Exception as e:
+            logger.warning("drift approve: jira sync failed for %s: %s", slug, e)
+            jira_synced = {"error": str(e)}
+
+    return {"slug": slug, "baselineSha": head_sha, "cleared": True, "jira_sync": jira_synced}
