@@ -21,7 +21,7 @@ project:
 spec:
   title: ""
   learning_objectives: []
-  modules: []              # [{title, duration_min}] — written by intake Phase 4
+  modules: []              # [{id, title, duration_min}] — written by intake Phase 4; id is stable (e.g. module-01)
   environment:
     platform: ""               # ocp | rhel-vms — determines which sizing fields apply
     topology: ""               # shared-cluster | per-student | cnv-pool

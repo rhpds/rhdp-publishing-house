@@ -3,6 +3,7 @@ import asyncio
 import base64
 import json
 import logging
+import re
 import ssl
 import urllib.parse
 import urllib.request
@@ -98,7 +99,7 @@ def create_epic(
         "summary": "[PH] Intake",
         "issuetype": {"name": "Task"},
         "parent": {"key": epic_key},
-        "labels": ["publishing-house"],
+        "labels": ["publishing-house", "ph:intake"],
         "assignee": None,
         "description": {
             "type": "doc",
@@ -137,151 +138,67 @@ class SyncRequest(BaseModel):
 class SyncResponse(BaseModel):
     epic_key: str
     tasks_created: int
+    tasks_updated: int
+    tasks_closed: int
     intake_closed: bool
 
 
-@router.post("/sync", response_model=SyncResponse)
-def sync_jira_tasks(
-    body: SyncRequest,
-    _caller: str = Depends(_require_auth),
-    settings: Settings = Depends(get_settings),
-):
-    """Read jira.yaml from project repo, update epic, close intake, create tasks.
-    Called by SonataFlow JiraSync state after reviews complete."""
-    if not settings.jira_url:
-        raise HTTPException(status_code=503, detail="Jira not configured")
-    if not settings.github_token:
-        raise HTTPException(status_code=503, detail="GitHub token not configured")
+FIXED_TASKS = [
+    {"id": "write-automation", "summary": "[PH] Write Automation"},
+    {"id": "write-health-check", "summary": "[PH] Write Health Check"},
+    {"id": "write-e2e-tests", "summary": "[PH] Write E2E Tests"},
+]
 
-    gh = GitHubService(token=settings.github_token)
-    jira_yaml_content = asyncio.run(
-        gh.get_file_content(body.repo_url, "publishing-house/jira.yaml")
-    )
-    if not jira_yaml_content:
-        raise HTTPException(status_code=404, detail="publishing-house/jira.yaml not found in repo")
+SPEC_PATH = "publishing-house/spec.yaml"
+DESIGN_PATH = "publishing-house/spec/design.md"
+MODULES_DIR = "publishing-house/spec/modules"
 
-    jira_data = yaml.safe_load(jira_yaml_content)
-    if not jira_data:
-        raise HTTPException(status_code=422, detail="jira.yaml is empty")
 
+def _extract_brief_overview(content: str) -> str:
+    """Extract the Brief Overview section from a module outline file."""
+    m = re.search(r'## Brief Overview\s*\n(.*?)(?=\n##|\Z)', content, re.DOTALL)
+    return m.group(1).strip() if m else ""
+
+
+def _get_epic_tasks(epic_key: str, settings: Settings) -> list[dict]:
+    """Fetch all tasks under an epic with key, summary, labels, and status."""
     headers = _jira_headers(settings)
-    epic_info = jira_data.get("epic", {})
-
-    if epic_info.get("summary"):
-        req = urllib.request.Request(
-            f"{settings.jira_url}/rest/api/3/issue/{body.epic_key}",
-            data=json.dumps({"fields": {"summary": epic_info["summary"]}}).encode(),
-            headers=headers,
-            method="PUT",
-        )
-        try:
-            with urllib.request.urlopen(req, context=_SSL_CTX, timeout=15):
-                logger.info("jira sync: updated epic %s summary", body.epic_key)
-        except Exception as e:
-            logger.warning("jira sync: epic summary update failed for %s: %s", body.epic_key, e)
-
-    desc_source = epic_info.get("description_source", "")
-    if desc_source:
-        desc_content = asyncio.run(
-            gh.get_file_content(body.repo_url, desc_source)
-        )
-        if desc_content:
-            desc_adf = {
-                "type": "doc",
-                "version": 1,
-                "content": [
-                    {"type": "paragraph", "content": [
-                        {"type": "text", "text": desc_content[:30000]}
-                    ]},
-                ],
-            }
-            req = urllib.request.Request(
-                f"{settings.jira_url}/rest/api/3/issue/{body.epic_key}",
-                data=json.dumps({"fields": {"description": desc_adf}}).encode(),
-                headers=headers,
-                method="PUT",
-            )
-            try:
-                with urllib.request.urlopen(req, context=_SSL_CTX, timeout=15):
-                    logger.info("jira sync: updated epic %s description from %s", body.epic_key, desc_source)
-            except Exception as e:
-                logger.warning("jira sync: epic description update failed: %s", e)
-
-    tasks = jira_data.get("tasks", [])
-    tasks_created = 0
-    intake_closed = False
-
-    for task in tasks:
-        summary = task.get("summary", "")
-        task_status = task.get("status", "open")
-
-        if task_status == "done":
-            intake_closed = _close_task_by_summary(body.epic_key, summary, settings)
-            continue
-
-        try:
-            fields: dict = {
-                "project": {"key": settings.jira_project_key},
-                "summary": summary,
-                "issuetype": {"name": "Task"},
-                "parent": {"key": body.epic_key},
-                "labels": ["publishing-house"],
-                "assignee": None,
-            }
-            desc_text = task.get("description", "")
-            if desc_text:
-                fields["description"] = {
-                    "type": "doc",
-                    "version": 1,
-                    "content": [
-                        {"type": "paragraph", "content": [
-                            {"type": "text", "text": desc_text[:30000]},
-                        ]},
-                    ],
-                }
-            task_req = urllib.request.Request(
-                f"{settings.jira_url}/rest/api/3/issue",
-                data=json.dumps({"fields": fields}).encode(),
-                headers=headers,
-                method="POST",
-            )
-            with urllib.request.urlopen(task_req, context=_SSL_CTX, timeout=10):
-                tasks_created += 1
-        except Exception as e:
-            logger.warning("jira sync: task creation failed for '%s': %s", summary, e)
-
-    logger.info("jira sync: epic %s — %d tasks created, intake closed: %s",
-                body.epic_key, tasks_created, intake_closed)
-    return SyncResponse(epic_key=body.epic_key, tasks_created=tasks_created, intake_closed=intake_closed)
-
-
-def _close_task_by_summary(epic_key: str, summary: str, settings: Settings) -> bool:
-    """Find a task under an epic by summary and transition it to Done."""
-    headers = _jira_headers(settings)
-    search_summary = summary.replace("[", "\\\\[").replace("]", "\\\\]")
     jql = (
-        f'project = {settings.jira_project_key} AND issuetype = Task '
-        f'AND parent = {epic_key} AND summary ~ "{search_summary}"'
+        f"project = {settings.jira_project_key} AND issuetype = Task "
+        f"AND parent = {epic_key}"
     )
-    search_url = f"{settings.jira_url}/rest/api/3/search/jql"
     req = urllib.request.Request(
-        search_url,
-        data=json.dumps({"jql": jql, "fields": ["key"]}).encode(),
+        f"{settings.jira_url}/rest/api/3/search/jql",
+        data=json.dumps({
+            "jql": jql,
+            "fields": ["key", "summary", "labels", "status"],
+            "maxResults": 100,
+        }).encode(),
         headers=headers,
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=15) as r:
             issues = json.loads(r.read().decode()).get("issues", [])
     except Exception as e:
-        logger.warning("jira sync: failed to search for task '%s' under %s: %s", summary, epic_key, e)
-        return False
+        logger.warning("jira sync: failed to fetch tasks under %s: %s", epic_key, e)
+        return []
 
-    if not issues:
-        logger.info("jira sync: no task matching '%s' found under epic %s", summary, epic_key)
-        return False
+    result = []
+    for issue in issues:
+        fields = issue.get("fields", {})
+        result.append({
+            "key": issue["key"],
+            "summary": fields.get("summary", ""),
+            "labels": fields.get("labels", []),
+            "status": fields.get("status", {}).get("name", ""),
+        })
+    return result
 
-    task_key = issues[0]["key"]
+
+def _transition_to_done(task_key: str, settings: Settings) -> bool:
+    """Transition a Jira task to Done."""
+    headers = _jira_headers(settings)
     trans_url = f"{settings.jira_url}/rest/api/3/issue/{task_key}/transitions"
     req = urllib.request.Request(trans_url, headers=headers)
     try:
@@ -311,10 +228,223 @@ def _close_task_by_summary(epic_key: str, summary: str, settings: Settings) -> b
     )
     try:
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
-            logger.info("jira sync: closed task %s", task_key)
+            logger.info("jira sync: transitioned %s to Done", task_key)
             return True
     except Exception as e:
         logger.warning("jira sync: failed to transition %s to Done: %s", task_key, e)
         return False
+
+
+def _update_task_fields(task_key: str, summary: str, description: str, settings: Settings) -> bool:
+    """Update a Jira task's summary and description."""
+    headers = _jira_headers(settings)
+    fields: dict = {"summary": summary}
+    if description:
+        fields["description"] = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {"type": "paragraph", "content": [
+                    {"type": "text", "text": description[:30000]},
+                ]},
+            ],
+        }
+    req = urllib.request.Request(
+        f"{settings.jira_url}/rest/api/3/issue/{task_key}",
+        data=json.dumps({"fields": fields}).encode(),
+        headers=headers,
+        method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+            logger.info("jira sync: updated task %s", task_key)
+            return True
+    except Exception as e:
+        logger.warning("jira sync: failed to update %s: %s", task_key, e)
+        return False
+
+
+def _create_task(
+    epic_key: str, summary: str, description: str, ph_label: str, settings: Settings,
+) -> bool:
+    """Create a Jira task under an epic with a ph:{id} label."""
+    headers = _jira_headers(settings)
+    fields: dict = {
+        "project": {"key": settings.jira_project_key},
+        "summary": summary,
+        "issuetype": {"name": "Task"},
+        "parent": {"key": epic_key},
+        "labels": ["publishing-house", ph_label],
+        "assignee": None,
+    }
+    if description:
+        fields["description"] = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {"type": "paragraph", "content": [
+                    {"type": "text", "text": description[:30000]},
+                ]},
+            ],
+        }
+    req = urllib.request.Request(
+        f"{settings.jira_url}/rest/api/3/issue",
+        data=json.dumps({"fields": fields}).encode(),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+            return True
+    except Exception as e:
+        logger.warning("jira sync: task creation failed for '%s': %s", summary, e)
+        return False
+
+
+@router.post("/sync", response_model=SyncResponse)
+def sync_jira_tasks(
+    body: SyncRequest,
+    _caller: str = Depends(_require_auth),
+    settings: Settings = Depends(get_settings),
+):
+    """Deterministically sync Jira tasks from spec.yaml, design.md, and module outlines.
+    Diffs against existing Jira tasks by ph:{id} labels — creates, updates, or closes."""
+    if not settings.jira_url:
+        raise HTTPException(status_code=503, detail="Jira not configured")
+    if not settings.github_token:
+        raise HTTPException(status_code=503, detail="GitHub token not configured")
+
+    gh = GitHubService(token=settings.github_token)
+
+    # --- Step 1: Read source files from repo ---
+    spec_content = asyncio.run(gh.get_file_content(body.repo_url, SPEC_PATH))
+    if not spec_content:
+        raise HTTPException(status_code=404, detail="spec.yaml not found in repo")
+    spec_data = yaml.safe_load(spec_content) or {}
+    project = spec_data.get("project", {})
+    spec_section = spec_data.get("spec", {})
+
+    design_content = asyncio.run(gh.get_file_content(body.repo_url, DESIGN_PATH))
+
+    module_files = asyncio.run(gh.list_directory(body.repo_url, MODULES_DIR))
+    module_briefs: dict[str, str] = {}
+    for fname in sorted(module_files):
+        if not fname.endswith(".md"):
+            continue
+        m = re.match(r"module-(\d+)", fname)
+        if not m:
+            continue
+        content = asyncio.run(gh.get_file_content(body.repo_url, f"{MODULES_DIR}/{fname}"))
+        if content:
+            module_briefs[int(m.group(1))] = _extract_brief_overview(content)
+
+    # --- Step 2: Update epic ---
+    headers = _jira_headers(settings)
+    title = spec_section.get("title", "") or project.get("slug", "")
+    content_type = project.get("content_type", "lab")
+    slug = project.get("slug", "")
+    epic_summary = f"[PH] {title} — {content_type} ({slug})"
+
+    req = urllib.request.Request(
+        f"{settings.jira_url}/rest/api/3/issue/{body.epic_key}",
+        data=json.dumps({"fields": {"summary": epic_summary}}).encode(),
+        headers=headers,
+        method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=15):
+            logger.info("jira sync: updated epic %s summary", body.epic_key)
+    except Exception as e:
+        logger.warning("jira sync: epic summary update failed for %s: %s", body.epic_key, e)
+
+    if design_content:
+        desc_adf = {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {"type": "paragraph", "content": [
+                    {"type": "text", "text": design_content[:30000]}
+                ]},
+            ],
+        }
+        req = urllib.request.Request(
+            f"{settings.jira_url}/rest/api/3/issue/{body.epic_key}",
+            data=json.dumps({"fields": {"description": desc_adf}}).encode(),
+            headers=headers,
+            method="PUT",
+        )
+        try:
+            with urllib.request.urlopen(req, context=_SSL_CTX, timeout=15):
+                logger.info("jira sync: updated epic %s description", body.epic_key)
+        except Exception as e:
+            logger.warning("jira sync: epic description update failed: %s", e)
+
+    # --- Step 3: Fetch existing tasks and build label lookup ---
+    existing_tasks = _get_epic_tasks(body.epic_key, settings)
+    label_to_task: dict[str, dict] = {}
+    for task in existing_tasks:
+        for label in task["labels"]:
+            if label.startswith("ph:"):
+                label_to_task[label] = task
+                break
+
+    # --- Step 4: Close intake ---
+    intake_closed = False
+    intake_task = label_to_task.get("ph:intake")
+    if intake_task and intake_task["status"].lower() != "done":
+        intake_closed = _transition_to_done(intake_task["key"], settings)
+
+    # --- Step 5: Build desired module tasks ---
+    modules = spec_section.get("modules", [])
+    desired: dict[str, dict] = {}
+    for i, mod in enumerate(modules, 1):
+        mod_id = mod.get("id", f"module-{i:02d}")
+        mod_title = mod.get("title", f"Module {i}")
+        brief = module_briefs.get(i, "")
+        desired[f"ph:{mod_id}"] = {
+            "summary": f"[PH] Write Module {i}: {mod_title}",
+            "description": brief,
+        }
+
+    for ft in FIXED_TASKS:
+        desired[f"ph:{ft['id']}"] = {
+            "summary": ft["summary"],
+            "description": "",
+        }
+
+    # --- Step 6: Diff — create, update, close ---
+    tasks_created = 0
+    tasks_updated = 0
+    tasks_closed = 0
+
+    for ph_label, want in desired.items():
+        existing = label_to_task.get(ph_label)
+        if not existing:
+            if _create_task(body.epic_key, want["summary"], want["description"], ph_label, settings):
+                tasks_created += 1
+        elif ph_label.startswith("ph:module-") and existing["summary"] != want["summary"]:
+            if _update_task_fields(existing["key"], want["summary"], want["description"], settings):
+                tasks_updated += 1
+
+    for ph_label, task in label_to_task.items():
+        if (
+            ph_label.startswith("ph:module-")
+            and ph_label not in desired
+            and task["status"].lower() != "done"
+        ):
+            if _transition_to_done(task["key"], settings):
+                tasks_closed += 1
+
+    logger.info(
+        "jira sync: epic %s — created=%d updated=%d closed=%d intake_closed=%s",
+        body.epic_key, tasks_created, tasks_updated, tasks_closed, intake_closed,
+    )
+    return SyncResponse(
+        epic_key=body.epic_key,
+        tasks_created=tasks_created,
+        tasks_updated=tasks_updated,
+        tasks_closed=tasks_closed,
+        intake_closed=intake_closed,
+    )
 
 
