@@ -10,12 +10,25 @@ data:
     g, group:default/rhdp-content-review, role:default/ph-content-reviewer
     g, group:default/rhdp-infra-review, role:default/ph-infra-reviewer
 
-    p, role:default/ph-content-reviewer, scaffolder-template, read, deny
-    p, role:default/ph-content-reviewer, scaffolder-action, use, deny
-    p, role:default/ph-infra-reviewer, scaffolder-template, read, deny
-    p, role:default/ph-infra-reviewer, scaffolder-action, use, deny
-
+    p, role:default/ph-admin, catalog-entity, read, allow
+    p, role:default/ph-admin, catalog.entity.create, create, allow
+    p, role:default/ph-admin, catalog-entity, delete, allow
+    p, role:default/ph-admin, catalog.location.create, create, allow
+    p, role:default/ph-admin, catalog.location.read, read, allow
     p, role:default/ph-admin, scaffolder-template, read, allow
     p, role:default/ph-admin, scaffolder-action, use, allow
+    p, role:default/ph-admin, scaffolder.task.create, create, allow
+    p, role:default/ph-admin, scaffolder.task.read, read, allow
+    p, role:default/ph-admin, scaffolder.task.cancel, cancel, allow
+
+    p, role:default/ph-developer, catalog-entity, read, allow
+    p, role:default/ph-developer, catalog.entity.create, create, allow
+    p, role:default/ph-developer, catalog.location.create, create, allow
+    p, role:default/ph-developer, catalog.location.read, read, allow
     p, role:default/ph-developer, scaffolder-template, read, allow
     p, role:default/ph-developer, scaffolder-action, use, allow
+    p, role:default/ph-developer, scaffolder.task.create, create, allow
+    p, role:default/ph-developer, scaffolder.task.read, read, allow
+
+    p, role:default/ph-content-reviewer, catalog-entity, read, allow
+    p, role:default/ph-infra-reviewer, catalog-entity, read, allow

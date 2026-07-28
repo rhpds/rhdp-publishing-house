@@ -198,6 +198,8 @@ spec:
           tags: ${{ parameters.tags }}
           project_description: ${{ parameters.project_description }}
           audit_trail_sha: ${{ steps['create-and-push'].output.commitHash }}
+          sso_user: ${{ user.entity.metadata.name }}
+          sso_email: ${{ user.entity.spec.profile.email }}
 
     # Step 6: Register in catalog
     - id: register

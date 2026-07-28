@@ -1,4 +1,5 @@
 """Publishing House projects and auth endpoints — all under /projects."""
+import asyncio
 import json
 import logging
 import re
@@ -516,6 +517,8 @@ class StartRequest(BaseModel):
     tags: list[str] = []
     project_description: str = ""
     audit_trail_sha: str = ""
+    sso_user: str = ""
+    sso_email: str = ""
 
 
 def _send_cloud_event(event_type: str, project_slug: str, data: dict):
@@ -736,8 +739,8 @@ async def start_workflow(
         "projectId": business_key,
         "repoUrl": body.repo_url,
         "projectName": business_key,
-        "ssoUser": owner,
-        "ssoEmail": owner if "@" in owner else "",
+        "ssoUser": body.sso_user or owner,
+        "ssoEmail": body.sso_email or (owner if "@" in owner else ""),
     }
     if body.deployment_mode:
         wd["deploymentMode"] = body.deployment_mode
@@ -751,20 +754,24 @@ async def start_workflow(
         wd["auditTrailSha"] = body.audit_trail_sha
     start_payload = wd
 
-    try:
-        url = f"{settings.sonataflow_url.rstrip('/')}/publishinghouseworkflow?businessKey={urllib.parse.quote(business_key)}"
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(start_payload).encode(),
-            headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=30) as r:
-            result = json.loads(r.read().decode())
-        logger.info("started workflow for %s by %s", business_key, owner)
-        return {"slug": business_key, "workflow_id": result.get("id", ""), "started": True}
-    except Exception as e:
-        logger.error("workflow start failed for %s: %s", business_key, e)
-        raise HTTPException(status_code=502, detail=f"Workflow start failed: {e}")
+    url = f"{settings.sonataflow_url.rstrip('/')}/publishinghouseworkflow?businessKey={urllib.parse.quote(business_key)}"
+
+    async def _fire_sonataflow():
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(start_payload).encode(),
+                headers={"Content-Type": "application/json"},
+            )
+            await asyncio.to_thread(
+                urllib.request.urlopen, req, context=_SSL_CTX, timeout=60
+            )
+            logger.info("workflow started for %s by %s", business_key, owner)
+        except Exception as e:
+            logger.error("workflow start failed for %s: %s", business_key, e)
+
+    asyncio.create_task(_fire_sonataflow())
+    return {"slug": business_key, "workflow_id": "", "started": True}
 
 
 # ── Project Deletion ─────────────────────────────────────────────────────────
