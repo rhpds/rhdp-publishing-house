@@ -9,6 +9,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings, Settings
+from .database import init_db
 from .models import HealthResponse
 from .routers import litellm, projects, jira, workspace, validate, drift
 from .services.rcars import rcars_overlap_check, rcars_health, rcars_advisor_submit, rcars_advisor_result
@@ -31,10 +32,15 @@ def create_app() -> FastAPI:
     else:
         logger.warning("OIDC not configured - portal endpoints will fail")
 
+    if settings.database_url:
+        init_db(settings.database_url)
+    else:
+        logger.warning("DATABASE_URL not set — API key storage is in-memory only")
+
     app = FastAPI(
         title=settings.api_title,
         version=settings.api_version,
-        description="Central API for Publishing House workflow orchestration"
+        description="Central API for Publishing House workflow orchestration",
     )
 
     @app.get(f"{settings.api_prefix}/health", response_model=HealthResponse)

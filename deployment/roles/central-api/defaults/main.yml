@@ -2,3 +2,9 @@
 app_namespace: publishing-house
 central_api_image: quay.io/rhpds/central-api:1.8.3
 central_api_replicas: 1
+
+# PostgreSQL for API key storage
+central_api_db_user: phuser
+central_api_db_password: changeme
+central_api_db_name: central_api
+central_api_db_storage: 1Gi

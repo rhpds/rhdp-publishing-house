@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     # PH Internal AI (drift detection via MaaS)
     ph_internal_ai_api_key: str = ""
 
+    # Database
+    database_url: str = ""
+    api_key_ttl_days: int = 7
+
     # RCARS integration
     rcars_url: str = "https://rcars-api.apps.ocpv-infra01.dal12.infra.demo.redhat.com"
     rcars_api_key: str = ""

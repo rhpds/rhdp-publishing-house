@@ -9,15 +9,17 @@ import time
 import urllib.parse
 import urllib.request
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
+from sqlalchemy import select, update
 
 from ..auth.oidc import require_oidc_auth
 from ..config import get_settings
+from ..database import ApiKey, get_session
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -27,32 +29,15 @@ _SSL_CTX = ssl.create_default_context()
 _SSL_CTX.check_hostname = False
 _SSL_CTX.verify_mode = ssl.CERT_NONE
 
-# Simple in-memory key store - one key per user (email)
-# Structure: {email: KeyRecord}
-keys_db: dict = {}
-
 
 # ── Auth Schemas ──────────────────────────────────────────────────────────────
-
-class KeyRecord:
-    def __init__(self, owner_email: str, label: str, raw_key: str):
-        self.id = str(uuid.uuid4())
-        self.key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-        self.owner_email = owner_email
-        self.label = label
-        self.created_at = datetime.now(timezone.utc).isoformat()
-        self.last_used_at = None
-        self.is_active = True
-
-    def masked(self) -> str:
-        return f"{self.key_hash[:8]}...{self.key_hash[-8:]}"
-
 
 class KeyResponse(BaseModel):
     id: str
     label: Optional[str]
     owner_email: str
     created_at: str
+    expires_at: Optional[str]
     last_used_at: Optional[str]
     masked: str
 
@@ -62,6 +47,7 @@ class KeyCreatedResponse(BaseModel):
     raw_key: str   # shown ONCE — never stored
     owner_email: str
     label: Optional[str]
+    expires_at: Optional[str]
 
 
 # ── Project Schemas ───────────────────────────────────────────────────────────
@@ -104,21 +90,52 @@ class DeleteProjectResponse(BaseModel):
 
 def _create_key(email: str, label: str = "API Key") -> tuple:
     """Create/replace key for user. One key per user. Returns (record, raw_key)."""
+    settings = get_settings()
     raw_key = secrets.token_hex(32)
-    rec = KeyRecord(owner_email=email, label=label, raw_key=raw_key)
-    keys_db[email] = rec  # Store by email (one key per user)
-    return rec, raw_key
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    key_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    expires = now + timedelta(days=settings.api_key_ttl_days)
+
+    with get_session() as session:
+        session.execute(
+            update(ApiKey)
+            .where(ApiKey.owner_email == email, ApiKey.is_active == True)  # noqa: E712
+            .values(is_active=False)
+        )
+        row = ApiKey(
+            id=key_id,
+            key_hash=key_hash,
+            owner_email=email,
+            label=label,
+            created_at=now,
+            expires_at=expires,
+            is_active=True,
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+
+    return row, raw_key
 
 
-def lookup_key(raw_key: str) -> Optional[KeyRecord]:
+def lookup_key(raw_key: str) -> Optional[ApiKey]:
     """Used by other endpoints to validate a Bearer token."""
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-    # Search all users for matching key hash
-    for rec in keys_db.values():
-        if rec.key_hash == key_hash and rec.is_active:
-            rec.last_used_at = datetime.now(timezone.utc).isoformat()
-            return rec
-    return None
+    with get_session() as session:
+        result = session.execute(
+            select(ApiKey).where(ApiKey.key_hash == key_hash, ApiKey.is_active == True)  # noqa: E712
+        )
+        rec = result.scalar_one_or_none()
+        if not rec:
+            return None
+        if rec.expires_at and rec.expires_at < datetime.now(timezone.utc):
+            rec.is_active = False
+            session.commit()
+            return None
+        rec.last_used_at = datetime.now(timezone.utc)
+        session.commit()
+        return rec
 
 
 def _require_auth(
@@ -202,12 +219,21 @@ def _patch_workflow_data(wf_uuid: str, data: dict, settings=None) -> None:
 @router.get("/keys", response_model=list[KeyResponse])
 def list_keys(email: str = Depends(require_oidc_auth)):
     """List key for the authenticated user (one key per user)."""
-    rec = keys_db.get(email)
-    if rec and rec.is_active:
-        return [KeyResponse(id=rec.id, label=rec.label, owner_email=rec.owner_email,
-                            created_at=rec.created_at, last_used_at=rec.last_used_at,
-                            masked=rec.masked())]
-    return []
+    with get_session() as session:
+        result = session.execute(
+            select(ApiKey).where(ApiKey.owner_email == email, ApiKey.is_active == True)  # noqa: E712
+        )
+        rec = result.scalar_one_or_none()
+    if not rec:
+        return []
+    masked = f"{rec.key_hash[:8]}...{rec.key_hash[-8:]}"
+    return [KeyResponse(
+        id=rec.id, label=rec.label, owner_email=rec.owner_email,
+        created_at=rec.created_at.isoformat() if rec.created_at else "",
+        expires_at=rec.expires_at.isoformat() if rec.expires_at else None,
+        last_used_at=rec.last_used_at.isoformat() if rec.last_used_at else None,
+        masked=masked,
+    )]
 
 
 @router.post("/keys", response_model=KeyCreatedResponse, status_code=201)
@@ -215,26 +241,41 @@ def create_key(email: str = Depends(require_oidc_auth)):
     """Generate/regenerate key for user. One key per user. Auto-generates on first portal login."""
     rec, raw_key = _create_key(email, label="Central API Key")
     logger.info("projects/keys: created key for %s", email)
-    return KeyCreatedResponse(id=rec.id, raw_key=raw_key, owner_email=email, label=rec.label)
+    return KeyCreatedResponse(
+        id=rec.id, raw_key=raw_key, owner_email=email, label=rec.label,
+        expires_at=rec.expires_at.isoformat() if rec.expires_at else None,
+    )
 
 
 @router.delete("/keys/{key_id}", status_code=204)
 def revoke_key(key_id: str, email: str = Depends(require_oidc_auth)):
     """Revoke user's key."""
-    rec = keys_db.get(email)
-    if not rec or rec.id != key_id:
-        raise HTTPException(status_code=404, detail="Key not found")
-    rec.is_active = False
+    with get_session() as session:
+        result = session.execute(
+            select(ApiKey).where(ApiKey.owner_email == email, ApiKey.id == key_id)
+        )
+        rec = result.scalar_one_or_none()
+        if not rec:
+            raise HTTPException(status_code=404, detail="Key not found")
+        rec.is_active = False
+        session.commit()
 
 
 @router.post("/keys/{key_id}/refresh", response_model=KeyCreatedResponse)
 def refresh_key(key_id: str, email: str = Depends(require_oidc_auth)):
     """Rotate user's key."""
-    old = keys_db.get(email)
-    if not old or old.id != key_id:
+    with get_session() as session:
+        result = session.execute(
+            select(ApiKey).where(ApiKey.owner_email == email, ApiKey.id == key_id)
+        )
+        old = result.scalar_one_or_none()
+    if not old:
         raise HTTPException(status_code=404, detail="Key not found")
     rec, raw_key = _create_key(email, label=old.label or "Central API Key")
-    return KeyCreatedResponse(id=rec.id, raw_key=raw_key, owner_email=email, label=rec.label)
+    return KeyCreatedResponse(
+        id=rec.id, raw_key=raw_key, owner_email=email, label=rec.label,
+        expires_at=rec.expires_at.isoformat() if rec.expires_at else None,
+    )
 
 
 # ── Project Endpoints ─────────────────────────────────────────────────────────

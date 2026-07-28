@@ -59,6 +59,18 @@ spec:
           value: "RHDPCD"
         - name: SONATAFLOW_URL
           value: "http://publishing-house-workflow.publishing-house.svc.cluster.local:8080"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: central-api-db
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: central-api-db
+              key: password
+        - name: DATABASE_URL
+          value: "postgresql://$(DB_USER):$(DB_PASSWORD)@central-api-postgresql.publishing-house.svc.cluster.local:5432/central_api"
         volumeMounts:
         - name: validation-policy
           mountPath: /etc/ph-policy
