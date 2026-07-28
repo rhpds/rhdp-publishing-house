@@ -4,7 +4,7 @@ metadata:
   displayName: ${{ values.project_name }} - Publishing House Workspace
   description: Workspace for creating RHDP lab/demo content with Claude AI assistance
 attributes:
-  che-theia.eclipse.org/vscode-preferences:
+  che-code.eclipse.org/vscode-preferences:
     security.workspace.trust.enabled: false
 
 components:
@@ -231,7 +231,7 @@ commands:
     exec:
       component: dev-tools
       commandLine: |
-        curl -sL -o /tmp/claude-code.vsix "https://open-vsx.org/api/Anthropic/claude-code/linux-x64/2.1.218/file/Anthropic.claude-code-2.1.218@linux-x64.vsix"
+        curl -sL -o /tmp/claude-code.vsix "https://open-vsx.org/api/Anthropic/claude-code/linux-x64/2.1.220/file/Anthropic.claude-code-2.1.220@linux-x64.vsix"
       workingDir: /projects
       label: "Download Claude Code Extension"
       group:
