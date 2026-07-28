@@ -14,34 +14,6 @@
     state: present
     definition: "{{ lookup('template', 'configmap-validation-policy.yaml.j2') | from_yaml }}"
 
-- name: Create central-api-db Secret
-  kubernetes.core.k8s:
-    state: present
-    definition: "{{ lookup('template', 'secret-central-api-db.yaml.j2') | from_yaml }}"
-
-- name: Deploy central-api PostgreSQL
-  kubernetes.core.k8s:
-    state: present
-    definition: "{{ lookup('template', 'ss-central-api-postgresql.yaml.j2') | from_yaml }}"
-
-- name: Create central-api PostgreSQL Service
-  kubernetes.core.k8s:
-    state: present
-    definition: "{{ lookup('template', 'svc-central-api-postgresql.yaml.j2') | from_yaml }}"
-
-- name: Wait for central-api PostgreSQL to be ready
-  kubernetes.core.k8s_info:
-    api_version: apps/v1
-    kind: StatefulSet
-    name: central-api-postgresql
-    namespace: "{{ app_namespace }}"
-  register: central_api_pg
-  until:
-    - central_api_pg.resources | length > 0
-    - (central_api_pg.resources[0].status.readyReplicas | default(0)) > 0
-  retries: 30
-  delay: 10
-
 - name: Deploy central-api
   kubernetes.core.k8s:
     state: present

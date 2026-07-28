@@ -43,13 +43,15 @@ class Settings(BaseSettings):
     # PH Internal AI (drift detection via MaaS)
     ph_internal_ai_api_key: str = ""
 
-    # Database
-    database_url: str = ""
+    # Signed token TTL
     api_key_ttl_days: int = 7
 
     # RCARS integration
     rcars_url: str = "https://rcars-api.apps.ocpv-infra01.dal12.infra.demo.redhat.com"
     rcars_api_key: str = ""
+
+    # CORS (comma-separated origins for direct browser→API calls)
+    cors_origins: str = ""
 
     # RHDH catalog API (for location cleanup on project delete)
     rhdh_service_token: str = ""

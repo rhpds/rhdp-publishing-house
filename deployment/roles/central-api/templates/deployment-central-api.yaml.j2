@@ -64,6 +64,8 @@ spec:
               value: "http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local:80"
               # preview mode: use platform data-index service
               # value: "http://sonataflow-platform-data-index-service.{{ app_namespace }}.svc.cluster.local:80"
+            - name: CORS_ORIGINS
+              value: "https://backstage-developer-hub-{{ app_namespace }}.{{ ocp_apps_domain }}"
             - name: OIDC_ISSUER_URL
               value: "https://keycloak-keycloak.{{ ocp_apps_domain }}/realms/publishing-house"
             - name: OIDC_CLIENT_ID
@@ -95,18 +97,6 @@ spec:
                   key: RHDH_SERVICE_TOKEN
             - name: RHDH_INTERNAL_URL
               value: "http://backstage-developer-hub.{{ app_namespace }}.svc.cluster.local"
-            - name: DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: central-api-db
-                  key: username
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: central-api-db
-                  key: password
-            - name: DATABASE_URL
-              value: "postgresql://$(DB_USER):$(DB_PASSWORD)@central-api-postgresql.{{ app_namespace }}.svc.cluster.local:5432/{{ central_api_db_name }}"
           volumeMounts:
             - name: validation-policy
               mountPath: /etc/ph-policy

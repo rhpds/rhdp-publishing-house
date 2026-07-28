@@ -12,6 +12,7 @@ import {
 import {
   discoveryApiRef,
   fetchApiRef,
+  identityApiRef,
   useApi,
 } from '@backstage/core-plugin-api';
 import {
@@ -36,6 +37,7 @@ import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 import { createPhWorkflowsClient } from '../../api/client';
 import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
+import { useUserGroups } from '../../hooks/useUserGroups';
 
 const REVIEW_STAGES: WorkflowStage[] = ['content_review', 'infra_review'];
 const STAGES_WITH_REVIEW_TAB: WorkflowStage[] = [
@@ -108,8 +110,10 @@ export function WorkflowDetailPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
+  const identityApi = useApi(identityApiRef);
 
-  const client = useMemo(() => createPhWorkflowsClient({ discoveryApi, fetchApi }), [discoveryApi, fetchApi]);
+  const client = useMemo(() => createPhWorkflowsClient({ discoveryApi, fetchApi, identityApi }), [discoveryApi, fetchApi, identityApi]);
+  const { isContentReviewer, isInfraReviewer } = useUserGroups();
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState(0);
@@ -293,6 +297,8 @@ export function WorkflowDetailPage() {
 
   const isReviewStage = REVIEW_STAGES.includes(summary.stage);
   const hasReviewTab = STAGES_WITH_REVIEW_TAB.includes(summary.stage);
+  const canReview = (summary.stage === 'content_review' && isContentReviewer)
+    || (summary.stage === 'infra_review' && isInfraReviewer);
 
   return (
     <Page themeId="tool">
@@ -680,8 +686,8 @@ export function WorkflowDetailPage() {
               );
             })()}
 
-            {/* Approve / Reject buttons */}
-            {isReviewStage && (validationReport || driftReport) && (
+            {/* Approve / Reject buttons — only shown to the relevant reviewer group */}
+            {canReview && (validationReport || driftReport) && (
               <InfoCard>
                 <div style={{ display: 'flex', gap: 12 }}>
                   <Button

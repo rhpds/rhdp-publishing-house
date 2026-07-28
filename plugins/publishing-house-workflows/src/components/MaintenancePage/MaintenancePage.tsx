@@ -12,6 +12,7 @@ import {
 import {
   discoveryApiRef,
   fetchApiRef,
+  identityApiRef,
   useApi,
 } from '@backstage/core-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
@@ -19,13 +20,16 @@ import { Entity } from '@backstage/catalog-model';
 import {
   IconButton,
   Tooltip,
+  Typography,
   makeStyles,
 } from '@material-ui/core';
 import RefreshIcon from '@material-ui/icons/Refresh';
 import DeleteIcon from '@material-ui/icons/Delete';
+import LockIcon from '@material-ui/icons/Lock';
 import { DeleteDialog } from './DeleteDialog';
 import { createPhWorkflowsClient } from '../../api/client';
 import { WorkflowSummary } from '../../api/types';
+import { useUserGroups } from '../../hooks/useUserGroups';
 
 const useStyles = makeStyles(theme => ({
   deleteButton: {
@@ -83,10 +87,12 @@ export function MaintenancePage() {
   const catalogApi = useApi(catalogApiRef);
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
+  const identityApi = useApi(identityApiRef);
+  const { isAdmin, loading: groupsLoading } = useUserGroups();
   const [refreshKey, setRefreshKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<Entity | null>(null);
 
-  const client = createPhWorkflowsClient({ discoveryApi, fetchApi });
+  const client = createPhWorkflowsClient({ discoveryApi, fetchApi, identityApi });
 
   const { value, loading, error } = useAsync(async () => {
     const [catalogResult, workflows] = await Promise.all([
@@ -195,6 +201,23 @@ export function MaintenancePage() {
       ),
     },
   ];
+
+  if (!groupsLoading && !isAdmin) {
+    return (
+      <Page themeId="tool">
+        <Header title="Publishing House" subtitle="Component maintenance and cleanup" />
+        <Content>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 64, gap: 16 }}>
+            <LockIcon style={{ fontSize: 48, color: '#757575' }} />
+            <Typography variant="h6" color="textSecondary">Access Restricted</Typography>
+            <Typography variant="body2" color="textSecondary">
+              This page is only available to members of rhdp-administrators.
+            </Typography>
+          </div>
+        </Content>
+      </Page>
+    );
+  }
 
   return (
     <Page themeId="tool">

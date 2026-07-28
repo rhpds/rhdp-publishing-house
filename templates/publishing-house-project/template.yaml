@@ -179,26 +179,25 @@ spec:
         gitCommitMessage: "Add templated skeleton artifacts"
         collaborators: ${{ parameters.github_users }}
 
-    # Step 5: Trigger workflow via RHDH proxy
+    # Step 5: Start workflow via central API
     - id: trigger-workflow
       name: Start Publishing House Workflow
       if: ${{ steps['check-catalog'].output.entity == null }}
       action: http:backstage:request
       input:
         method: POST
-        path: '/proxy/sonataflow/publishinghouseworkflow?businessKey=${{ parameters.project_name }}'
+        path: '/proxy/central-api/projects/${{ parameters.project_name }}'
         headers:
           content-type: 'application/json'
         body:
-          projectId: ${{ parameters.project_name }}
-          repoUrl: https://github.com/rhpds/${{ parameters.project_name }}
-          ssoUser: ${{ user.entity.metadata.name }}
-          ssoEmail: ${{ user.entity.spec.profile.email }}
-          deploymentMode: ${{ parameters.deployment_mode }}
-          contentType: ${{ parameters.content_type }}
+          repo_url: https://github.com/rhpds/${{ parameters.project_name }}
+          branch: main
+          project_name: ${{ parameters.project_name }}
+          deployment_mode: ${{ parameters.deployment_mode }}
+          content_type: ${{ parameters.content_type }}
           tags: ${{ parameters.tags }}
-          projectDescription: ${{ parameters.project_description }}
-          auditTrailSha: ${{ steps['create-and-push'].output.commitHash }}
+          project_description: ${{ parameters.project_description }}
+          audit_trail_sha: ${{ steps['create-and-push'].output.commitHash }}
 
     # Step 6: Register in catalog
     - id: register

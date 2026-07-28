@@ -56,29 +56,22 @@ def _get_review_history(workflow_id: str, settings=None) -> list:
 
 def _require_auth(
     credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
-) -> str:
-    settings = get_settings()
-    if not credentials:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bearer token required")
-    if credentials.credentials == settings.ph_api_key:
-        return "service"
-
-    from .projects import lookup_key
-    rec = lookup_key(credentials.credentials)
-    if not rec:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
-    return rec.owner_email
+) -> tuple[str, int]:
+    from .projects import _require_auth as _shared_auth
+    return _shared_auth(credentials)
 
 
 @router.post("/{slug}", response_model=DriftResponse)
 async def detect_drift(
     slug: str,
     mode: str = Query("semantic", regex="^(structural|semantic)$"),
-    owner: str = Depends(_require_auth),
+    auth: tuple[str, int] = Depends(_require_auth),
 ):
     """Look up workflow data for slug, then compare spec.yaml (structural) or design.md (semantic)
     between baselineSha and current HEAD."""
-    from .projects import _get_workflow_data
+    from .projects import _get_workflow_data, _require_group, GROUP_BITS
+    _owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
 
     settings = get_settings()
     if not settings.github_token:
@@ -113,66 +106,3 @@ async def detect_drift(
     )
 
 
-@router.post("/{slug}/approve")
-async def approve_drift(
-    slug: str,
-    owner: str = Depends(_require_auth),
-):
-    """Clear hasDrift and advance baselineSha to current HEAD."""
-    from .projects import _get_workflow_data, _patch_workflow_data
-
-    settings = get_settings()
-    if not settings.github_token:
-        raise HTTPException(status_code=500, detail="GITHUB_TOKEN not configured on Central API")
-
-    wd = _get_workflow_data(slug)
-    if not wd or not wd.get("workflow_id"):
-        raise HTTPException(status_code=404, detail=f"No active workflow found for '{slug}'")
-
-    repo_url = wd.get("repoUrl", "")
-    if not repo_url:
-        raise HTTPException(status_code=422, detail="Workflow has no repoUrl set")
-
-    github = GitHubService(token=settings.github_token)
-    head_sha = await github.get_head_sha(repo_url, "main")
-    if not head_sha:
-        raise HTTPException(status_code=502, detail="Failed to fetch HEAD SHA from GitHub")
-
-    history = _get_review_history(wd["workflow_id"], settings=settings)
-    history.append({
-        "stage": "DriftReview",
-        "action": "approved",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "user": owner,
-        "commitSha": head_sha,
-    })
-
-    _patch_workflow_data(
-        wd["workflow_id"],
-        {"hasDrift": False, "baselineSha": head_sha, "reviewHistory": history},
-        settings=settings,
-    )
-    logger.info("drift approved for %s by %s — baselineSha=%s", slug, owner, head_sha[:8])
-
-    # Sync Jira tasks to reflect any module changes
-    jira_synced = None
-    epic_key = wd.get("epic_key", "")
-    if epic_key and repo_url:
-        from .jira import sync_jira_tasks, SyncRequest
-        try:
-            result = await sync_jira_tasks(
-                body=SyncRequest(repo_url=repo_url, epic_key=epic_key),
-                _caller=owner,
-                settings=settings,
-            )
-            jira_synced = {
-                "tasks_created": result.tasks_created,
-                "tasks_updated": result.tasks_updated,
-                "tasks_closed": result.tasks_closed,
-            }
-            logger.info("drift approve: jira sync complete for %s — %s", slug, jira_synced)
-        except Exception as e:
-            logger.warning("drift approve: jira sync failed for %s: %s", slug, e)
-            jira_synced = {"error": str(e)}
-
-    return {"slug": slug, "baselineSha": head_sha, "cleared": True, "jira_sync": jira_synced}

@@ -13,6 +13,7 @@ import {
 import {
   discoveryApiRef,
   fetchApiRef,
+  identityApiRef,
   useApi,
 } from '@backstage/core-plugin-api';
 import {
@@ -169,11 +170,12 @@ export function WorkflowListPage() {
   const navigate = useNavigate();
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
+  const identityApi = useApi(identityApiRef);
   const [stageFilter, setStageFilter] = useState<string>('ALL');
   const [searchText, setSearchText] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const client = createPhWorkflowsClient({ discoveryApi, fetchApi });
+  const client = createPhWorkflowsClient({ discoveryApi, fetchApi, identityApi });
 
   const { value: workflows, loading, error } = useAsync(
     () => client.getWorkflows(),

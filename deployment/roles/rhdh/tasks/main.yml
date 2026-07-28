@@ -75,6 +75,13 @@
     state: present
     definition: "{{ lookup('template', 'cm-rhdh-app-config.yaml.j2') }}"
 
+# --- RBAC policy ConfigMap ---
+
+- name: Create RBAC policy ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cm-rbac-policy.yaml.j2') }}"
+
 # --- Dynamic plugins ConfigMap ---
 
 - name: Create RHDH dynamic plugins ConfigMap

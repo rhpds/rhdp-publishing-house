@@ -81,12 +81,14 @@ class OIDCAuth:
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+        result = await self.validate_token_string(token)
+        return result["email"]
+
+    async def validate_token_string(self, token: str) -> dict:
+        """Validate a raw JWT token string. Returns dict with 'email' and 'groups'."""
         try:
-            # Get public key for verification
             public_key = await self._get_public_key()
 
-            # Decode and validate JWT
-            # Note: Skip audience validation as openshift realm doesn't include aud claim by default
             payload = jwt.decode(
                 token,
                 public_key,
@@ -95,7 +97,6 @@ class OIDCAuth:
                 options={"verify_aud": False}
             )
 
-            # Extract email from claims
             email = payload.get("email") or payload.get("preferred_username")
             if not email:
                 raise HTTPException(
@@ -103,8 +104,11 @@ class OIDCAuth:
                     detail="Token missing email claim"
                 )
 
-            logger.info("OIDC auth successful for: %s", email)
-            return email
+            groups = payload.get("groups", [])
+            groups = [g.lstrip("/") for g in groups]
+
+            logger.info("OIDC auth successful for: %s (groups: %s)", email, groups)
+            return {"email": email, "groups": groups}
 
         except JWTError as e:
             logger.warning("JWT validation failed: %s", e)
@@ -113,6 +117,8 @@ class OIDCAuth:
                 detail=f"Invalid token: {str(e)}",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error("Token validation error: %s", e)
             raise HTTPException(
@@ -129,6 +135,11 @@ def init_oidc(issuer_url: str, client_id: str):
     """Initialize global OIDC validator."""
     global _oidc_validator
     _oidc_validator = OIDCAuth(issuer_url, client_id)
+
+
+def get_oidc_validator() -> Optional["OIDCAuth"]:
+    """Return the global OIDC validator instance."""
+    return _oidc_validator
 
 
 async def require_oidc_auth(request: Request) -> str:

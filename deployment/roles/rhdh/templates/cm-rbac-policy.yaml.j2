@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ph-rbac-policy
+  namespace: "{{ app_namespace }}"
+data:
+  rbac-policy.csv: |
+    g, group:default/rhdp-administrators, role:default/ph-admin
+    g, group:default/rhdp-developers, role:default/ph-developer
+    g, group:default/rhdp-content-review, role:default/ph-content-reviewer
+    g, group:default/rhdp-infra-review, role:default/ph-infra-reviewer
+
+    p, role:default/ph-content-reviewer, scaffolder-template, read, deny
+    p, role:default/ph-content-reviewer, scaffolder-action, use, deny
+    p, role:default/ph-infra-reviewer, scaffolder-template, read, deny
+    p, role:default/ph-infra-reviewer, scaffolder-action, use, deny
+
+    p, role:default/ph-admin, scaffolder-template, read, allow
+    p, role:default/ph-admin, scaffolder-action, use, allow
+    p, role:default/ph-developer, scaffolder-template, read, allow
+    p, role:default/ph-developer, scaffolder-action, use, allow

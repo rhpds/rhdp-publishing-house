@@ -22,6 +22,7 @@ import ErrorIcon from '@material-ui/icons/Error';
 import {
   discoveryApiRef,
   fetchApiRef,
+  identityApiRef,
   useApi,
 } from '@backstage/core-plugin-api';
 import { Entity } from '@backstage/catalog-model';
@@ -54,6 +55,7 @@ export function DeleteDialog({ open, entity, onClose, onDeleted }: DeleteDialogP
   const classes = useStyles();
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
+  const identityApi = useApi(identityApiRef);
 
   const [deleteRepo, setDeleteRepo] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -77,7 +79,7 @@ export function DeleteDialog({ open, entity, onClose, onDeleted }: DeleteDialogP
     setResult(null);
 
     try {
-      const client = createPhWorkflowsClient({ discoveryApi, fetchApi });
+      const client = createPhWorkflowsClient({ discoveryApi, fetchApi, identityApi });
       const res = await client.deleteProject(slug, deleteRepo);
       setResult(res);
     } catch (e: any) {
@@ -85,7 +87,7 @@ export function DeleteDialog({ open, entity, onClose, onDeleted }: DeleteDialogP
     } finally {
       setDeleting(false);
     }
-  }, [entity, slug, deleteRepo, discoveryApi, fetchApi]);
+  }, [entity, slug, deleteRepo, discoveryApi, fetchApi, identityApi]);
 
   return (
     <Dialog open={open} onClose={deleting || result ? undefined : handleClose} maxWidth="sm" fullWidth disableEscapeKeyDown={!!result || deleting}>

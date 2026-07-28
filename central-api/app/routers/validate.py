@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from ..auth.groups import decode_signed_key
 from ..config import get_settings
 from ..services.github import GitHubService
 from ..services.validation.models import ValidationRequest, ValidationResponse
@@ -24,11 +25,10 @@ def _require_auth(
     if credentials.credentials == settings.ph_api_key:
         return "service"
 
-    from .projects import lookup_key
-    rec = lookup_key(credentials.credentials)
-    if not rec:
+    result = decode_signed_key(credentials.credentials)
+    if not result:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
-    return rec.owner_email
+    return result[0]
 
 
 @router.get("/policy")

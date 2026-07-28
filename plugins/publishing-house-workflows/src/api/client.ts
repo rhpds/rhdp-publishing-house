@@ -1,6 +1,9 @@
-import { DiscoveryApi, FetchApi } from '@backstage/core-plugin-api';
+import { DiscoveryApi, FetchApi, IdentityApi } from '@backstage/core-plugin-api';
 import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult } from './types';
 import { deriveStage } from '../utils/stageMapping';
+
+const TOKEN_STORAGE_KEY = 'ph-central-token';
+const EXPIRY_STORAGE_KEY = 'ph-central-token-expiry';
 
 const GRAPHQL_QUERY = `
   query GetPublishingHouseWorkflows {
@@ -41,16 +44,68 @@ function toSummary(inst: ProcessInstance): WorkflowSummary {
   };
 }
 
+const CENTRAL_API_URL = 'https://central-api-publishing-house.apps.ocpv-infra01.dal12.infra.demo.redhat.com';
+
 export function createPhWorkflowsClient(options: {
   discoveryApi: DiscoveryApi;
   fetchApi: FetchApi;
+  identityApi?: IdentityApi;
 }) {
-  const { discoveryApi, fetchApi } = options;
+  const { discoveryApi, fetchApi, identityApi } = options;
+
+  async function getUserToken(): Promise<string | undefined> {
+    const cached = localStorage.getItem(TOKEN_STORAGE_KEY);
+    const expiry = Number(localStorage.getItem(EXPIRY_STORAGE_KEY) || '0');
+    if (cached && Date.now() / 1000 < expiry - 60) {
+      return cached;
+    }
+
+    if (!identityApi) return undefined;
+
+    let backstageToken: string | undefined;
+    try {
+      const creds = await identityApi.getCredentials();
+      backstageToken = creds.token;
+    } catch {
+      return undefined;
+    }
+    if (!backstageToken) return undefined;
+
+    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
+    const resp = await fetchApi.fetch(
+      `${proxyUrl}/central-api/auth/keys/exchange`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ backstage_token: backstageToken }),
+      },
+    );
+
+    if (!resp.ok) return undefined;
+
+    const data = await resp.json();
+    localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+    localStorage.setItem(EXPIRY_STORAGE_KEY, String(new Date(data.expires_at).getTime() / 1000));
+    return data.token;
+  }
+
+  async function centralFetch(path: string, init?: RequestInit): Promise<Response> {
+    const token = await getUserToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers as Record<string, string> | undefined),
+    };
+    return globalThis.fetch(`${CENTRAL_API_URL}/api/v1${path}`, {
+      ...init,
+      headers,
+    });
+  }
 
   async function getWorkflows(): Promise<WorkflowSummary[]> {
     const proxyUrl = await discoveryApi.getBaseUrl('proxy');
     const response = await fetchApi.fetch(
-      `${proxyUrl}/sonataflow/graphql`,
+      `${proxyUrl}/sonataflow`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -91,7 +146,7 @@ export function createPhWorkflowsClient(options: {
       }
     `;
     const response = await fetchApi.fetch(
-      `${proxyUrl}/sonataflow/graphql`,
+      `${proxyUrl}/sonataflow`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,7 +190,7 @@ export function createPhWorkflowsClient(options: {
       }
     `;
     const response = await fetchApi.fetch(
-      `${proxyUrl}/sonataflow/graphql`,
+      `${proxyUrl}/sonataflow`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -165,38 +220,25 @@ export function createPhWorkflowsClient(options: {
     projectId?: string,
     auditData?: { user: string; commitSha?: string },
   ): Promise<void> {
-    const typeMap: Partial<Record<WorkflowStage, string>> = {
-      content_review: 'ph.content-review.complete',
-      infra_review: 'ph.infra-review.complete',
-      development: 'ph.development.complete',
-      testing: 'ph.testing.complete',
+    const stagePathMap: Partial<Record<WorkflowStage, string>> = {
+      content_review: 'content-review',
+      infra_review: 'infra-review',
     };
-    const eventType = typeMap[stage];
-    if (!eventType) {
+    const stagePath = stagePathMap[stage];
+    if (!stagePath) {
       throw new Error(`Cannot approve stage: ${stage}`);
     }
 
-    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
-    const response = await fetchApi.fetch(`${proxyUrl}/sonataflow/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/cloudevents+json' },
-      body: JSON.stringify({
-        specversion: '1.0',
-        type: eventType,
-        source: 'publishing-house',
-        id: crypto.randomUUID(),
-        kogitobusinesskey: projectId ?? workflowId,
-        projectid: projectId ?? workflowId,
-        datacontenttype: 'application/json',
-        data: {
-          user: auditData?.user ?? '',
-          stage,
-          action: stage === 'development' || stage === 'testing' ? 'completed' : 'approved',
-          timestamp: new Date().toISOString(),
-          commitSha: auditData?.commitSha ?? '',
-        },
-      }),
-    });
+    const slug = projectId ?? workflowId;
+    const response = await centralFetch(
+      `/projects/${slug}/${stagePath}/approve`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          commit_sha: auditData?.commitSha ?? '',
+        }),
+      },
+    );
 
     if (!response.ok) {
       throw new Error(
@@ -212,38 +254,27 @@ export function createPhWorkflowsClient(options: {
     projectId?: string,
     commitSha?: string,
   ): Promise<void> {
-    const typeMap: Partial<Record<WorkflowStage, string>> = {
-      content_review: 'ph.content-review.rejected',
-      infra_review: 'ph.infra-review.rejected',
+    const stagePathMap: Partial<Record<WorkflowStage, string>> = {
+      content_review: 'content-review',
+      infra_review: 'infra-review',
     };
-    const eventType = typeMap[stage];
-    if (!eventType) {
+    const stagePath = stagePathMap[stage];
+    if (!stagePath) {
       throw new Error(`Cannot reject stage: ${stage}`);
     }
 
-    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
-    const response = await fetchApi.fetch(`${proxyUrl}/sonataflow/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/cloudevents+json' },
-      body: JSON.stringify({
-        specversion: '1.0',
-        type: eventType,
-        source: 'publishing-house',
-        id: crypto.randomUUID(),
-        kogitobusinesskey: projectId ?? workflowId,
-        projectid: projectId ?? workflowId,
-        datacontenttype: 'application/json',
-        data: {
-          user: rejectionData.reviewerName,
-          stage,
-          action: 'rejected',
-          timestamp: rejectionData.timestamp,
-          commitSha: commitSha ?? '',
-          rejectionId: rejectionData.rejectionId,
+    const slug = projectId ?? workflowId;
+    const response = await centralFetch(
+      `/projects/${slug}/${stagePath}/reject`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
           reasons: rejectionData.reasons,
-        },
-      }),
-    });
+          reviewer_name: rejectionData.reviewerName,
+          commit_sha: commitSha ?? '',
+        }),
+      },
+    );
 
     if (!response.ok) {
       throw new Error(
@@ -258,16 +289,14 @@ export function createPhWorkflowsClient(options: {
     branch: string = 'main',
     baselineSha?: string,
   ): Promise<ValidationReport> {
-    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
     const params = new URLSearchParams({ stage: 'review' });
     if (baselineSha) {
       params.set('baseline_sha', baselineSha);
     }
-    const response = await fetchApi.fetch(
-      `${proxyUrl}/central-api/spec/validation/${slug}?${params}`,
+    const response = await centralFetch(
+      `/spec/validation/${slug}?${params}`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repo_url: repoUrl, branch }),
       },
     );
@@ -280,9 +309,8 @@ export function createPhWorkflowsClient(options: {
     slug: string,
     mode: 'structural' | 'semantic' = 'semantic',
   ): Promise<DriftReport> {
-    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
-    const response = await fetchApi.fetch(
-      `${proxyUrl}/central-api/spec/drift/${slug}?mode=${mode}`,
+    const response = await centralFetch(
+      `/spec/drift/${slug}?mode=${mode}`,
       { method: 'POST' },
     );
 
@@ -296,9 +324,8 @@ export function createPhWorkflowsClient(options: {
   async function approveDrift(
     slug: string,
   ): Promise<{ slug: string; baselineSha: string; cleared: boolean }> {
-    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
-    const response = await fetchApi.fetch(
-      `${proxyUrl}/central-api/spec/drift/${slug}/approve`,
+    const response = await centralFetch(
+      `/projects/${slug}/drift/approve`,
       { method: 'POST' },
     );
 
@@ -331,9 +358,8 @@ export function createPhWorkflowsClient(options: {
     slug: string,
     deleteRepo: boolean,
   ): Promise<DeleteProjectResult> {
-    const proxyUrl = await discoveryApi.getBaseUrl('proxy');
-    const response = await fetchApi.fetch(
-      `${proxyUrl}/central-api/projects/${slug}?delete_repo=${deleteRepo}`,
+    const response = await centralFetch(
+      `/projects/${slug}?delete_repo=${deleteRepo}`,
       { method: 'DELETE' },
     );
 

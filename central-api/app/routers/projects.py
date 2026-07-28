@@ -1,25 +1,20 @@
 """Publishing House projects and auth endpoints — all under /projects."""
-import hashlib
 import json
 import logging
 import re
-import secrets
 import ssl
 import time
 import urllib.parse
 import urllib.request
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
-from sqlalchemy import select, update
-
-from ..auth.oidc import require_oidc_auth
+from ..auth.groups import GROUP_BITS, ALL_GROUPS_MASK, decode_signed_key
 from ..config import get_settings
-from ..database import ApiKey, get_session
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -28,26 +23,6 @@ _bearer = HTTPBearer(auto_error=False)
 _SSL_CTX = ssl.create_default_context()
 _SSL_CTX.check_hostname = False
 _SSL_CTX.verify_mode = ssl.CERT_NONE
-
-
-# ── Auth Schemas ──────────────────────────────────────────────────────────────
-
-class KeyResponse(BaseModel):
-    id: str
-    label: Optional[str]
-    owner_email: str
-    created_at: str
-    expires_at: Optional[str]
-    last_used_at: Optional[str]
-    masked: str
-
-
-class KeyCreatedResponse(BaseModel):
-    id: str
-    raw_key: str   # shown ONCE — never stored
-    owner_email: str
-    label: Optional[str]
-    expires_at: Optional[str]
 
 
 # ── Project Schemas ───────────────────────────────────────────────────────────
@@ -88,69 +63,38 @@ class DeleteProjectResponse(BaseModel):
 
 # ── Auth Helpers ──────────────────────────────────────────────────────────────
 
-def _create_key(email: str, label: str = "API Key") -> tuple:
-    """Create/replace key for user. One key per user. Returns (record, raw_key)."""
-    settings = get_settings()
-    raw_key = secrets.token_hex(32)
-    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-    key_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
-    expires = now + timedelta(days=settings.api_key_ttl_days)
-
-    with get_session() as session:
-        session.execute(
-            update(ApiKey)
-            .where(ApiKey.owner_email == email, ApiKey.is_active == True)  # noqa: E712
-            .values(is_active=False)
-        )
-        row = ApiKey(
-            id=key_id,
-            key_hash=key_hash,
-            owner_email=email,
-            label=label,
-            created_at=now,
-            expires_at=expires,
-            is_active=True,
-        )
-        session.add(row)
-        session.commit()
-        session.refresh(row)
-
-    return row, raw_key
-
-
-def lookup_key(raw_key: str) -> Optional[ApiKey]:
-    """Used by other endpoints to validate a Bearer token."""
-    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-    with get_session() as session:
-        result = session.execute(
-            select(ApiKey).where(ApiKey.key_hash == key_hash, ApiKey.is_active == True)  # noqa: E712
-        )
-        rec = result.scalar_one_or_none()
-        if not rec:
-            return None
-        if rec.expires_at and rec.expires_at < datetime.now(timezone.utc):
-            rec.is_active = False
-            session.commit()
-            return None
-        rec.last_used_at = datetime.now(timezone.utc)
-        session.commit()
-        return rec
-
-
 def _require_auth(
     credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
-) -> str:
-    """Validate PH API key (single key from PH_API_KEY env var or per-user keys)."""
+) -> tuple[str, int]:
+    """Validate auth and return (identity, groups_bitmask).
+
+    Checks in order:
+    1. Master PH_API_KEY → ("service", ALL_GROUPS_MASK)
+    2. Signed bitmask token → (email, bitmask)
+    """
     settings = get_settings()
     if not credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bearer token required")
-    if credentials.credentials == settings.ph_api_key:
-        return "service"
-    rec = lookup_key(credentials.credentials)
-    if not rec:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
-    return rec.owner_email
+
+    token = credentials.credentials
+
+    if token == settings.ph_api_key:
+        return "service", ALL_GROUPS_MASK
+
+    result = decode_signed_key(token)
+    if result:
+        return result
+
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+
+
+
+def _require_group(groups: int, required: int, group_name: str):
+    if not (groups & required):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Requires membership in {group_name}",
+        )
 
 
 def _advance_workflow(
@@ -214,70 +158,6 @@ def _patch_workflow_data(wf_uuid: str, data: dict, settings=None) -> None:
         raise HTTPException(status_code=502, detail=f"Workflow PATCH failed: {e}")
 
 
-# ── Auth Endpoints (Portal key management) ────────────────────────────────────
-
-@router.get("/keys", response_model=list[KeyResponse])
-def list_keys(email: str = Depends(require_oidc_auth)):
-    """List key for the authenticated user (one key per user)."""
-    with get_session() as session:
-        result = session.execute(
-            select(ApiKey).where(ApiKey.owner_email == email, ApiKey.is_active == True)  # noqa: E712
-        )
-        rec = result.scalar_one_or_none()
-    if not rec:
-        return []
-    masked = f"{rec.key_hash[:8]}...{rec.key_hash[-8:]}"
-    return [KeyResponse(
-        id=rec.id, label=rec.label, owner_email=rec.owner_email,
-        created_at=rec.created_at.isoformat() if rec.created_at else "",
-        expires_at=rec.expires_at.isoformat() if rec.expires_at else None,
-        last_used_at=rec.last_used_at.isoformat() if rec.last_used_at else None,
-        masked=masked,
-    )]
-
-
-@router.post("/keys", response_model=KeyCreatedResponse, status_code=201)
-def create_key(email: str = Depends(require_oidc_auth)):
-    """Generate/regenerate key for user. One key per user. Auto-generates on first portal login."""
-    rec, raw_key = _create_key(email, label="Central API Key")
-    logger.info("projects/keys: created key for %s", email)
-    return KeyCreatedResponse(
-        id=rec.id, raw_key=raw_key, owner_email=email, label=rec.label,
-        expires_at=rec.expires_at.isoformat() if rec.expires_at else None,
-    )
-
-
-@router.delete("/keys/{key_id}", status_code=204)
-def revoke_key(key_id: str, email: str = Depends(require_oidc_auth)):
-    """Revoke user's key."""
-    with get_session() as session:
-        result = session.execute(
-            select(ApiKey).where(ApiKey.owner_email == email, ApiKey.id == key_id)
-        )
-        rec = result.scalar_one_or_none()
-        if not rec:
-            raise HTTPException(status_code=404, detail="Key not found")
-        rec.is_active = False
-        session.commit()
-
-
-@router.post("/keys/{key_id}/refresh", response_model=KeyCreatedResponse)
-def refresh_key(key_id: str, email: str = Depends(require_oidc_auth)):
-    """Rotate user's key."""
-    with get_session() as session:
-        result = session.execute(
-            select(ApiKey).where(ApiKey.owner_email == email, ApiKey.id == key_id)
-        )
-        old = result.scalar_one_or_none()
-    if not old:
-        raise HTTPException(status_code=404, detail="Key not found")
-    rec, raw_key = _create_key(email, label=old.label or "Central API Key")
-    return KeyCreatedResponse(
-        id=rec.id, raw_key=raw_key, owner_email=email, label=rec.label,
-        expires_at=rec.expires_at.isoformat() if rec.expires_at else None,
-    )
-
-
 # ── Project Endpoints ─────────────────────────────────────────────────────────
 
 def _get_workflow_data(project_id: str):
@@ -328,8 +208,10 @@ def _get_workflow_data(project_id: str):
 
 
 @router.get("/{project_id}/workflow-data")
-def get_workflow_data(project_id: str, _caller: str = Depends(_require_auth)):
+def get_workflow_data(project_id: str, auth: tuple[str, int] = Depends(_require_auth)):
     """Return workflow data subset (epic_key, jira_url)."""
+    _owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
     return _get_workflow_data(project_id)
 
 
@@ -402,8 +284,10 @@ def _get_workflow_state(workflow_id: str):
 
 
 @router.get("/workflow-state/{workflow_id}")
-def get_workflow_state(workflow_id: str, _caller: str = Depends(_require_auth)):
+def get_workflow_state(workflow_id: str, auth: tuple[str, int] = Depends(_require_auth)):
     """Return semantic workflow stage by process instance UUID."""
+    _owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
     return _get_workflow_state(workflow_id)
 
 
@@ -423,7 +307,7 @@ def _require_stage(workflow_id: str, allowed: list[str]) -> str:
 async def submit_intake(
     project_slug: str,
     body: IntakeRequest,
-    owner: str = Depends(_require_auth),
+    auth: tuple[str, int] = Depends(_require_auth),
 ):
     """Validate spec, then advance workflow past intake.
 
@@ -438,6 +322,8 @@ async def submit_intake(
     from ..services.github import GitHubService
     from ..services.validation.runner import run_validation
 
+    owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
     stage = None
 
     try:
@@ -508,7 +394,7 @@ async def submit_intake(
 async def submit_development(
     project_slug: str,
     body: DevelopmentRequest,
-    owner: str = Depends(_require_auth),
+    auth: tuple[str, int] = Depends(_require_auth),
 ):
     """Validate development artifacts, run semantic drift check, then advance workflow.
 
@@ -524,6 +410,8 @@ async def submit_development(
     from ..services.validation.runner import run_validation
     from ..services.drift import check_drift_semantic
 
+    owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
     stage = None
     drift_msg = "Design drift detected. Your submission has been referred for additional review."
 
@@ -607,29 +495,294 @@ async def submit_development(
         ).model_dump())
 
 
-# ── Project Deletion ─────────────────────────────────────────────────────────
+# ── Review Action Schemas ────────────────────────────────────────────────────
 
-def _require_service_auth(
-    credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
-) -> str:
-    """Only accept the master PH_API_KEY — not per-user keys."""
+class ApproveRequest(BaseModel):
+    commit_sha: str = ""
+
+
+class RejectRequest(BaseModel):
+    reasons: list[str]
+    reviewer_name: str = ""
+    commit_sha: str = ""
+
+
+class StartRequest(BaseModel):
+    repo_url: str
+    branch: str = "main"
+    project_name: str = ""
+    deployment_mode: str = ""
+    content_type: str = ""
+    tags: list[str] = []
+    project_description: str = ""
+    audit_trail_sha: str = ""
+
+
+def _send_cloud_event(event_type: str, project_slug: str, data: dict):
+    """Send a CloudEvent to SonataFlow."""
     settings = get_settings()
-    if not credentials or credentials.credentials != settings.ph_api_key:
-        raise HTTPException(status_code=403, detail="This endpoint requires the service API key")
-    return "service"
+    cloud_event = {
+        "specversion": "1.0",
+        "type": event_type,
+        "source": "publishing-house",
+        "id": str(uuid.uuid4()),
+        "kogitobusinesskey": project_slug,
+        "projectid": project_slug,
+        "datacontenttype": "application/json",
+        "data": data,
+    }
+    req = urllib.request.Request(
+        f"{settings.sonataflow_url.rstrip('/')}",
+        data=json.dumps(cloud_event).encode(),
+        headers={"Content-Type": "application/cloudevents+json"},
+    )
+    with urllib.request.urlopen(req, context=_SSL_CTX, timeout=30) as r:
+        pass
+    logger.info("sent %s for %s", event_type, project_slug)
+
+
+# ── Content Review ──────────────────────────────────────────────────────────
+
+@router.post("/{slug}/content-review/approve")
+async def approve_content_review(
+    slug: str,
+    body: ApproveRequest,
+    auth: tuple[str, int] = Depends(_require_auth),
+):
+    owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-content-review"], "rhdp-content-review")
+
+    wd = _get_workflow_data(slug)
+    wf_uuid = wd.get("workflow_id", "")
+    if not wf_uuid:
+        raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
+    _require_stage(wf_uuid, ["content_review"])
+
+    _send_cloud_event("ph.content-review.complete", slug, {
+        "user": owner,
+        "stage": "content_review",
+        "action": "approved",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "commitSha": body.commit_sha,
+    })
+    return {"slug": slug, "action": "approved", "stage": "content_review"}
+
+
+@router.post("/{slug}/content-review/reject")
+async def reject_content_review(
+    slug: str,
+    body: RejectRequest,
+    auth: tuple[str, int] = Depends(_require_auth),
+):
+    owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-content-review"], "rhdp-content-review")
+
+    wd = _get_workflow_data(slug)
+    wf_uuid = wd.get("workflow_id", "")
+    if not wf_uuid:
+        raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
+    _require_stage(wf_uuid, ["content_review"])
+
+    rejection_id = str(uuid.uuid4())
+    _send_cloud_event("ph.content-review.rejected", slug, {
+        "user": body.reviewer_name or owner,
+        "stage": "content_review",
+        "action": "rejected",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "commitSha": body.commit_sha,
+        "rejectionId": rejection_id,
+        "reasons": body.reasons,
+    })
+    return {"slug": slug, "action": "rejected", "stage": "content_review", "rejectionId": rejection_id}
+
+
+# ── Infra Review ────────────────────────────────────────────────────────────
+
+@router.post("/{slug}/infra-review/approve")
+async def approve_infra_review(
+    slug: str,
+    body: ApproveRequest,
+    auth: tuple[str, int] = Depends(_require_auth),
+):
+    owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-infra-review"], "rhdp-infra-review")
+
+    wd = _get_workflow_data(slug)
+    wf_uuid = wd.get("workflow_id", "")
+    if not wf_uuid:
+        raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
+    _require_stage(wf_uuid, ["infra_review"])
+
+    _send_cloud_event("ph.infra-review.complete", slug, {
+        "user": owner,
+        "stage": "infra_review",
+        "action": "approved",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "commitSha": body.commit_sha,
+    })
+    return {"slug": slug, "action": "approved", "stage": "infra_review"}
+
+
+@router.post("/{slug}/infra-review/reject")
+async def reject_infra_review(
+    slug: str,
+    body: RejectRequest,
+    auth: tuple[str, int] = Depends(_require_auth),
+):
+    owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-infra-review"], "rhdp-infra-review")
+
+    wd = _get_workflow_data(slug)
+    wf_uuid = wd.get("workflow_id", "")
+    if not wf_uuid:
+        raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
+    _require_stage(wf_uuid, ["infra_review"])
+
+    rejection_id = str(uuid.uuid4())
+    _send_cloud_event("ph.infra-review.rejected", slug, {
+        "user": body.reviewer_name or owner,
+        "stage": "infra_review",
+        "action": "rejected",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "commitSha": body.commit_sha,
+        "rejectionId": rejection_id,
+        "reasons": body.reasons,
+    })
+    return {"slug": slug, "action": "rejected", "stage": "infra_review", "rejectionId": rejection_id}
+
+
+# ── Drift Approve ───────────────────────────────────────────────────────────
+
+@router.post("/{slug}/drift/approve")
+async def approve_drift(
+    slug: str,
+    auth: tuple[str, int] = Depends(_require_auth),
+):
+    owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-content-review"], "rhdp-content-review")
+
+    settings = get_settings()
+    if not settings.github_token:
+        raise HTTPException(status_code=500, detail="GITHUB_TOKEN not configured on Central API")
+
+    wd = _get_workflow_data(slug)
+    if not wd or not wd.get("workflow_id"):
+        raise HTTPException(status_code=404, detail=f"No active workflow found for '{slug}'")
+
+    repo_url = wd.get("repoUrl", "")
+    if not repo_url:
+        raise HTTPException(status_code=422, detail="Workflow has no repoUrl set")
+
+    from ..services.github import GitHubService
+    github = GitHubService(token=settings.github_token)
+    head_sha = await github.get_head_sha(repo_url, "main")
+    if not head_sha:
+        raise HTTPException(status_code=502, detail="Failed to fetch HEAD SHA from GitHub")
+
+    from .drift import _get_review_history
+    history = _get_review_history(wd["workflow_id"], settings=settings)
+    history.append({
+        "stage": "DriftReview",
+        "action": "approved",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user": owner,
+        "commitSha": head_sha,
+    })
+
+    _patch_workflow_data(
+        wd["workflow_id"],
+        {"hasDrift": False, "baselineSha": head_sha, "reviewHistory": history},
+        settings=settings,
+    )
+    logger.info("drift approved for %s by %s — baselineSha=%s", slug, owner, head_sha[:8])
+
+    jira_synced = None
+    epic_key = wd.get("epic_key", "")
+    if epic_key and repo_url:
+        from .jira import sync_jira_tasks, SyncRequest
+        try:
+            result = await sync_jira_tasks(
+                body=SyncRequest(repo_url=repo_url, epic_key=epic_key),
+                _caller=owner,
+                settings=settings,
+            )
+            jira_synced = {
+                "tasks_created": result.tasks_created,
+                "tasks_updated": result.tasks_updated,
+                "tasks_closed": result.tasks_closed,
+            }
+            logger.info("drift approve: jira sync complete for %s — %s", slug, jira_synced)
+        except Exception as e:
+            logger.warning("drift approve: jira sync failed for %s: %s", slug, e)
+            jira_synced = {"error": str(e)}
+
+    return {"slug": slug, "baselineSha": head_sha, "cleared": True, "jira_sync": jira_synced}
+
+
+# ── Start Workflow ──────────────────────────────────────────────────────────
+
+@router.post("/{slug}")
+async def start_workflow(
+    slug: str,
+    body: StartRequest,
+    auth: tuple[str, int] = Depends(_require_auth),
+):
+    owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
+
+    settings = get_settings()
+    business_key = body.project_name or slug
+    wd = {
+        "projectId": business_key,
+        "repoUrl": body.repo_url,
+        "projectName": business_key,
+        "ssoUser": owner,
+        "ssoEmail": owner if "@" in owner else "",
+    }
+    if body.deployment_mode:
+        wd["deploymentMode"] = body.deployment_mode
+    if body.content_type:
+        wd["contentType"] = body.content_type
+    if body.tags:
+        wd["tags"] = body.tags
+    if body.project_description:
+        wd["projectDescription"] = body.project_description
+    if body.audit_trail_sha:
+        wd["auditTrailSha"] = body.audit_trail_sha
+    start_payload = wd
+
+    try:
+        url = f"{settings.sonataflow_url.rstrip('/')}/publishinghouseworkflow?businessKey={urllib.parse.quote(business_key)}"
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(start_payload).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=30) as r:
+            result = json.loads(r.read().decode())
+        logger.info("started workflow for %s by %s", business_key, owner)
+        return {"slug": business_key, "workflow_id": result.get("id", ""), "started": True}
+    except Exception as e:
+        logger.error("workflow start failed for %s: %s", business_key, e)
+        raise HTTPException(status_code=502, detail=f"Workflow start failed: {e}")
+
+
+# ── Project Deletion ─────────────────────────────────────────────────────────
 
 
 @router.delete("/{project_slug}", response_model=DeleteProjectResponse)
 async def delete_project(
     project_slug: str,
     delete_repo: bool = False,
-    owner: str = Depends(_require_service_auth),
+    auth: tuple[str, int] = Depends(_require_auth),
 ):
     """Delete a project and clean up all associated resources.
 
-    Requires the master service key (PH_API_KEY). Best-effort: each step
+    Requires rhdp-administrators group. Best-effort: each step
     runs independently. Failures are reported but don't block subsequent steps.
     """
+    owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-administrators"], "rhdp-administrators")
     from ..services.litellm import LiteLLMService
 
     settings = get_settings()

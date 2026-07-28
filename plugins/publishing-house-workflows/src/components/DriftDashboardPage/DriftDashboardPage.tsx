@@ -12,6 +12,7 @@ import {
 import {
   discoveryApiRef,
   fetchApiRef,
+  identityApiRef,
   useApi,
 } from '@backstage/core-plugin-api';
 import {
@@ -30,6 +31,7 @@ import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import { createPhWorkflowsClient } from '../../api/client';
 import { WorkflowSummary, DriftReport } from '../../api/types';
 import { STAGE_LABELS } from '../../utils/stageMapping';
+import { useUserGroups } from '../../hooks/useUserGroups';
 
 const useStyles = makeStyles(theme => ({
   chip: {
@@ -78,12 +80,14 @@ function DriftDetailPanel({
   state,
   onFetch,
   onApprove,
+  canApprove,
   classes,
 }: {
   slug: string;
   state: DriftRowState | undefined;
   onFetch: (slug: string) => void;
   onApprove: (slug: string) => void;
+  canApprove: boolean;
   classes: ReturnType<typeof useStyles>;
 }) {
   const fetchedRef = useRef(false);
@@ -149,7 +153,7 @@ function DriftDetailPanel({
           )}
         </>
       ) : null}
-      {reportLoaded && !state?.approved && (
+      {reportLoaded && !state?.approved && canApprove && (
         <Box className={classes.approveButton}>
           <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginBottom: 4 }}>
             Approving updates the baseline SHA to the latest commit.
@@ -178,10 +182,12 @@ export function DriftDashboardPage() {
   const classes = useStyles();
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
+  const identityApi = useApi(identityApiRef);
+  const { isContentReviewer } = useUserGroups();
   const [refreshKey, setRefreshKey] = useState(0);
   const [rowStates, setRowStates] = useState<Record<string, DriftRowState>>({});
 
-  const client = createPhWorkflowsClient({ discoveryApi, fetchApi });
+  const client = createPhWorkflowsClient({ discoveryApi, fetchApi, identityApi });
 
   const { value: workflows, loading, error } = useAsync(async () => {
     const all = await client.getWorkflows();
@@ -332,6 +338,7 @@ export function DriftDashboardPage() {
                   state={rowStates[rowData.projectId]}
                   onFetch={fetchDrift}
                   onApprove={handleApprove}
+                  canApprove={isContentReviewer}
                   classes={classes}
                 />
               ),

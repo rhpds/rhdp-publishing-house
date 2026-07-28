@@ -47,10 +47,8 @@ commands:
         else
           CENTRAL_URL="${{ values.central_api_url }}"
 
-          SETUP_RESP=$(curl -sk -X POST "${CENTRAL_URL}/api/v1/workspace/setup" \
-            -H "Authorization: Bearer ${SA_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "{\"username\": \"${USERNAME}\"}")
+          SETUP_RESP=$(curl -sk -X POST "${CENTRAL_URL}/api/v1/auth/keys/anonymous" \
+            -H "Authorization: Bearer ${SA_TOKEN}")
 
           API_KEY=$(echo "$SETUP_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['api_key'])" 2>/dev/null)
           USER_EMAIL=$(echo "$SETUP_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['user_email'])" 2>/dev/null)

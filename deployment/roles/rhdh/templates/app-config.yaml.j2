@@ -79,16 +79,36 @@ integrations:
     - host: github.com
       token: ${GITHUB_TOKEN}
 
+permission:
+  enabled: true
+  rbac:
+    defaultPolicy: allow
+    precedingPolicy: allow
+    policies-csv-file: /opt/app-root/src/rbac-policy.csv
+    policyFileReload: true
+    admin:
+      superUsers:
+        - name: group:default/rhdp-administrators
+
 proxy:
   endpoints:
     /sonataflow:
-      target: http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local
+      target: http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local/graphql
       changeOrigin: true
       secure: false
-    /central-api:
-      target: http://central-api.{{ app_namespace }}.svc.cluster.local:8000/api/v1
+      allowedMethods: ['POST']
+    /central-api/auth/keys/exchange:
+      target: http://central-api.{{ app_namespace }}.svc.cluster.local:8000/api/v1/auth/keys/exchange
       changeOrigin: true
       secure: false
+      allowedMethods: ['POST']
+      headers:
+        Authorization: Bearer ${PH_API_KEY}
+    /central-api/projects:
+      target: http://central-api.{{ app_namespace }}.svc.cluster.local:8000/api/v1/projects
+      changeOrigin: true
+      secure: false
+      allowedMethods: ['POST']
       headers:
         Authorization: Bearer ${PH_API_KEY}
     /github-api:
@@ -102,6 +122,9 @@ scaffolder:
   defaultEnvironment:
     parameters:
       baseDomain: {{ ocp_apps_domain }}
+
+phWorkflows:
+  centralApiUrl: https://central-api-{{ app_namespace }}.{{ ocp_apps_domain }}
 
 signInPage: oidc
 
