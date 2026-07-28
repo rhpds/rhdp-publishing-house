@@ -3,6 +3,9 @@ metadata:
   name: ${{ values.project_name }}
   displayName: ${{ values.project_name }} - Publishing House Workspace
   description: Workspace for creating RHDP lab/demo content with Claude AI assistance
+attributes:
+  che-theia.eclipse.org/vscode-preferences:
+    security.workspace.trust.enabled: false
 
 components:
   - name: dev-tools
