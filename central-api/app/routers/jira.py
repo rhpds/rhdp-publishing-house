@@ -1,5 +1,4 @@
 """Jira system endpoints — epic creation, updates, task management, and sync."""
-import asyncio
 import base64
 import json
 import logging
@@ -302,7 +301,7 @@ def _create_task(
 
 
 @router.post("/sync", response_model=SyncResponse)
-def sync_jira_tasks(
+async def sync_jira_tasks(
     body: SyncRequest,
     _caller: str = Depends(_require_auth),
     settings: Settings = Depends(get_settings),
@@ -317,16 +316,16 @@ def sync_jira_tasks(
     gh = GitHubService(token=settings.github_token)
 
     # --- Step 1: Read source files from repo ---
-    spec_content = asyncio.run(gh.get_file_content(body.repo_url, SPEC_PATH))
+    spec_content = await gh.get_file_content(body.repo_url, SPEC_PATH)
     if not spec_content:
         raise HTTPException(status_code=404, detail="spec.yaml not found in repo")
     spec_data = yaml.safe_load(spec_content) or {}
     project = spec_data.get("project", {})
     spec_section = spec_data.get("spec", {})
 
-    design_content = asyncio.run(gh.get_file_content(body.repo_url, DESIGN_PATH))
+    design_content = await gh.get_file_content(body.repo_url, DESIGN_PATH)
 
-    module_files = asyncio.run(gh.list_directory(body.repo_url, MODULES_DIR))
+    module_files = await gh.list_directory(body.repo_url, MODULES_DIR)
     module_briefs: dict[str, str] = {}
     for fname in sorted(module_files):
         if not fname.endswith(".md"):
@@ -334,7 +333,7 @@ def sync_jira_tasks(
         m = re.match(r"module-(\d+)", fname)
         if not m:
             continue
-        content = asyncio.run(gh.get_file_content(body.repo_url, f"{MODULES_DIR}/{fname}"))
+        content = await gh.get_file_content(body.repo_url, f"{MODULES_DIR}/{fname}")
         if content:
             module_briefs[int(m.group(1))] = _extract_brief_overview(content)
 

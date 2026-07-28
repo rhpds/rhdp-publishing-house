@@ -160,7 +160,7 @@ async def approve_drift(
     if epic_key and repo_url:
         from .jira import sync_jira_tasks, SyncRequest
         try:
-            result = sync_jira_tasks(
+            result = await sync_jira_tasks(
                 body=SyncRequest(repo_url=repo_url, epic_key=epic_key),
                 _caller=owner,
                 settings=settings,
