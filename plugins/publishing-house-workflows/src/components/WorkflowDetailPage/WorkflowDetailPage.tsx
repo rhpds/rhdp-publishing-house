@@ -552,12 +552,14 @@ export function WorkflowDetailPage() {
                       {validationReport.approval_checklist.content.assessment_strategy || '— not set (optional for classic) —'}
                     </Typography>
                   </Grid>
-                  <Grid item xs={12}>
-                    <Typography className={classes.label}>Differentiation</Typography>
-                    <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 4 }}>
-                      {validationReport.approval_checklist.content.differentiation || '— not set —'}
-                    </Typography>
-                  </Grid>
+                  {validationReport.approval_checklist.content.catalog_gap && (
+                    <Grid item xs={12}>
+                      <Typography className={classes.label}>Catalog Gap</Typography>
+                      <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 4 }}>
+                        {validationReport.approval_checklist.content.catalog_gap}
+                      </Typography>
+                    </Grid>
+                  )}
                   {validationReport.approval_checklist.content.design_overview && (
                     <Grid item xs={12}>
                       <Typography className={classes.label}>Design Overview</Typography>
@@ -573,7 +575,7 @@ export function WorkflowDetailPage() {
                         {validationReport.approval_checklist.content.module_summaries!.map((m, i) => (
                           <div key={i} style={{ marginBottom: i < validationReport.approval_checklist!.content!.module_summaries!.length - 1 ? 12 : 0 }}>
                             <Typography variant="subtitle2" style={{ fontWeight: 600 }}>{m.title}</Typography>
-                            <Typography variant="body2" style={{ marginTop: 4, color: 'rgba(255,255,255,0.7)' }}>{m.overview}</Typography>
+                            <Typography variant="body2" style={{ marginTop: 4 }}>{m.overview}</Typography>
                           </div>
                         ))}
                       </div>
@@ -582,7 +584,7 @@ export function WorkflowDetailPage() {
                   {validationReport.approval_checklist.content.rcars_overlap_pct != null && (
                     <Grid item xs={12}>
                       <Typography className={classes.label}>RCARS Overlap</Typography>
-                      <Typography variant="body2" style={{ fontWeight: 600, color: (validationReport.approval_checklist.content.rcars_overlap_pct ?? 0) > 60 ? '#ef5350' : '#66bb6a' }}>
+                      <Typography variant="body2" style={{ fontWeight: 600 }}>
                         {validationReport.approval_checklist.content.rcars_overlap_pct}%
                       </Typography>
                     </Grid>
@@ -627,6 +629,9 @@ export function WorkflowDetailPage() {
               return (
                 <InfoCard title="Infra Review — Environment Spec">
                   <Grid container spacing={2}>
+                    {has(env.platform) && (
+                      <Grid item xs={4}><DetailField label="Platform" value={env.platform!} /></Grid>
+                    )}
                     {has(env.topology) && (
                       <Grid item xs={4}><DetailField label="Topology" value={env.topology!} /></Grid>
                     )}
@@ -680,6 +685,35 @@ export function WorkflowDetailPage() {
                     )}
                     {has(env.non_ga_access_plan) && (
                       <Grid item xs={12}><DetailField label="Non-GA Access Plan" value={env.non_ga_access_plan!} /></Grid>
+                    )}
+                    {(env.vms_per_student ?? []).length > 0 && (
+                      <Grid item xs={12}>
+                        <Typography className={classes.label}>VMs per Student</Typography>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', marginTop: 4 }}>
+                          <thead>
+                            <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+                              <th style={{ padding: '6px 8px' }}>Role</th>
+                              <th style={{ padding: '6px 8px' }}>Count</th>
+                              <th style={{ padding: '6px 8px' }}>CPU</th>
+                              <th style={{ padding: '6px 8px' }}>RAM</th>
+                              <th style={{ padding: '6px 8px' }}>Disk</th>
+                              <th style={{ padding: '6px 8px' }}>OS</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {env.vms_per_student!.map((vm, i) => (
+                              <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                                <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{vm.role}</td>
+                                <td style={{ padding: '6px 8px' }}>{vm.count}</td>
+                                <td style={{ padding: '6px 8px' }}>{vm.cpu} vCPU</td>
+                                <td style={{ padding: '6px 8px' }}>{vm.ram_gb} GB</td>
+                                <td style={{ padding: '6px 8px' }}>{vm.disk_gb} GB</td>
+                                <td style={{ padding: '6px 8px' }}>{vm.os}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </Grid>
                     )}
                   </Grid>
                 </InfoCard>
