@@ -33,7 +33,7 @@ _FALLBACK_POLICY = {
         "internet", "any public ip", "any ip", "anywhere", "cloud", "external",
     ],
     "required_design_sections": [
-        "problem statement",
+        "overview",
         "target audience",
         "prerequisites",
         "learning objectives",
