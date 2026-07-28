@@ -2,6 +2,7 @@
 import base64
 import json
 import logging
+import re
 
 import httpx
 from fastapi import APIRouter, HTTPException, Security
@@ -154,6 +155,8 @@ def _extract_namespace_from_jwt(token: str) -> str:
         raise HTTPException(status_code=400, detail="Cannot decode SA token payload")
     ns = payload.get("kubernetes.io/serviceaccount/namespace", "")
     if not ns:
+        ns = payload.get("kubernetes.io", {}).get("namespace", "")
+    if not ns:
         raise HTTPException(status_code=400, detail="SA token missing namespace claim")
     return ns
 
@@ -166,13 +169,19 @@ async def anonymous_key(
     if not await _validate_sa_token(token):
         raise HTTPException(status_code=401, detail="Invalid service account token")
 
-    ns = _extract_namespace_from_jwt(token)
-    # Namespace format: treddy-redhat-com-devspaces
-    username = ns.removesuffix("-devspaces").removesuffix("-redhat-com")
-    email = f"{username}@redhat.com"
+    try:
+        ns = _extract_namespace_from_jwt(token)
+        # Namespace format: treddy-redhat-com-devspaces-0xcl74
+        m = re.match(r"^([^-]+)", ns)
+        username = m.group(1) if m else ns
+        email = f"{username}@redhat.com"
+        logger.info("anonymous_key: ns=%s username=%s email=%s", ns, username, email)
 
-    mask = lookup_user_groups(email)
-    signed = create_signed_key(email, mask)
+        mask = lookup_user_groups(email)
+        signed = create_signed_key(email, mask)
 
-    logger.info("workspace key created for %s (ns=%s, mask=%d)", email, ns, mask)
-    return WorkspaceResponse(api_key=signed, user_email=email)
+        logger.info("workspace key created for %s (ns=%s, mask=%d)", email, ns, mask)
+        return WorkspaceResponse(api_key=signed, user_email=email)
+    except Exception as e:
+        logger.error("anonymous_key failed: %s", e, exc_info=True)
+        raise

@@ -25,21 +25,7 @@ commands:
     exec:
       component: dev-tools
       commandLine: |
-        NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace 2>/dev/null)
-        USERNAME=$(echo "$NAMESPACE" | cut -d'-' -f1)
         SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token 2>/dev/null)
-
-        # Set git identity from namespace username and GitHub credentials
-        if [ -z "$(git config --global user.email)" ] && [ -n "$USERNAME" ]; then
-          git config --global user.email "${USERNAME}@redhat.com"
-        fi
-
-        if [ -z "$(git config --global user.name)" ]; then
-          GITHUB_USER=$(echo "url=https://github.com" | git credential fill | awk -F= '/password/ {print $2}' | xargs -I {} curl -s -H "Authorization: token {}" https://api.github.com/user | awk -F'"' '/"login":/ {print $4}')
-          if [ -n "$GITHUB_USER" ]; then
-            git config --global user.name "$GITHUB_USER"
-          fi
-        fi
 
         AUTH_FILE=/home/user/.config/publishing-house/auth.json
         if [ -f "$AUTH_FILE" ] && grep -q "litellm_key" "$AUTH_FILE" 2>/dev/null; then
@@ -52,6 +38,17 @@ commands:
 
           API_KEY=$(echo "$SETUP_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['api_key'])" 2>/dev/null)
           USER_EMAIL=$(echo "$SETUP_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['user_email'])" 2>/dev/null)
+
+          if [ -z "$(git config --global user.email)" ] && [ -n "$USER_EMAIL" ]; then
+            git config --global user.email "$USER_EMAIL"
+          fi
+
+          if [ -z "$(git config --global user.name)" ]; then
+            GITHUB_USER=$(echo "url=https://github.com" | git credential fill | awk -F= '/password/ {print $2}' | xargs -I {} curl -s -H "Authorization: token {}" https://api.github.com/user | awk -F'"' '/"login":/ {print $4}')
+            if [ -n "$GITHUB_USER" ]; then
+              git config --global user.name "$GITHUB_USER"
+            fi
+          fi
 
           if [ -n "$API_KEY" ]; then
             LITELLM_RESP=$(curl -sk -X POST "${CENTRAL_URL}/api/v1/litellm/keys/generate" \
