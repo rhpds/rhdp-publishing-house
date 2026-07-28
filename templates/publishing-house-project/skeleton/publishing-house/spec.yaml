@@ -13,8 +13,7 @@ project:
   initiative_key: "${{ values.initiative_key }}"
   showroom_type: "${{ values.showroom_type }}"
   description: "${{ values.project_description }}"
-  content_reviewer_email: ""
-  infra_reviewer_email: ""
+  # content_reviewer_email and infra_reviewer_email are assigned by the RHDP team — not set by the author
   jira_ticket: ""
   workflow_id: ""
 
