@@ -7,20 +7,13 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
     approval = spec_data.get("approval_checklist", {})
     cl = approval.get("content", {})
 
-    # C-01: prerequisites_verifiable
+    # C-01: prerequisites_verifiable (informational only — never blocks)
     pv = cl.get("prerequisites_verifiable")
-    if pv is None:
-        results.append(CheckResult(
-            check_id="C-01", group="C", status=CheckStatus.FAIL,
-            message="prerequisites_verifiable must be true or false (Phase 6)",
-            field="approval_checklist.content.prerequisites_verifiable",
-        ))
-    else:
-        results.append(CheckResult(
-            check_id="C-01", group="C", status=CheckStatus.PASS,
-            message=f"prerequisites_verifiable = {pv}",
-            field="approval_checklist.content.prerequisites_verifiable",
-        ))
+    results.append(CheckResult(
+        check_id="C-01", group="C", status=CheckStatus.SKIP,
+        message=f"prerequisites_verifiable = {pv}" if pv is not None else "prerequisites_verifiable not set (informational only)",
+        field="approval_checklist.content.prerequisites_verifiable",
+    ))
 
     # C-02: assessment_strategy (optional for classic labs)
     strategy = cl.get("assessment_strategy", "")
