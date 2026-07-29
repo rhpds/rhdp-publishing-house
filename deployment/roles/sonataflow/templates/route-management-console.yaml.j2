@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: sonataflow-management-console
+  namespace: "{{ app_namespace }}"
+  labels:
+    app: publishing-house
+    component: management-console
+spec:
+  tls:
+    termination: edge
+  to:
+    kind: Service
+    name: sonataflow-management-console
+    weight: 100
+  port:
+    targetPort: 8080

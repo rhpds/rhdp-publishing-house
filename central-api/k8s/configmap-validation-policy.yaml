@@ -90,7 +90,7 @@ data:
       - external
 
     required_design_sections:
-      - problem statement
+      - overview
       - target audience
       - prerequisites
       - learning objectives

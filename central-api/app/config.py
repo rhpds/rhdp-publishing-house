@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # API Configuration
     api_title: str = "Publishing House Central API"
-    api_version: str = "1.0.0"
+    api_version: str = "1.9.0"
     api_prefix: str = "/api/v1"
 
     # Authentication

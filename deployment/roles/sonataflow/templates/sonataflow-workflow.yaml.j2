@@ -3,7 +3,7 @@ kind: SonataFlow
 metadata:
   annotations:
     sonataflow.org/description: 4-stage content lifecycle orchestration
-    sonataflow.org/profile: dev
+    sonataflow.org/profile: preview
     sonataflow.org/version: "2.0"
   labels:
     app: publishing-house
@@ -170,7 +170,7 @@ spec:
               reviewHistory: ((.reviewHistory // []) + (if .latestAudit then [.latestAudit] else [] end)),
               auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
               baselineSha: (.latestAudit.commitSha // ""),
-              rejection: { isRejected: false },
+              rejection: (.rejection + { isRejected: false, reasons: [(.rejection.reasons // [])[] | . + {resolved: true}] }),
               hasDrift: false
             }
         timeouts:
@@ -212,7 +212,7 @@ spec:
               reviewHistory: ((.reviewHistory // []) + (if .latestAudit then [.latestAudit] else [] end)),
               auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
               baselineSha: (if .latestAudit then (if .latestAudit.action == "approved" then .latestAudit.commitSha else .baselineSha end) else .baselineSha end),
-              rejection: (if .latestAudit then (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else { isRejected: false } end) else { isRejected: false } end)
+              rejection: (if .latestAudit then (if .latestAudit.action == "rejected" then { isRejected: true, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: ((.rejection.reasons // []) + .latestAudit.reasons) } else (.rejection + { isRejected: false, reasons: [(.rejection.reasons // [])[] | . + {resolved: true}] }) end) else { isRejected: false } end)
             }
         timeouts:
           stateExecTimeout: PT168H
@@ -262,7 +262,7 @@ spec:
               reviewHistory: ((.reviewHistory // []) + (if .latestAudit then [.latestAudit] else [] end)),
               auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
               baselineSha: (if .latestAudit then (if .latestAudit.action == "approved" then .latestAudit.commitSha else .baselineSha end) else .baselineSha end),
-              rejection: (if .latestAudit then (if .latestAudit.action == "rejected" then { isRejected: true, rejectionId: .latestAudit.rejectionId, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: .latestAudit.reasons } else { isRejected: false } end) else { isRejected: false } end)
+              rejection: (if .latestAudit then (if .latestAudit.action == "rejected" then { isRejected: true, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: ((.rejection.reasons // []) + .latestAudit.reasons) } else (.rejection + { isRejected: false, reasons: [(.rejection.reasons // [])[] | . + {resolved: true}] }) end) else { isRejected: false } end)
             }
         timeouts:
           stateExecTimeout: PT168H
@@ -317,7 +317,7 @@ spec:
             . + {
               reviewHistory: ((.reviewHistory // []) + (if .latestAudit then [.latestAudit] else [] end)),
               auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
-              rejection: { isRejected: false },
+              rejection: (.rejection + { isRejected: false, reasons: [(.rejection.reasons // [])[] | . + {resolved: true}] }),
               hasDrift: false
             }
         timeouts:

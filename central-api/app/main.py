@@ -5,15 +5,17 @@ from datetime import datetime
 
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings, Settings
 from .models import HealthResponse
 from .routers import litellm, projects, jira, validate, drift, auth as auth_router
-from .services.rcars import rcars_overlap_check, rcars_health, rcars_advisor_submit, rcars_advisor_result
+from .services.rcars import rcars_health, rcars_advisor_submit, rcars_advisor_result
 from .auth import init_oidc
+from .auth.groups import decode_signed_key
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,29 +72,30 @@ def create_app() -> FastAPI:
             "clientId": settings.oidc_client_id,
         }
 
-    @app.get(f"{settings.api_prefix}/rcars/overlap")
-    async def get_rcars_overlap(
-        products: Optional[str] = Query(None, description="Comma-separated product names"),
-        audience: Optional[str] = Query(None, description="Target audience (beginner/intermediate/advanced)"),
-        limit: int = Query(5, description="Max number of matches to return"),
-    ):
-        """Query RCARS for existing catalog overlap by products and audience."""
-        product_list = [p.strip() for p in products.split(",")] if products else []
-        return rcars_overlap_check(
-            products=product_list,
-            audience=audience or "",
-            limit=limit,
-        )
+    _bearer = HTTPBearer(auto_error=False)
+
+    def _require_token(
+        credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
+    ) -> str:
+        if not credentials:
+            raise HTTPException(status_code=401, detail="Bearer token required")
+        if credentials.credentials == settings.ph_api_key:
+            return "service"
+        result = decode_signed_key(credentials.credentials)
+        if not result:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        return result[0]
 
     @app.post(f"{settings.api_prefix}/rcars/advisor")
     async def submit_advisor_query(
         query: str = Query(..., description="Natural-language query describing the lab content"),
+        _caller: str = Depends(_require_token),
     ):
         """Submit an advisor query to RCARS. Returns {job_id} to poll for results."""
         return rcars_advisor_submit(query)
 
     @app.get(f"{settings.api_prefix}/rcars/advisor/{{job_id}}")
-    async def get_advisor_result(job_id: str):
+    async def get_advisor_result(job_id: str, _caller: str = Depends(_require_token)):
         """Poll for advisor query result. Returns {status, result, error}."""
         return rcars_advisor_result(job_id)
 

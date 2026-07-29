@@ -10,6 +10,7 @@ import {
   TableColumn,
 } from '@backstage/core-components';
 import {
+  configApiRef,
   discoveryApiRef,
   fetchApiRef,
   identityApiRef,
@@ -85,14 +86,16 @@ function toRow(entity: Entity, wfMap: Record<string, WorkflowSummary>): Componen
 export function MaintenancePage() {
   const classes = useStyles();
   const catalogApi = useApi(catalogApiRef);
+  const configApi = useApi(configApiRef);
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
   const identityApi = useApi(identityApiRef);
+  const centralApiUrl = configApi.getString('phWorkflows.centralApiUrl');
   const { isAdmin, loading: groupsLoading } = useUserGroups();
   const [refreshKey, setRefreshKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<Entity | null>(null);
 
-  const client = createPhWorkflowsClient({ discoveryApi, fetchApi, identityApi });
+  const client = createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi });
 
   const { value, loading, error } = useAsync(async () => {
     const [catalogResult, workflows] = await Promise.all([

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sonataflow-management-console
+  namespace: "{{ app_namespace }}"
+  labels:
+    app: publishing-house
+    component: management-console
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sonataflow-management-console
+  template:
+    metadata:
+      labels:
+        app: sonataflow-management-console
+    spec:
+      containers:
+        - name: console
+          image: docker.io/apache/incubator-kie-sonataflow-management-console:main
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            - name: SONATAFLOW_MANAGEMENT_CONSOLE_KOGITO_ENV_MODE
+              value: "DEV"
+            - name: SONATAFLOW_MANAGEMENT_CONSOLE_DATA_INDEX_ENDPOINT
+              value: "http://sonataflow-platform-data-index-service.{{ app_namespace }}.svc.cluster.local/graphql"
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m

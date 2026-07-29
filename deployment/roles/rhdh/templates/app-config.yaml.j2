@@ -93,7 +93,7 @@ permission:
 proxy:
   endpoints:
     /sonataflow:
-      target: http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local/graphql
+      target: http://sonataflow-platform-data-index-service.{{ app_namespace }}.svc.cluster.local/graphql
       changeOrigin: true
       secure: false
       allowedMethods: ['POST']

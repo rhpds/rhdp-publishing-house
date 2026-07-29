@@ -101,9 +101,27 @@
     state: present
     definition: "{{ lookup('template', 'sonataflow-workflow.yaml.j2') | from_yaml }}"
 
+# --- Management Console ---
+
+- name: Deploy SonataFlow Management Console
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'deployment-management-console.yaml.j2') | from_yaml }}"
+
+- name: Create Management Console service
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'svc-management-console.yaml.j2') | from_yaml }}"
+
+- name: Create Management Console route
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'route-management-console.yaml.j2') | from_yaml }}"
+
 - name: Display SonataFlow summary
   ansible.builtin.debug:
     msg:
       - "SonataFlow platform and workflow deployed in {{ app_namespace }}"
       - "Data Index: http://sonataflow-platform-data-index-service.{{ app_namespace }}.svc.cluster.local"
       - "Workflow: publishinghouseworkflow"
+      - "Management Console: https://sonataflow-management-console-{{ app_namespace }}.{{ ocp_apps_domain }}"

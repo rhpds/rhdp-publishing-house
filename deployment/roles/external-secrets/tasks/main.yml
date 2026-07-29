@@ -101,6 +101,27 @@
     - css_status.resources[0].status.conditions is defined
     - css_status.resources[0].status.conditions | selectattr('type', 'equalto', 'Ready') | selectattr('status', 'equalto', 'True') | list | length > 0
 
+# --- Create ExternalSecret in publishing-house namespace ---
+
+- name: Create publishing-house-credentials ExternalSecret
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'externalsecret-publishing-house-credentials.yaml.j2') | from_yaml }}"
+
+- name: Wait for ExternalSecret to sync
+  kubernetes.core.k8s_info:
+    api_version: external-secrets.io/v1beta1
+    kind: ExternalSecret
+    name: publishing-house-credentials
+    namespace: "{{ app_namespace }}"
+  register: external_secret
+  until:
+    - external_secret.resources | length > 0
+    - external_secret.resources[0].status.conditions is defined
+    - external_secret.resources[0].status.conditions | selectattr('type', 'equalto', 'Ready') | selectattr('status', 'equalto', 'True') | list | length > 0
+  retries: 12
+  delay: 10
+
 - name: Display ESO deployment summary
   ansible.builtin.debug:
     msg:
@@ -108,3 +129,4 @@
       - "Chart version: {{ eso_chart_version }}"
       - "ClusterSecretStore '{{ cluster_secret_store }}' is Ready"
       - "Connected to Vault at: {{ vault_address }}"
+      - "ExternalSecret publishing-house-credentials synced in {{ app_namespace }}"

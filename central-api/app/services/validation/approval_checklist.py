@@ -46,4 +46,22 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
             field="approval_checklist.content.differentiation",
         ))
 
+    # C-04: all rejection reasons must be resolved before resubmitting
+    content_rejections = cl.get("rejections", [])
+    infra_rejections = approval.get("infra", {}).get("rejections", [])
+    all_rejections = (content_rejections or []) + (infra_rejections or [])
+    unresolved = [r for r in all_rejections if not r.get("resolved", True)]
+    if unresolved:
+        results.append(CheckResult(
+            check_id="C-04", group="C", status=CheckStatus.FAIL,
+            message=f"{len(unresolved)} unresolved rejection reason(s) — address all feedback before resubmitting",
+            field="approval_checklist.rejections",
+        ))
+    elif all_rejections:
+        results.append(CheckResult(
+            check_id="C-04", group="C", status=CheckStatus.PASS,
+            message=f"All {len(all_rejections)} rejection reason(s) resolved",
+            field="approval_checklist.rejections",
+        ))
+
     return results

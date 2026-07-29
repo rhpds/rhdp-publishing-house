@@ -54,6 +54,7 @@ def _decode_jwt_payload(token: str) -> dict:
 
 
 @router.post("/keys/exchange", response_model=ExchangeResponse)
+@router.post("/keys/exchange/", response_model=ExchangeResponse, include_in_schema=False)
 async def exchange_token(
     body: ExchangeRequest,
     credentials: HTTPAuthorizationCredentials | None = Security(_bearer),

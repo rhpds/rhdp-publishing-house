@@ -44,14 +44,13 @@ function toSummary(inst: ProcessInstance): WorkflowSummary {
   };
 }
 
-const CENTRAL_API_URL = 'https://central-api-publishing-house.apps.ocpv-infra01.dal12.infra.demo.redhat.com';
-
 export function createPhWorkflowsClient(options: {
+  centralApiUrl: string;
   discoveryApi: DiscoveryApi;
   fetchApi: FetchApi;
   identityApi?: IdentityApi;
 }) {
-  const { discoveryApi, fetchApi, identityApi } = options;
+  const { centralApiUrl, discoveryApi, fetchApi, identityApi } = options;
 
   async function getUserToken(): Promise<string | undefined> {
     const cached = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -96,7 +95,7 @@ export function createPhWorkflowsClient(options: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers as Record<string, string> | undefined),
     };
-    return globalThis.fetch(`${CENTRAL_API_URL}/api/v1${path}`, {
+    return globalThis.fetch(`${centralApiUrl}/api/v1${path}`, {
       ...init,
       headers,
     });
@@ -315,7 +314,8 @@ export function createPhWorkflowsClient(options: {
     );
 
     if (!response.ok) {
-      throw new Error(`Drift check failed: ${response.status} ${response.statusText}`);
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || `Drift check failed: ${response.status}`);
     }
 
     return await response.json() as DriftReport;

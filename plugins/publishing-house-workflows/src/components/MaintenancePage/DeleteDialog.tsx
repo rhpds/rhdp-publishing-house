@@ -20,6 +20,7 @@ import WarningIcon from '@material-ui/icons/Warning';
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import ErrorIcon from '@material-ui/icons/Error';
 import {
+  configApiRef,
   discoveryApiRef,
   fetchApiRef,
   identityApiRef,
@@ -53,9 +54,11 @@ interface DeleteDialogProps {
 
 export function DeleteDialog({ open, entity, onClose, onDeleted }: DeleteDialogProps) {
   const classes = useStyles();
+  const configApi = useApi(configApiRef);
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
   const identityApi = useApi(identityApiRef);
+  const centralApiUrl = configApi.getString('phWorkflows.centralApiUrl');
 
   const [deleteRepo, setDeleteRepo] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -79,7 +82,7 @@ export function DeleteDialog({ open, entity, onClose, onDeleted }: DeleteDialogP
     setResult(null);
 
     try {
-      const client = createPhWorkflowsClient({ discoveryApi, fetchApi, identityApi });
+      const client = createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi });
       const res = await client.deleteProject(slug, deleteRepo);
       setResult(res);
     } catch (e: any) {

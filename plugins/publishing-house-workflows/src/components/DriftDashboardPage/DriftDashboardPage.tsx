@@ -10,6 +10,7 @@ import {
   TableColumn,
 } from '@backstage/core-components';
 import {
+  configApiRef,
   discoveryApiRef,
   fetchApiRef,
   identityApiRef,
@@ -180,14 +181,16 @@ function DriftDetailPanel({
 
 export function DriftDashboardPage() {
   const classes = useStyles();
+  const configApi = useApi(configApiRef);
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
   const identityApi = useApi(identityApiRef);
+  const centralApiUrl = configApi.getString('phWorkflows.centralApiUrl');
   const { isContentReviewer } = useUserGroups();
   const [refreshKey, setRefreshKey] = useState(0);
   const [rowStates, setRowStates] = useState<Record<string, DriftRowState>>({});
 
-  const client = createPhWorkflowsClient({ discoveryApi, fetchApi, identityApi });
+  const client = createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi });
 
   const { value: workflows, loading, error } = useAsync(async () => {
     const all = await client.getWorkflows();

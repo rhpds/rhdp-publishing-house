@@ -11,6 +11,7 @@ import {
   TableColumn,
 } from '@backstage/core-components';
 import {
+  configApiRef,
   discoveryApiRef,
   fetchApiRef,
   identityApiRef,
@@ -168,14 +169,16 @@ const columns: TableColumn<WorkflowSummary>[] = [
 export function WorkflowListPage() {
   const classes = useStyles();
   const navigate = useNavigate();
+  const configApi = useApi(configApiRef);
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
   const identityApi = useApi(identityApiRef);
+  const centralApiUrl = configApi.getString('phWorkflows.centralApiUrl');
   const [stageFilter, setStageFilter] = useState<string>('ALL');
   const [searchText, setSearchText] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const client = createPhWorkflowsClient({ discoveryApi, fetchApi, identityApi });
+  const client = createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi });
 
   const { value: workflows, loading, error } = useAsync(
     () => client.getWorkflows(),

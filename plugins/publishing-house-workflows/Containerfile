@@ -25,6 +25,16 @@ COPY . .
 
 RUN npx --yes @red-hat-developer-hub/cli@1.8.0 plugin export 2>&1
 
+RUN node -e " \
+  const pkg = require('./package.json'); \
+  if (typeof pkg.configSchema === 'object') { \
+    require('fs').writeFileSync('./dist-dynamic/dist-scalprum/configSchema.json', JSON.stringify(pkg.configSchema, null, 2)); \
+    console.log('Wrote inline configSchema to configSchema.json'); \
+  } else { \
+    console.log('configSchema is a file ref — using CLI-generated configSchema.json'); \
+  } \
+"
+
 # Build index.json and compute the OCI annotation value
 RUN node -e " \
   const pkg = require('./dist-dynamic/package.json'); \

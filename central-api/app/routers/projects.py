@@ -5,6 +5,7 @@ import logging
 import re
 import ssl
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
@@ -168,7 +169,7 @@ def _get_workflow_data(project_id: str):
         graphql_query = {
             "query": """
                 query GetWorkflowData($businessKey: String!) {
-                    ProcessInstances(where: { businessKey: { equal: $businessKey } }) {
+                    ProcessInstances(where: { businessKey: { equal: $businessKey }, state: { in: [ACTIVE, SUSPENDED] } }) {
                         id
                         variables
                     }
@@ -198,7 +199,7 @@ def _get_workflow_data(project_id: str):
             "hasDrift": wd.get("hasDrift", False),
             "repoUrl": wd.get("repoUrl", ""),
         }
-        if rejection:
+        if rejection and rejection.get("isRejected"):
             result["rejection"] = rejection
         return result
     except HTTPException:
@@ -503,7 +504,7 @@ class ApproveRequest(BaseModel):
 
 
 class RejectRequest(BaseModel):
-    reasons: list[str]
+    reasons: list
     reviewer_name: str = ""
     commit_sha: str = ""
 
@@ -534,13 +535,20 @@ def _send_cloud_event(event_type: str, project_slug: str, data: dict):
         "datacontenttype": "application/json",
         "data": data,
     }
+    payload = json.dumps(cloud_event).encode()
     req = urllib.request.Request(
         f"{settings.sonataflow_url.rstrip('/')}",
-        data=json.dumps(cloud_event).encode(),
+        data=payload,
         headers={"Content-Type": "application/cloudevents+json"},
     )
-    with urllib.request.urlopen(req, context=_SSL_CTX, timeout=30) as r:
-        pass
+    try:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=30) as r:
+            pass
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")
+        logger.warning("cloud event %s for %s returned %s: %s", event_type, project_slug, e.code, body[:500])
+    except Exception as e:
+        logger.warning("cloud event %s send error for %s: %s", event_type, project_slug, e)
     logger.info("sent %s for %s", event_type, project_slug)
 
 
@@ -586,17 +594,16 @@ async def reject_content_review(
         raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
     _require_stage(wf_uuid, ["content_review"])
 
-    rejection_id = str(uuid.uuid4())
+    reasons = [{**r, "id": str(uuid.uuid4()), "resolved": False} for r in body.reasons]
     _send_cloud_event("ph.content-review.rejected", slug, {
         "user": body.reviewer_name or owner,
         "stage": "content_review",
         "action": "rejected",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "commitSha": body.commit_sha,
-        "rejectionId": rejection_id,
-        "reasons": body.reasons,
+        "reasons": reasons,
     })
-    return {"slug": slug, "action": "rejected", "stage": "content_review", "rejectionId": rejection_id}
+    return {"slug": slug, "action": "rejected", "stage": "content_review"}
 
 
 # ── Infra Review ────────────────────────────────────────────────────────────
@@ -641,17 +648,16 @@ async def reject_infra_review(
         raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
     _require_stage(wf_uuid, ["infra_review"])
 
-    rejection_id = str(uuid.uuid4())
+    reasons = [{**r, "id": str(uuid.uuid4()), "resolved": False} for r in body.reasons]
     _send_cloud_event("ph.infra-review.rejected", slug, {
         "user": body.reviewer_name or owner,
         "stage": "infra_review",
         "action": "rejected",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "commitSha": body.commit_sha,
-        "rejectionId": rejection_id,
-        "reasons": body.reasons,
+        "reasons": reasons,
     })
-    return {"slug": slug, "action": "rejected", "stage": "infra_review", "rejectionId": rejection_id}
+    return {"slug": slug, "action": "rejected", "stage": "infra_review"}
 
 
 # ── Drift Approve ───────────────────────────────────────────────────────────
@@ -699,27 +705,16 @@ async def approve_drift(
     )
     logger.info("drift approved for %s by %s — baselineSha=%s", slug, owner, head_sha[:8])
 
-    jira_synced = None
     epic_key = wd.get("epic_key", "")
     if epic_key and repo_url:
-        from .jira import sync_jira_tasks, SyncRequest
-        try:
-            result = await sync_jira_tasks(
-                body=SyncRequest(repo_url=repo_url, epic_key=epic_key),
-                _caller=owner,
-                settings=settings,
-            )
-            jira_synced = {
-                "tasks_created": result.tasks_created,
-                "tasks_updated": result.tasks_updated,
-                "tasks_closed": result.tasks_closed,
-            }
-            logger.info("drift approve: jira sync complete for %s — %s", slug, jira_synced)
-        except Exception as e:
-            logger.warning("drift approve: jira sync failed for %s: %s", slug, e)
-            jira_synced = {"error": str(e)}
+        from .jira import _sync_jira_tasks_bg
+        import asyncio
+        asyncio.get_event_loop().run_in_executor(
+            None, _sync_jira_tasks_bg, repo_url, epic_key, settings,
+        )
+        logger.info("drift approve: jira sync dispatched for %s", slug)
 
-    return {"slug": slug, "baselineSha": head_sha, "cleared": True, "jira_sync": jira_synced}
+    return {"slug": slug, "baselineSha": head_sha, "cleared": True}
 
 
 # ── Start Workflow ──────────────────────────────────────────────────────────

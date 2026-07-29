@@ -172,16 +172,15 @@ def run_checks(
                 field="publishing-house/spec/modules/",
             ))
 
-    # E-03: No orphan outline files (files not matching any spec module)
+    # E-03: No orphan outline files (more outlines than spec modules)
     if outline_files and modules_in_spec:
-        spec_ids = {m.get("id", "") for m in modules_in_spec if m.get("id")}
+        expected_count = len(modules_in_spec)
         orphans = []
         for fname in outline_files:
-            # module-01-installing-openshift.md → extract the slug part
-            match = re.match(r"module-\d+-(.+)\.md", fname)
+            match = re.match(r"module-(\d+)", fname)
             if match:
-                slug = match.group(1)
-                if spec_ids and slug not in spec_ids:
+                num = int(match.group(1))
+                if num > expected_count:
                     orphans.append(fname)
         if orphans:
             results.append(CheckResult(

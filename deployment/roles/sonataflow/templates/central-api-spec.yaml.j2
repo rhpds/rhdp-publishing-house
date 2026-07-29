@@ -438,31 +438,6 @@ paths:
                     type: string
                   user_email:
                     type: string
-  /rcars/overlap:
-    get:
-      operationId: rcarsOverlap
-      summary: Query RCARS for existing catalog overlap
-      parameters:
-        - name: products
-          in: query
-          schema:
-            type: string
-        - name: audience
-          in: query
-          schema:
-            type: string
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 5
-      responses:
-        '200':
-          description: Overlap results
-          content:
-            application/json:
-              schema:
-                type: object
   /rcars/advisor:
     post:
       operationId: rcarsAdvisorSubmit

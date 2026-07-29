@@ -10,6 +10,7 @@ import {
   Progress,
 } from '@backstage/core-components';
 import {
+  configApiRef,
   discoveryApiRef,
   fetchApiRef,
   identityApiRef,
@@ -108,11 +109,13 @@ function DetailField({ label, value }: { label: string; value: string }) {
 export function WorkflowDetailPage() {
   const classes = useStyles();
   const { workflowId } = useParams<{ workflowId: string }>();
+  const configApi = useApi(configApiRef);
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
   const identityApi = useApi(identityApiRef);
+  const centralApiUrl = configApi.getString('phWorkflows.centralApiUrl');
 
-  const client = useMemo(() => createPhWorkflowsClient({ discoveryApi, fetchApi, identityApi }), [discoveryApi, fetchApi, identityApi]);
+  const client = useMemo(() => createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi }), [centralApiUrl, discoveryApi, fetchApi, identityApi]);
   const { isContentReviewer, isInfraReviewer } = useUserGroups();
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -210,9 +213,14 @@ export function WorkflowDetailPage() {
       setSnackbar({
         open: true,
         severity: 'success',
-        message: `${STAGE_LABELS[stage]} approved — refreshing...`,
+        message: `${STAGE_LABELS[stage]} approved — waiting for workflow to advance...`,
       });
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      const prevStage = result.summary.stage;
+      for (let i = 0; i < 6; i++) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const updated = await client.getWorkflow(result.summary.projectId);
+        if (updated && updated.summary.stage !== prevStage) break;
+      }
       setRefreshKey(k => k + 1);
     } catch (err: any) {
       setSnackbar({
@@ -239,9 +247,14 @@ export function WorkflowDetailPage() {
       setSnackbar({
         open: true,
         severity: 'success',
-        message: `${STAGE_LABELS[rejectingStage]} rejected — workflow returning to Intake...`,
+        message: `${STAGE_LABELS[rejectingStage]} rejected — returning to ${rejectingStage === 'infra_review' ? 'Content Review' : 'Intake'}...`,
       });
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      const prevStage = result.summary.stage;
+      for (let i = 0; i < 6; i++) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const updated = await client.getWorkflow(result.summary.projectId);
+        if (updated && updated.summary.stage !== prevStage) break;
+      }
       setRefreshKey(k => k + 1);
     } catch (err: any) {
       setSnackbar({
@@ -291,7 +304,7 @@ export function WorkflowDetailPage() {
     ? (instance.variables as any).workflowdata?.rejection ?? (instance.variables as any).rejection
     : null;
   const rejectedFrom = rejection?.reviewerStage as WorkflowStage | null;
-  const rejectionReasons = rejection?.reasons ?? [];
+  const rejectionReasons = (rejection?.reasons ?? []).filter((r: any) => !r.resolved);
   const wd = instance?.variables?.workflowdata as any;
   const reviewHistory: Array<{ user: string; stage: string; action: string; timestamp: string; commitSha?: string }> = wd?.reviewHistory ?? [];
 
@@ -836,7 +849,7 @@ export function WorkflowDetailPage() {
         <Snackbar
           open={snackbar.open}
           autoHideDuration={snackbar.severity === 'error' ? null : 6000}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
           onClose={() => setSnackbar(s => ({ ...s, open: false }))}
         >
           <Alert

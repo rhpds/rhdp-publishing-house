@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from ..auth.groups import decode_signed_key
 from ..config import get_settings
 from ..services.github import GitHubService
 from ..services.drift import DriftResponse, check_drift_structural, check_drift_semantic
@@ -56,22 +57,27 @@ def _get_review_history(workflow_id: str, settings=None) -> list:
 
 def _require_auth(
     credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
-) -> tuple[str, int]:
-    from .projects import _require_auth as _shared_auth
-    return _shared_auth(credentials)
+) -> str:
+    settings = get_settings()
+    if not credentials:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bearer token required")
+    if credentials.credentials == settings.ph_api_key:
+        return "service"
+    result = decode_signed_key(credentials.credentials)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+    return result[0]
 
 
 @router.post("/{slug}", response_model=DriftResponse)
 async def detect_drift(
     slug: str,
     mode: str = Query("semantic", regex="^(structural|semantic)$"),
-    auth: tuple[str, int] = Depends(_require_auth),
+    owner: str = Depends(_require_auth),
 ):
     """Look up workflow data for slug, then compare spec.yaml (structural) or design.md (semantic)
     between baselineSha and current HEAD."""
-    from .projects import _get_workflow_data, _require_group, GROUP_BITS
-    _owner, groups = auth
-    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
+    from .projects import _get_workflow_data
 
     settings = get_settings()
     if not settings.github_token:

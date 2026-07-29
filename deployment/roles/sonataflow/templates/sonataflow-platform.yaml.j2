@@ -15,10 +15,10 @@ spec:
     template:
       buildArgs:
         - name: MAVEN_ARGS_APPEND
-          value: "-DskipTests -Dquarkus.generate-code.skip=true"
+          value: "-DskipTests -Dquarkus.generate-code.skip=false"
       envs:
         - name: MAVEN_ARGS_APPEND
-          value: "-DskipTests -Dquarkus.generate-code.skip=true"
+          value: "-DskipTests -Dquarkus.generate-code.skip=false"
       resources:
         limits:
           cpu: "4"
@@ -43,6 +43,13 @@ spec:
   services:
     dataIndex:
       enabled: true
+      podTemplate:
+        container:
+          env:
+            - name: QUARKUS_HTTP_CORS
+              value: "true"
+            - name: QUARKUS_HTTP_CORS_ORIGINS
+              value: "https://sonataflow-management-console-{{ app_namespace }}.{{ ocp_apps_domain }}"
       persistence:
         dbMigrationStrategy: service
         postgresql:
