@@ -27,6 +27,7 @@ data:
     valid_cloud_providers:
       - cnv
       - aws
+      - troshka
 
     valid_cluster_types:
       - sno
