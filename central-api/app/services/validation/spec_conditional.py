@@ -171,7 +171,7 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
     else:
         results.append(CheckResult(
             check_id="B-05", group="B", status=CheckStatus.PASS,
-            message="No external services — auto-approved",
+            message="No external services — no justification required",
             field="spec.environment.external_services",
         ))
 
@@ -194,7 +194,7 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
     else:
         results.append(CheckResult(
             check_id="B-06", group="B", status=CheckStatus.PASS,
-            message="No non-GA products — auto-approved",
+            message="No non-GA products — no justification required",
             field="spec.environment.non_ga_products",
         ))
 

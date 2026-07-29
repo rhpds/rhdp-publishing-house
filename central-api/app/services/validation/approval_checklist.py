@@ -31,19 +31,19 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
         field="approval_checklist.content.assessment_strategy",
     ))
 
-    # C-03: differentiation (Phase 3 RCARS)
-    diff = cl.get("differentiation", "")
+    # C-03: catalog_gap (Phase 3 RCARS)
+    diff = cl.get("catalog_gap", "")
     if not diff:
         results.append(CheckResult(
             check_id="C-03", group="C", status=CheckStatus.FAIL,
-            message="differentiation must be non-empty (Phase 3)",
-            field="approval_checklist.content.differentiation",
+            message="catalog_gap must be non-empty (Phase 3 RCARS vetting)",
+            field="approval_checklist.content.catalog_gap",
         ))
     else:
         results.append(CheckResult(
             check_id="C-03", group="C", status=CheckStatus.PASS,
-            message=f"Differentiation set ({len(diff)} chars)",
-            field="approval_checklist.content.differentiation",
+            message=f"catalog_gap set ({len(diff)} chars)",
+            field="approval_checklist.content.catalog_gap",
         ))
 
     # C-04: all rejection reasons must be resolved before resubmitting

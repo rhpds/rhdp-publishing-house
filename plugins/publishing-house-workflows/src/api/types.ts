@@ -93,7 +93,7 @@ export interface ApprovalChecklist {
   content?: {
     prerequisites_verifiable?: boolean | null;
     assessment_strategy?: string;
-    differentiation?: string;
+    catalog_gap?: string;
     design_overview?: string;
     module_summaries?: Array<{ title: string; overview: string }>;
     rcars_overlap_pct?: number | null;
@@ -110,10 +110,21 @@ export interface ApprovalChecklist {
   };
 }
 
+export interface VmSpec {
+  role: string;
+  count: number;
+  cpu: number;
+  ram_gb: number;
+  disk_gb: number;
+  os: string;
+}
+
 export interface SpecEnvironment {
+  platform?: string;
   topology?: string;
   ocp_version?: string;
   cloud_provider?: string;
+  vms_per_student?: VmSpec[];
   cluster_type?: string;
   control_plane_instance_count?: number;
   control_plane_cpu?: number;

@@ -255,9 +255,8 @@ spec:
 
           **Option A — DevSpaces (recommended, fastest way to start!):**
           1. Click the **Open in DevSpaces** link above
-          2. Once the workspace loads, open a new terminal
-          3. Start Claude CLI: `claude`
-          4. Run: `/rhdp-publishing-house` — and you're off!
+          2. Once the workspace loads, open a new Claude Code session
+          3. Run: `/rhdp-publishing-house` — and you're off!
 
           **Option B — Local machine:**
           1. Install the skills: `git clone https://github.com/rhpds/rhdp-publishing-house-skills.git ~/.claude/skills/publishing-house`
