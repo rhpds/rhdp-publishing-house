@@ -328,7 +328,7 @@
         let newKeyRaw = '';
 
         // Fetch OIDC config from the API, then initialize Keycloak
-        fetch('/api/v1/auth/config')
+        fetch('/api/v1/auth/keys/oidc/config')
             .then(r => r.json())
             .then(config => {
                 keycloak = new Keycloak({
@@ -395,37 +395,9 @@
         }
 
         async function loadKeys() {
-            try {
-                const keys = await apiCall('/projects/keys');
-                displayKeys(keys);
-            } catch (error) {
-                showError('Failed to load keys: ' + error.message);
-            }
-        }
-
-        function displayKeys(keys) {
+            // No server-side key storage — keys are signed tokens generated on demand
             const container = document.getElementById('keys-list');
-
-            if (keys.length === 0) {
-                container.innerHTML = '<div class="empty-state">No API key yet. Click "Generate New Key" above to create one.</div>';
-                return;
-            }
-
-            container.innerHTML = keys.map(key => `
-                <div class="key-card">
-                    <div class="key-header">
-                        <div class="key-label">${key.label || 'API Key'}</div>
-                    </div>
-                    <div class="key-meta">
-                        Created: ${new Date(key.created_at).toLocaleString()}<br>
-                        Last used: ${key.last_used_at ? new Date(key.last_used_at).toLocaleString() : 'Never'}
-                    </div>
-                    <div class="key-value">${key.masked}</div>
-                    <div class="key-hint">
-                        Click "Generate New Key" above to regenerate (invalidates this key)
-                    </div>
-                </div>
-            `).join('');
+            container.innerHTML = '<div class="empty-state">Keys are generated on demand. Each key is valid for 7 days.</div>';
         }
 
         async function createKey() {
@@ -434,14 +406,11 @@
             btn.textContent = 'Creating...';
 
             try {
-                const result = await apiCall('/projects/keys', 'POST');
-                newKeyRaw = result.raw_key;
+                const result = await apiCall('/auth/keys/oidc', 'POST');
+                newKeyRaw = result.token;
 
-                document.getElementById('new-key-value').textContent = result.raw_key;
+                document.getElementById('new-key-value').textContent = result.token;
                 document.getElementById('new-key-display').style.display = 'block';
-
-                // Reload keys list
-                await loadKeys();
 
                 btn.textContent = 'Generate New Key';
             } catch (error) {

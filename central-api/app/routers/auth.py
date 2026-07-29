@@ -39,6 +39,50 @@ class WorkspaceResponse(BaseModel):
     user_email: str
 
 
+# ── OIDC config (static page fetches Keycloak params for JS SDK) ─────────────
+
+@router.get("/keys/oidc/config")
+async def oidc_config():
+    settings = get_settings()
+    if not settings.oidc_issuer_url or not settings.oidc_client_id:
+        raise HTTPException(status_code=503, detail="OIDC not configured")
+    url = settings.oidc_issuer_url.rstrip("/")
+    parts = url.rsplit("/realms/", 1)
+    base_url = parts[0] if len(parts) == 2 else url
+    realm = parts[1] if len(parts) == 2 else ""
+    return {"url": base_url, "realm": realm, "clientId": settings.oidc_client_id}
+
+
+# ── OIDC direct key (browser sends Keycloak token, gets signed key) ──────────
+
+@router.post("/keys/oidc")
+async def oidc_key(
+    credentials: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+):
+    validator = get_oidc_validator()
+    if not validator:
+        raise HTTPException(status_code=503, detail="OIDC not configured")
+
+    result = await validator.validate_token_string(credentials.credentials)
+    email = result["email"]
+    mask = compute_bitmask(result["groups"])
+    token = create_signed_key(email, mask)
+
+    padded = token.split(".")[0] + "=" * (-len(token.split(".")[0]) % 4)
+    payload = base64.urlsafe_b64decode(padded).decode()
+    expiry = payload.split("|")[2]
+
+    from datetime import datetime, timezone
+    exp_dt = datetime.fromtimestamp(int(expiry), tz=timezone.utc)
+
+    return ExchangeResponse(
+        token=token,
+        email=email,
+        groups_bitmask=mask,
+        expires_at=exp_dt.isoformat(),
+    )
+
+
 # ── Token exchange (plugin sends Keycloak token, gets signed bitmask key) ───
 
 def _decode_jwt_payload(token: str) -> dict:
