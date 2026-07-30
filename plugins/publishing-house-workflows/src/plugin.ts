@@ -1,6 +1,7 @@
 import {
   createPlugin,
   createRoutableExtension,
+  createComponentExtension,
 } from '@backstage/core-plugin-api';
 import { rootRouteRef, driftRouteRef, maintenanceRouteRef } from './routes';
 
@@ -41,5 +42,15 @@ export const PhMaintenancePage = phWorkflowsPlugin.provide(
         m => m.MaintenancePage,
       ),
     mountPoint: maintenanceRouteRef,
+  }),
+);
+
+export const PhHomeCard = phWorkflowsPlugin.provide(
+  createComponentExtension({
+    name: 'PhHomeCard',
+    component: {
+      lazy: () =>
+        import('./components/HomeCard/PhHomeCard').then(m => m.PhHomeCard),
+    },
   }),
 );

@@ -1,4 +1,4 @@
-export { phWorkflowsPlugin, PhWorkflowsPage, PhDriftDashboardPage, PhMaintenancePage } from './plugin';
+export { phWorkflowsPlugin, PhWorkflowsPage, PhDriftDashboardPage, PhMaintenancePage, PhHomeCard } from './plugin';
 
 export { default as PhWorkflowIcon } from '@material-ui/icons/AccountTree';
 export { default as PhDriftIcon } from '@material-ui/icons/CompareArrows';

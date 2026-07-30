@@ -62,7 +62,7 @@ plugins:
         frontend:
           red-hat-developer-hub.backstage-plugin-orchestrator-form-widgets: {}
   - disabled: false
-    package: 'oci://quay.io/rhpds/backstage-plugin-ph-workflows:1.10.0!backstage-plugin-ph-workflows'
+    package: 'oci://quay.io/rhpds/backstage-plugin-ph-workflows:1.11.0!backstage-plugin-ph-workflows'
     pluginConfig:
       dynamicPlugins:
         frontend:
@@ -90,6 +90,16 @@ plugins:
                   icon: phMaintenanceIcon
                   text: Maintenance
                 path: /publishing-house-maintenance
+            mountPoints:
+              - mountPoint: home.page/cards
+                importName: PhHomeCard
+                config:
+                  layouts:
+                    xl: { w: 12, h: 4 }
+                    lg: { w: 12, h: 4 }
+                    md: { w: 12, h: 4 }
+                    sm: { w: 12, h: 4 }
+                    xs: { w: 12, h: 4 }
             menuItems:
               publishing-house-workflows:
                 priority: 30

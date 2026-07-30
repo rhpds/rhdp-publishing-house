@@ -50,10 +50,10 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
             message=f"{len(unresolved)} unresolved rejection reason(s) — address all feedback before resubmitting",
             field="approval_checklist.rejections",
         ))
-    elif all_rejections:
+    else:
         results.append(CheckResult(
             check_id="C-04", group="C", status=CheckStatus.PASS,
-            message=f"All {len(all_rejections)} rejection reason(s) resolved",
+            message="No unresolved rejections",
             field="approval_checklist.rejections",
         ))
 

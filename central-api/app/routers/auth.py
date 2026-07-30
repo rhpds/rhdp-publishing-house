@@ -149,26 +149,48 @@ async def exchange_token(
 
 # ── Workspace setup (SA token → signed key, replaces /workspace/setup) ──────
 
-async def _validate_ocp_token(token: str) -> str | None:
-    """Verify an OCP user token via the User API and return the username (email)."""
+def _extract_namespace_from_jwt(token: str) -> str | None:
+    """Decode SA JWT and return the namespace claim."""
+    try:
+        padded = token.split(".")[1] + "=" * (-len(token.split(".")[1]) % 4)
+        claims = json.loads(base64.urlsafe_b64decode(padded))
+        return claims.get("kubernetes.io/serviceaccount/namespace") or claims.get("kubernetes.io", {}).get("namespace")
+    except Exception:
+        return None
+
+
+async def _resolve_devspaces_user(token: str) -> str | None:
+    """Extract namespace from SA token, read user-profile secret using caller's token."""
+    namespace = _extract_namespace_from_jwt(token)
+    if not namespace:
+        logger.warning("could not extract namespace from token")
+        return None
+
+    logger.info("SA token namespace: %s", namespace)
     try:
         async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
             resp = await client.get(
-                "https://kubernetes.default.svc/apis/user.openshift.io/v1/users/~",
+                f"https://kubernetes.default.svc/api/v1/namespaces/{namespace}/secrets/user-profile",
                 headers={"Authorization": f"Bearer {token}"},
             )
             if resp.status_code != 200:
-                logger.warning("OCP User API returned %s", resp.status_code)
+                logger.warning("user-profile secret lookup returned %s", resp.status_code)
                 return None
 
-            username = resp.json().get("metadata", {}).get("name", "")
-            if not username or username.startswith("system:"):
-                logger.warning("OCP User API: rejected non-user identity %s", username)
+            import base64 as b64mod
+            data = resp.json().get("data", {})
+            raw = data.get("name") or data.get("email")
+            if not raw:
+                logger.warning("user-profile secret has no name/email field")
                 return None
-            logger.info("OCP User API OK: %s", username)
-            return username
+
+            email = b64mod.b64decode(raw).decode().strip()
+            if email.endswith("@che"):
+                email = email.removesuffix("@che")
+            logger.info("DevSpaces user-profile: %s", email)
+            return email
     except Exception as exc:
-        logger.error("OCP User API failed: %s", exc)
+        logger.error("user-profile lookup failed: %s", exc)
         return None
 
 
@@ -177,7 +199,7 @@ async def anonymous_key(
     credentials: HTTPAuthorizationCredentials = Security(HTTPBearer()),
 ):
     token = credentials.credentials
-    email = await _validate_ocp_token(token)
+    email = await _resolve_devspaces_user(token)
     if not email:
         raise HTTPException(status_code=401, detail="Invalid OpenShift token")
 
