@@ -13,7 +13,6 @@ class HealthResponse(BaseModel):
 class GenerateKeyRequest(BaseModel):
     """Request model for generating LiteLLM key."""
     project_id: str = Field(..., description="Project ID")
-    user_email: str = Field(..., description="User email address")
 
 
 class GenerateKeyResponse(BaseModel):

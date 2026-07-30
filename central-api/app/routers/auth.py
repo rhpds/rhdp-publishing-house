@@ -2,7 +2,6 @@
 import base64
 import json
 import logging
-import re
 
 import httpx
 from fastapi import APIRouter, HTTPException, Security
@@ -150,60 +149,27 @@ async def exchange_token(
 
 # ── Workspace setup (SA token → signed key, replaces /workspace/setup) ──────
 
-async def _validate_sa_token(token: str) -> bool:
-    try:
-        with open("/var/run/secrets/kubernetes.io/serviceaccount/token", "r") as f:
-            server_token = f.read().strip()
-    except FileNotFoundError:
-        logger.error("No service account token found — not running in-cluster")
-        return False
-
+async def _validate_ocp_token(token: str) -> str | None:
+    """Verify an OCP user token via the User API and return the username (email)."""
     try:
         async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
-            resp = await client.post(
-                "https://kubernetes.default.svc/apis/authentication.k8s.io/v1/tokenreviews",
-                headers={
-                    "Authorization": f"Bearer {server_token}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "apiVersion": "authentication.k8s.io/v1",
-                    "kind": "TokenReview",
-                    "spec": {"token": token},
-                },
+            resp = await client.get(
+                "https://kubernetes.default.svc/apis/user.openshift.io/v1/users/~",
+                headers={"Authorization": f"Bearer {token}"},
             )
-            if resp.status_code != 201:
-                logger.error("TokenReview HTTP %s: %s", resp.status_code, resp.text)
-                return False
+            if resp.status_code != 200:
+                logger.warning("OCP User API returned %s", resp.status_code)
+                return None
 
-            tr_status = resp.json().get("status", {})
-            if not tr_status.get("authenticated", False):
-                logger.warning("TokenReview: token not authenticated")
-                return False
-
-            logger.info("TokenReview OK: %s", tr_status.get("user", {}).get("username", "?"))
-            return True
+            username = resp.json().get("metadata", {}).get("name", "")
+            if not username or username.startswith("system:"):
+                logger.warning("OCP User API: rejected non-user identity %s", username)
+                return None
+            logger.info("OCP User API OK: %s", username)
+            return username
     except Exception as exc:
-        logger.error("TokenReview failed: %s", exc)
-        return False
-
-
-def _extract_namespace_from_jwt(token: str) -> str:
-    """Decode SA token JWT payload (no verification) and extract namespace."""
-    parts = token.split(".")
-    if len(parts) < 2:
-        raise HTTPException(status_code=400, detail="Malformed SA token")
-    padded = parts[1] + "=" * (-len(parts[1]) % 4)
-    try:
-        payload = json.loads(base64.urlsafe_b64decode(padded))
-    except Exception:
-        raise HTTPException(status_code=400, detail="Cannot decode SA token payload")
-    ns = payload.get("kubernetes.io/serviceaccount/namespace", "")
-    if not ns:
-        ns = payload.get("kubernetes.io", {}).get("namespace", "")
-    if not ns:
-        raise HTTPException(status_code=400, detail="SA token missing namespace claim")
-    return ns
+        logger.error("OCP User API failed: %s", exc)
+        return None
 
 
 @router.post("/keys/anonymous", response_model=WorkspaceResponse)
@@ -211,22 +177,12 @@ async def anonymous_key(
     credentials: HTTPAuthorizationCredentials = Security(HTTPBearer()),
 ):
     token = credentials.credentials
-    if not await _validate_sa_token(token):
-        raise HTTPException(status_code=401, detail="Invalid service account token")
+    email = await _validate_ocp_token(token)
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid OpenShift token")
 
-    try:
-        ns = _extract_namespace_from_jwt(token)
-        # Namespace format: treddy-redhat-com-devspaces-0xcl74
-        m = re.match(r"^([^-]+)", ns)
-        username = m.group(1) if m else ns
-        email = f"{username}@redhat.com"
-        logger.info("anonymous_key: ns=%s username=%s email=%s", ns, username, email)
+    mask = lookup_user_groups(email)
+    signed = create_signed_key(email, mask)
 
-        mask = lookup_user_groups(email)
-        signed = create_signed_key(email, mask)
-
-        logger.info("workspace key created for %s (ns=%s, mask=%d)", email, ns, mask)
-        return WorkspaceResponse(api_key=signed, user_email=email)
-    except Exception as e:
-        logger.error("anonymous_key failed: %s", e, exc_info=True)
-        raise
+    logger.info("workspace key created for %s (mask=%d)", email, mask)
+    return WorkspaceResponse(api_key=signed, user_email=email)

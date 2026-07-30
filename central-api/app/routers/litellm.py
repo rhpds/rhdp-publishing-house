@@ -20,12 +20,13 @@ def get_litellm_service(settings: Settings = Depends(get_settings)) -> LiteLLMSe
 @router.post("/keys/generate", response_model=GenerateKeyResponse)
 async def generate_litellm_key(
     request: GenerateKeyRequest,
-    _caller: str = Depends(_require_auth),
+    _caller: tuple[str, int] = Depends(_require_auth),
     litellm: LiteLLMService = Depends(get_litellm_service),
     settings: Settings = Depends(get_settings)
 ):
     """Generate LiteLLM virtual key for a project."""
-    litellm_key = await litellm.generate_key(request.project_id, request.user_email)
+    caller_email = _caller[0]
+    litellm_key = await litellm.generate_key(request.project_id, caller_email)
     if not litellm_key:
         raise HTTPException(status_code=503, detail="Failed to generate LiteLLM key")
 
@@ -36,5 +37,5 @@ async def generate_litellm_key(
         litellm_key=litellm_key,
         litellm_endpoint=settings.litellm_api_url,
         litellm_model=model,
-        message=f"LiteLLM key generated for {request.user_email}"
+        message=f"LiteLLM key generated for {caller_email}"
     )

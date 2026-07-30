@@ -28,7 +28,7 @@ commands:
     exec:
       component: dev-tools
       commandLine: |
-        SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token 2>/dev/null)
+        OCP_TOKEN=$(oc whoami -t 2>/dev/null)
 
         AUTH_FILE=/home/user/.config/publishing-house/auth.json
         if [ -f "$AUTH_FILE" ] && grep -q "litellm_key" "$AUTH_FILE" 2>/dev/null; then
@@ -37,7 +37,7 @@ commands:
           CENTRAL_URL="${{ values.central_api_url }}"
 
           SETUP_RESP=$(curl -sk -X POST "${CENTRAL_URL}/api/v1/auth/keys/anonymous" \
-            -H "Authorization: Bearer ${SA_TOKEN}")
+            -H "Authorization: Bearer ${OCP_TOKEN}")
 
           API_KEY=$(echo "$SETUP_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['api_key'])" 2>/dev/null)
           USER_EMAIL=$(echo "$SETUP_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['user_email'])" 2>/dev/null)
@@ -57,7 +57,7 @@ commands:
             LITELLM_RESP=$(curl -sk -X POST "${CENTRAL_URL}/api/v1/litellm/keys/generate" \
               -H "Authorization: Bearer ${API_KEY}" \
               -H "Content-Type: application/json" \
-              -d "{\"project_id\": \"${{ values.project_name }}\", \"user_email\": \"${USER_EMAIL}\"}")
+              -d "{\"project_id\": \"${{ values.project_name }}\"}")
 
             LITELLM_KEY=$(echo "$LITELLM_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['litellm_key'])" 2>/dev/null)
             LITELLM_ENDPOINT=$(echo "$LITELLM_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['litellm_endpoint'])" 2>/dev/null)
