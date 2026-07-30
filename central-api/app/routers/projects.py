@@ -53,6 +53,18 @@ class DevelopmentResponse(BaseModel):
     validation: Optional[dict] = None
 
 
+class TestingRequest(BaseModel):
+    repo_url: str
+    branch: str = "main"
+
+
+class TestingResponse(BaseModel):
+    status: int
+    stage: Optional[str] = None
+    error: Optional[str] = None
+    validation: Optional[dict] = None
+
+
 class DeleteProjectResponse(BaseModel):
     slug: str
     workflow_aborted: bool = False
@@ -493,6 +505,109 @@ async def submit_development(
     except Exception as e:
         logger.exception("development: unexpected error for %s", project_slug)
         return JSONResponse(status_code=500, content=DevelopmentResponse(
+            status=500, stage=stage, error=f"Internal server error: {e}",
+        ).model_dump())
+
+
+@router.post("/testing/{project_slug}", response_model=TestingResponse)
+async def submit_testing(
+    project_slug: str,
+    body: TestingRequest,
+    auth: tuple[str, int] = Depends(_require_auth),
+):
+    """Validate testing artifacts, run semantic drift check, then advance workflow.
+
+    Returns a unified response shape for all outcomes:
+    201 — validation passed, no drift, workflow advanced
+    422 — validation failed OR design drift detected
+    409 — workflow not in testing stage
+    404 — no workflow found
+    500 — unexpected server error
+    """
+    from fastapi.responses import JSONResponse
+    from ..services.github import GitHubService
+    from ..services.validation.runner import run_validation
+    from ..services.drift import check_drift_semantic
+
+    owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
+    stage = None
+    drift_msg = "Design drift detected. Your submission has been referred for additional review."
+
+    try:
+        try:
+            wd = _get_workflow_data(project_slug)
+        except HTTPException as e:
+            if e.status_code == 404:
+                return JSONResponse(status_code=404, content=TestingResponse(
+                    status=404, error=f"No workflow found for {project_slug}",
+                ).model_dump())
+            raise
+
+        wf_uuid = wd.get("workflow_id", "")
+        if not wf_uuid:
+            return JSONResponse(status_code=404, content=TestingResponse(
+                status=404, error=f"No workflow found for {project_slug}",
+            ).model_dump())
+
+        current = _get_workflow_state(wf_uuid).get("stage", "unknown")
+        stage = current
+        if current != "testing":
+            return JSONResponse(status_code=409, content=TestingResponse(
+                status=409, stage=current,
+                error=f"Workflow is in '{current}' stage. Testing requires 'testing'.",
+            ).model_dump())
+
+        if wd.get("hasDrift"):
+            return JSONResponse(status_code=422, content=TestingResponse(
+                status=422, stage=stage, error=drift_msg,
+            ).model_dump())
+
+        settings = get_settings()
+        if not settings.github_token:
+            return JSONResponse(status_code=500, content=TestingResponse(
+                status=500, stage=stage, error="GITHUB_TOKEN not configured on Central API",
+            ).model_dump())
+
+        github = GitHubService(token=settings.github_token)
+        result = await run_validation(github, body.repo_url, body.branch, "testing")
+
+        if not result.passed:
+            return JSONResponse(status_code=422, content=TestingResponse(
+                status=422, stage=stage, error="Validation failed",
+                validation=result.model_dump(),
+            ).model_dump())
+
+        baseline_sha = wd.get("baselineSha", "")
+        if baseline_sha and settings.ph_internal_ai_api_key:
+            drift_result = await check_drift_semantic(
+                github, body.repo_url, body.branch, baseline_sha,
+                settings.litellm_api_url, settings.ph_internal_ai_api_key,
+            )
+            if drift_result.has_drift:
+                _patch_workflow_data(wf_uuid, {"hasDrift": True}, settings=settings)
+                logger.info("testing: drift detected for %s, set hasDrift", project_slug)
+                return JSONResponse(status_code=422, content=TestingResponse(
+                    status=422, stage=stage, error=drift_msg,
+                ).model_dump())
+
+        _advance_workflow(
+            project_slug, wf_uuid, owner, stage="testing",
+            commit_sha=result.commit_sha, settings=settings,
+        )
+        logger.info("testing: submitted for %s", project_slug)
+
+        return JSONResponse(status_code=201, content=TestingResponse(
+            status=201,
+        ).model_dump())
+
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code, content=TestingResponse(
+            status=e.status_code, stage=stage, error=e.detail,
+        ).model_dump())
+    except Exception as e:
+        logger.exception("testing: unexpected error for %s", project_slug)
+        return JSONResponse(status_code=500, content=TestingResponse(
             status=500, stage=stage, error=f"Internal server error: {e}",
         ).model_dump())
 
