@@ -28,6 +28,10 @@ spec:
               value: "DEV"
             - name: SONATAFLOW_MANAGEMENT_CONSOLE_DATA_INDEX_ENDPOINT
               value: "http://sonataflow-platform-data-index-service.{{ app_namespace }}.svc.cluster.local/graphql"
+            - name: QUARKUS_HTTP_CORS
+              value: "true"
+            - name: QUARKUS_HTTP_CORS_ORIGINS
+              value: "https://sonataflow-management-console-{{ app_namespace }}.{{ ocp_apps_domain }}"
           resources:
             requests:
               memory: 256Mi

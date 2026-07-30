@@ -2,6 +2,7 @@
 app_namespace: publishing-house
 drift_checker_schedule: "0 6 * * *"
 inactivity_checker_schedule: "0 7 * * *"
+workflow_cleanup_schedule: "0 5 * * *"
 inactivity_threshold_days: 7
 inactivity_review_group: rhdp-content-review
 jobs_image: python:3.11-slim

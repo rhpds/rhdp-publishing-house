@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workflow-cleanup-script
+  namespace: "{{ app_namespace }}"
+data:
+  workflow-cleanup.py: |
+    #!/usr/bin/env python3
+    """Delete aborted SonataFlow process instances from the data-index database."""
+
+    import os
+    import sys
+
+    try:
+        import psycopg2
+    except ImportError:
+        import subprocess
+        subprocess.check_call([
+            sys.executable, "-m", "pip", "install", "--quiet",
+            "--target", "/tmp/pip-packages", "psycopg2-binary",
+        ])
+        sys.path.insert(0, "/tmp/pip-packages")
+        import psycopg2
+
+    DB_HOST = os.environ["SONATAFLOW_DB_HOST"]
+    DB_NAME = os.environ["SONATAFLOW_DB_NAME"]
+    DB_USER = os.environ["SONATAFLOW_DB_USER"]
+    DB_PASS = os.environ["SONATAFLOW_DB_PASSWORD"]
+    DB_PORT = int(os.environ.get("SONATAFLOW_DB_PORT", "5432"))
+
+    SCHEMA = "sonataflow-platform-data-index-service"
+    STATE_ABORTED = 3
+
+
+    def main():
+        print("=== Workflow Cleanup Job ===")
+
+        conn = psycopg2.connect(
+            host=DB_HOST, port=DB_PORT,
+            dbname=DB_NAME, user=DB_USER, password=DB_PASS,
+        )
+        conn.autocommit = True
+        cur = conn.cursor()
+
+        s = SCHEMA
+        cur.execute(
+            f'SELECT id, business_key FROM "{s}".processes WHERE state = %s',
+            (STATE_ABORTED,),
+        )
+        aborted = cur.fetchall()
+        print(f"Found {len(aborted)} aborted instance(s)")
+
+        if not aborted:
+            print("Nothing to clean up")
+            cur.close()
+            conn.close()
+            return
+
+        for inst_id, bk in aborted:
+            print(f"  deleting {bk} ({inst_id})")
+
+        ids = [row[0] for row in aborted]
+
+        for child in ("milestones", "nodes", "processes_addons", "processes_roles"):
+            col = "process_instance_id" if child in ("milestones", "nodes") else "process_id"
+            cur.execute(f'DELETE FROM "{s}".{child} WHERE {col} = ANY(%s)', (ids,))
+            if cur.rowcount:
+                print(f"  cleaned {cur.rowcount} row(s) from {child}")
+
+        cur.execute(f'DELETE FROM "{s}".processes WHERE id = ANY(%s)', (ids,))
+        print(f"Deleted {cur.rowcount} aborted instance(s)")
+
+        cur.close()
+        conn.close()
+
+        print("=== Cleanup complete ===")
+
+
+    if __name__ == "__main__":
+        main()

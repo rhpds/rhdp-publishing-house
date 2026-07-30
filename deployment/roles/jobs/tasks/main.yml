@@ -21,9 +21,21 @@
     state: present
     definition: "{{ lookup('template', 'cronjob-inactivity-checker.yaml.j2') | from_yaml }}"
 
+# Workflow cleanup job
+- name: Create workflow-cleanup script ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cm-workflow-cleanup-script.yaml.j2') | from_yaml }}"
+
+- name: Create workflow-cleanup CronJob
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'cronjob-workflow-cleanup.yaml.j2') | from_yaml }}"
+
 - name: Display jobs summary
   ansible.builtin.debug:
     msg:
       - "Jobs deployed in {{ app_namespace }}"
       - "  drift-checker: {{ drift_checker_schedule }}"
       - "  inactivity-checker: {{ inactivity_checker_schedule }}"
+      - "  workflow-cleanup: {{ workflow_cleanup_schedule }}"
