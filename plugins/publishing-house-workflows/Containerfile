@@ -19,7 +19,8 @@ COPY package.json ./
 
 RUN npm pkg delete dependencies.@rollup/rollup-darwin-arm64 \
     dependencies.@swc/core-darwin-arm64 && \
-    npm install --legacy-peer-deps --ignore-scripts 2>&1 | tail -5
+    npm install --legacy-peer-deps --ignore-scripts 2>&1 | tail -5 && \
+    npm install react@18 react-dom@18 react-router-dom@6 --legacy-peer-deps --ignore-scripts 2>&1 | tail -3
 
 COPY . .
 

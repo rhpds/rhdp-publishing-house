@@ -188,6 +188,16 @@ export interface DriftReport {
   changes: DriftChange[];
 }
 
+export interface ReviewMessage {
+  id: string;
+  title: string;
+  text: string;
+  origin: string;
+  stage: string;
+  timestamp: string;
+  read: boolean;
+}
+
 export interface WorkflowSummary {
   id: string;
   projectId: string;

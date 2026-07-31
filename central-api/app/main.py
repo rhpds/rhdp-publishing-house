@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings, Settings
 from .models import HealthResponse
-from .routers import litellm, projects, jira, validate, drift, auth as auth_router
+from .routers import litellm, projects, jira, validate, drift, auth as auth_router, messages
 from .services.rcars import rcars_health, rcars_advisor_submit, rcars_advisor_result
 from .auth import init_oidc
 from .auth.groups import decode_signed_key
@@ -117,6 +117,7 @@ def create_app() -> FastAPI:
     # Auth router — key management, token exchange, workspace setup
     app.include_router(auth_router.router, prefix=settings.api_prefix)
 
+    app.include_router(messages.router, prefix=settings.api_prefix)
     app.include_router(litellm.router, prefix=settings.api_prefix)
     app.include_router(jira.router, prefix=settings.api_prefix)
 

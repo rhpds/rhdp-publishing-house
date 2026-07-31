@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Security, status
+from fastapi import APIRouter, Depends, HTTPException, Header, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from ..auth.groups import GROUP_BITS, ALL_GROUPS_MASK, decode_signed_key
@@ -317,11 +317,59 @@ def _require_stage(workflow_id: str, allowed: list[str]) -> str:
     return current
 
 
+def _check_github_write_access(repo_url: str, github_user: str | None) -> None:
+    """Verify the GitHub user has write or admin access to the repo. Reusable across stages."""
+    if not github_user:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=json.dumps({"error": "GitHub username is required", "code": "github_user_missing"}),
+        )
+    match = re.match(r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?$", repo_url)
+    if not match:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot parse owner/repo from URL: {repo_url}",
+        )
+    owner, repo = match.group(1), match.group(2)
+    settings = get_settings()
+    if not settings.github_token:
+        logger.warning("GITHUB_TOKEN not set — skipping write-access check")
+        return
+    try:
+        req = urllib.request.Request(
+            f"https://api.github.com/repos/{owner}/{repo}/collaborators/{github_user}/permission",
+            headers={
+                "Authorization": f"Bearer {settings.github_token}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read().decode())
+        permission = data.get("permission", "")
+        if permission not in ("write", "admin"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=json.dumps({
+                    "error": f"User '{github_user}' does not have write access to {owner}/{repo}",
+                    "code": "github_write_denied",
+                }),
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("GitHub permission check failed for %s on %s/%s: %s", github_user, owner, repo, e)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to verify GitHub permissions: {e}",
+        )
+
+
 @router.post("/intake/{project_slug}", response_model=IntakeResponse)
 async def submit_intake(
     project_slug: str,
     body: IntakeRequest,
     auth: tuple[str, int] = Depends(_require_auth),
+    x_github_user: str | None = Header(None, alias="X-GitHub-User"),
 ):
     """Validate spec, then advance workflow past intake.
 
@@ -366,6 +414,8 @@ async def submit_intake(
                 error=f"Workflow is in '{current}' stage. Intake requires 'intake'.",
             ).model_dump())
 
+        _check_github_write_access(body.repo_url, x_github_user)
+
         # Validate
         settings = get_settings()
         if not settings.github_token:
@@ -409,6 +459,7 @@ async def submit_development(
     project_slug: str,
     body: DevelopmentRequest,
     auth: tuple[str, int] = Depends(_require_auth),
+    x_github_user: str | None = Header(None, alias="X-GitHub-User"),
 ):
     """Validate development artifacts, run semantic drift check, then advance workflow.
 
@@ -452,6 +503,8 @@ async def submit_development(
                 status=409, stage=current,
                 error=f"Workflow is in '{current}' stage. Development requires 'development'.",
             ).model_dump())
+
+        _check_github_write_access(body.repo_url, x_github_user)
 
         # If hasDrift is already set, return immediately without re-checking
         if wd.get("hasDrift"):
@@ -514,6 +567,7 @@ async def submit_testing(
     project_slug: str,
     body: TestingRequest,
     auth: tuple[str, int] = Depends(_require_auth),
+    x_github_user: str | None = Header(None, alias="X-GitHub-User"),
 ):
     """Validate testing artifacts, run semantic drift check, then advance workflow.
 
@@ -557,6 +611,8 @@ async def submit_testing(
                 status=409, stage=current,
                 error=f"Workflow is in '{current}' stage. Testing requires 'testing'.",
             ).model_dump())
+
+        _check_github_write_access(body.repo_url, x_github_user)
 
         if wd.get("hasDrift"):
             return JSONResponse(status_code=422, content=TestingResponse(

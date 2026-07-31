@@ -36,7 +36,7 @@ import RefreshIcon from '@material-ui/icons/Refresh';
 import ReplayIcon from '@material-ui/icons/Replay';
 import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 import { createPhWorkflowsClient } from '../../api/client';
-import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport } from '../../api/types';
+import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport, ReviewMessage } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
 import { useUserGroups } from '../../hooks/useUserGroups';
 
@@ -73,6 +73,7 @@ const STATUS_ICONS: Record<CheckStatus, string> = {
 };
 import { WorkflowProgress } from './WorkflowProgress';
 import { RejectionDialog } from './RejectionDialog';
+import { MessageDialog } from './MessageDialog';
 
 const useStyles = makeStyles(theme => ({
   linkButtons: {
@@ -116,7 +117,7 @@ export function WorkflowDetailPage() {
   const centralApiUrl = configApi.getString('phWorkflows.centralApiUrl');
 
   const client = useMemo(() => createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi }), [centralApiUrl, discoveryApi, fetchApi, identityApi]);
-  const { isContentReviewer, isInfraReviewer } = useUserGroups();
+  const { isContentReviewer, isInfraReviewer, isAdmin } = useUserGroups();
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState(0);
@@ -179,6 +180,10 @@ export function WorkflowDetailPage() {
     message: string;
   }>({ open: false, severity: 'success', message: '' });
   const [reasonsPopover, setReasonsPopover] = useState<{ anchorEl: HTMLElement | null; reasons: { id: number; text: string }[] }>({ anchorEl: null, reasons: [] });
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [messages, setMessages] = useState<ReviewMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
 
   const handleApprove = async (stage: WorkflowStage) => {
     if (!result) return;
@@ -272,6 +277,38 @@ export function WorkflowDetailPage() {
     setRejectingStage(null);
   };
 
+  const handleSendMessage = async (text: string) => {
+    if (!result) return;
+    setSendingMessage(true);
+    try {
+      await client.sendMessage(result.summary.projectId, text, result.summary.stage);
+      setMessageDialogOpen(false);
+      setSnackbar({ open: true, severity: 'success', message: 'Message sent to author.' });
+      loadMessages();
+    } catch (err: any) {
+      setSnackbar({ open: true, severity: 'error', message: `Send failed: ${err.message}` });
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const loadMessages = useCallback(async () => {
+    if (!result) return;
+    setMessagesLoading(true);
+    try {
+      const msgs = await client.getMessages(result.summary.projectId);
+      setMessages(msgs);
+    } catch {
+      setMessages([]);
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, [result, client]);
+
+  React.useEffect(() => {
+    if (result) loadMessages();
+  }, [result, loadMessages]);
+
   if (loading) {
     return (
       <Page themeId="tool">
@@ -312,6 +349,7 @@ export function WorkflowDetailPage() {
   const hasReviewTab = STAGES_WITH_REVIEW_TAB.includes(summary.stage);
   const canReview = (summary.stage === 'content_review' && isContentReviewer)
     || (summary.stage === 'infra_review' && isInfraReviewer);
+  const canMessage = isContentReviewer || isInfraReviewer;
 
   return (
     <Page themeId="tool">
@@ -422,6 +460,53 @@ export function WorkflowDetailPage() {
                 </div>
               </Grid>
             </Grid>
+          </InfoCard>
+        )}
+
+        {activeTab === 0 && canMessage && (
+          <InfoCard>
+            <Button
+              variant="contained"
+              style={{ backgroundColor: '#0099FF', color: '#fff', fontWeight: 600 }}
+              size="large"
+              onClick={() => setMessageDialogOpen(true)}
+            >
+              Message
+            </Button>
+          </InfoCard>
+        )}
+
+        {activeTab === 0 && messages.length > 0 && (
+          <InfoCard title={`Messages (${messages.length})`}>
+            {messagesLoading ? (
+              <CircularProgress size={20} />
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+                    <th style={{ padding: '6px 8px' }}>When</th>
+                    <th style={{ padding: '6px 8px' }}>From</th>
+                    <th style={{ padding: '6px 8px' }}>Stage</th>
+                    <th style={{ padding: '6px 8px' }}>Message</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {messages.map(msg => (
+                    <tr key={msg.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', opacity: msg.read ? 0.6 : 1 }}>
+                      <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>
+                        {msg.timestamp ? new Date(msg.timestamp).toLocaleString() : '—'}
+                      </td>
+                      <td style={{ padding: '6px 8px' }}>{msg.origin || '—'}</td>
+                      <td style={{ padding: '6px 8px' }}>{STAGE_LABELS[msg.stage as WorkflowStage] || msg.stage || '—'}</td>
+                      <td style={{ padding: '6px 8px' }}>
+                        {!msg.read && <Chip label="New" size="small" style={{ backgroundColor: '#1976d2', color: '#fff', marginRight: 6, fontSize: '0.7rem', height: 18 }} />}
+                        {msg.text}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </InfoCard>
         )}
 
@@ -733,7 +818,7 @@ export function WorkflowDetailPage() {
               );
             })()}
 
-            {/* Approve / Reject buttons — only shown to the relevant reviewer group */}
+            {/* Approve / Reject / Message buttons */}
             {canReview && (validationReport || driftReport) && (
               <InfoCard>
                 <div style={{ display: 'flex', gap: 12 }}>
@@ -878,6 +963,15 @@ export function WorkflowDetailPage() {
           submitting={submittingRejection}
           onConfirm={handleRejectionConfirm}
           onCancel={handleRejectionCancel}
+        />
+
+        <MessageDialog
+          open={messageDialogOpen}
+          stage={summary.stage}
+          senderName={summary.ssoEmail || summary.owner}
+          submitting={sendingMessage}
+          onConfirm={handleSendMessage}
+          onCancel={() => setMessageDialogOpen(false)}
         />
 
         <Snackbar

@@ -62,7 +62,7 @@ spec:
             - name: SONATAFLOW_GRAPHQL_URL
               value: "http://sonataflow-platform-data-index-service.{{ app_namespace }}.svc.cluster.local:80"
             - name: CORS_ORIGINS
-              value: "https://backstage-developer-hub-{{ app_namespace }}.{{ ocp_apps_domain }}"
+              value: "https://central-publishing-house-{{ app_namespace }}.{{ ocp_apps_domain }}"
             - name: OIDC_ISSUER_URL
               value: "https://keycloak-keycloak.{{ keycloak_domain | default(ocp_apps_domain) }}/realms/publishing-house"
             - name: OIDC_CLIENT_ID

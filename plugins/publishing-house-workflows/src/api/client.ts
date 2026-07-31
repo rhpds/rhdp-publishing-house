@@ -1,5 +1,5 @@
 import { DiscoveryApi, FetchApi, IdentityApi } from '@backstage/core-plugin-api';
-import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult } from './types';
+import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult, ReviewMessage } from './types';
 import { deriveStage } from '../utils/stageMapping';
 
 const TOKEN_STORAGE_KEY = 'ph-central-token';
@@ -371,6 +371,58 @@ export function createPhWorkflowsClient(options: {
     return await response.json();
   }
 
+  async function sendMessage(
+    slug: string,
+    text: string,
+    stage: string,
+  ): Promise<{ sent: boolean; recipients: string[] }> {
+    const response = await centralFetch(
+      `/projects/${slug}/messages`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ text, stage }),
+      },
+    );
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || `Send message failed: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  async function getMessages(
+    slug: string,
+    unreadOnly?: boolean,
+  ): Promise<ReviewMessage[]> {
+    const params = unreadOnly !== undefined ? `?read=${!unreadOnly}` : '';
+    const response = await centralFetch(
+      `/projects/${slug}/messages${params}`,
+    );
+
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    return data.messages ?? [];
+  }
+
+  async function markMessagesRead(
+    slug: string,
+    ids: string[],
+  ): Promise<{ marked: number }> {
+    const response = await centralFetch(
+      `/projects/${slug}/messages/read`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      },
+    );
+
+    if (!response.ok) return { marked: 0 };
+    return await response.json();
+  }
+
   return {
     getWorkflows,
     getWorkflow,
@@ -382,5 +434,8 @@ export function createPhWorkflowsClient(options: {
     approveDrift,
     fetchHeadCommitSha,
     deleteProject,
+    sendMessage,
+    getMessages,
+    markMessagesRead,
   };
 }
