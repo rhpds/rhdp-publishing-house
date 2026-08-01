@@ -53,9 +53,12 @@ yarn-error.log
 
 # Build outputs
 dist/
+dist-types/
+dist-dynamic/
 *.log
 coverage/
 .nyc_output/
+*.tsbuildinfo
 
 # Environment files
 .env
