@@ -126,7 +126,8 @@ def decode_signed_key(token: str) -> Optional[tuple[str, int]]:
     except ValueError:
         return None
 
-    if time.time() > exp:
+    from .token_cache import is_token_in_cache
+    if not is_token_in_cache(token, email):
         return None
 
     return email, mask

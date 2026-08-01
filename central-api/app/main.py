@@ -1,5 +1,7 @@
 """Publishing House Central API - Main application."""
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import datetime
 
@@ -16,12 +18,35 @@ from .routers import litellm, projects, jira, validate, drift, auth as auth_rout
 from .services.rcars import rcars_health, rcars_advisor_submit, rcars_advisor_result
 from .auth import init_oidc
 from .auth.groups import decode_signed_key
+from .auth.token_cache import load_backup, save_backup
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+_BACKUP_INTERVAL = 86400  # 24 hours
+
+
+async def _backup_loop():
+    """Save token cache backup every 24 hours."""
+    while True:
+        await asyncio.sleep(_BACKUP_INTERVAL)
+        save_backup()
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Startup: restore cache from backup. Shutdown: save final backup."""
+    loaded = load_backup()
+    logger.info("token cache startup: restored %d entries", loaded)
+    task = asyncio.create_task(_backup_loop())
+    yield
+    task.cancel()
+    save_backup()
+    logger.info("token cache shutdown: backup saved")
 
 
 def create_app() -> FastAPI:
@@ -38,6 +63,7 @@ def create_app() -> FastAPI:
         title=settings.api_title,
         version=settings.api_version,
         description="Central API for Publishing House workflow orchestration",
+        lifespan=_lifespan,
     )
 
     if settings.cors_origins:

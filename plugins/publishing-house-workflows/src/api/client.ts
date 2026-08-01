@@ -1,5 +1,5 @@
 import { DiscoveryApi, FetchApi, IdentityApi } from '@backstage/core-plugin-api';
-import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult, ReviewMessage } from './types';
+import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult, ReviewMessage, TokenListResponse, RevokeResponse, RevokeAllResponse } from './types';
 import { deriveStage } from '../utils/stageMapping';
 
 const TOKEN_STORAGE_KEY = 'ph-central-token';
@@ -423,6 +423,30 @@ export function createPhWorkflowsClient(options: {
     return await response.json();
   }
 
+  async function getTokens(): Promise<TokenListResponse> {
+    const response = await centralFetch('/auth/tokens');
+    if (!response.ok) throw new Error(`Failed to list tokens: ${response.status}`);
+    return await response.json();
+  }
+
+  async function searchTokens(query: string): Promise<TokenListResponse> {
+    const response = await centralFetch(`/auth/tokens/search?q=${encodeURIComponent(query)}`);
+    if (!response.ok) throw new Error(`Token search failed: ${response.status}`);
+    return await response.json();
+  }
+
+  async function revokeToken(email: string): Promise<RevokeResponse> {
+    const response = await centralFetch(`/auth/tokens/${encodeURIComponent(email)}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error(`Revoke failed: ${response.status}`);
+    return await response.json();
+  }
+
+  async function revokeAllTokens(): Promise<RevokeAllResponse> {
+    const response = await centralFetch('/auth/tokens', { method: 'DELETE' });
+    if (!response.ok) throw new Error(`Revoke all failed: ${response.status}`);
+    return await response.json();
+  }
+
   return {
     getWorkflows,
     getWorkflow,
@@ -437,5 +461,9 @@ export function createPhWorkflowsClient(options: {
     sendMessage,
     getMessages,
     markMessagesRead,
+    getTokens,
+    searchTokens,
+    revokeToken,
+    revokeAllTokens,
   };
 }

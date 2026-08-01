@@ -198,6 +198,29 @@ export interface ReviewMessage {
   read: boolean;
 }
 
+export interface TokenInfo {
+  email: string;
+  groups_bitmask: number;
+  group_names: string[];
+  issued_at: string;
+  expires_at: string;
+  source: string;
+}
+
+export interface TokenListResponse {
+  tokens: TokenInfo[];
+  count: number;
+}
+
+export interface RevokeResponse {
+  revoked: boolean;
+  email: string | null;
+}
+
+export interface RevokeAllResponse {
+  revoked_count: number;
+}
+
 export interface WorkflowSummary {
   id: string;
   projectId: string;

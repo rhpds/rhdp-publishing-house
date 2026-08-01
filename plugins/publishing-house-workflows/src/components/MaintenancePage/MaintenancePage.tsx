@@ -20,6 +20,8 @@ import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { Entity } from '@backstage/catalog-model';
 import {
   IconButton,
+  Tab,
+  Tabs,
   Tooltip,
   Typography,
   makeStyles,
@@ -28,6 +30,7 @@ import RefreshIcon from '@material-ui/icons/Refresh';
 import DeleteIcon from '@material-ui/icons/Delete';
 import LockIcon from '@material-ui/icons/Lock';
 import { DeleteDialog } from './DeleteDialog';
+import { TokenManagementTab } from './TokenManagementTab';
 import { createPhWorkflowsClient } from '../../api/client';
 import { WorkflowSummary } from '../../api/types';
 import { useUserGroups } from '../../hooks/useUserGroups';
@@ -92,6 +95,7 @@ export function MaintenancePage() {
   const identityApi = useApi(identityApiRef);
   const centralApiUrl = configApi.getString('phWorkflows.centralApiUrl');
   const { isAdmin, loading: groupsLoading } = useUserGroups();
+  const [activeTab, setActiveTab] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<Entity | null>(null);
 
@@ -224,45 +228,62 @@ export function MaintenancePage() {
 
   return (
     <Page themeId="tool">
-      <Header title="Publishing House" subtitle="Component maintenance and cleanup">
+      <Header title="Publishing House" subtitle="Maintenance and administration">
         <HeaderLabel label="Components" value={String(entities.length)} />
       </Header>
       <Content>
-        <ContentHeader title="Registered Components">
-          <Tooltip title="Refresh">
-            <IconButton onClick={handleRefresh} disabled={loading}>
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-        </ContentHeader>
-        <Table<ComponentRow>
-          title="Publishing House Components"
-          options={{
-            search: true,
-            paging: true,
-            pageSize: 20,
-            padding: 'dense',
-          }}
-          columns={columns}
-          data={rows}
-          isLoading={loading}
-          emptyContent={
-            error ? (
-              <div style={{ padding: 16 }}>
-                Failed to load components: {error.message}
-              </div>
-            ) : undefined
-          }
-        />
-        <DeleteDialog
-          open={!!deleteTarget}
-          entity={deleteTarget}
-          onClose={() => setDeleteTarget(null)}
-          onDeleted={() => {
-            setDeleteTarget(null);
-            handleRefresh();
-          }}
-        />
+        <Tabs
+          value={activeTab}
+          onChange={(_e, v) => setActiveTab(v)}
+          indicatorColor="primary"
+          textColor="primary"
+          style={{ marginBottom: 16 }}
+        >
+          <Tab label="Components" />
+          <Tab label="Token Management" />
+        </Tabs>
+
+        {activeTab === 0 && (
+          <>
+            <ContentHeader title="Registered Components">
+              <Tooltip title="Refresh">
+                <IconButton onClick={handleRefresh} disabled={loading}>
+                  <RefreshIcon />
+                </IconButton>
+              </Tooltip>
+            </ContentHeader>
+            <Table<ComponentRow>
+              title="Publishing House Components"
+              options={{
+                search: true,
+                paging: true,
+                pageSize: 20,
+                padding: 'dense',
+              }}
+              columns={columns}
+              data={rows}
+              isLoading={loading}
+              emptyContent={
+                error ? (
+                  <div style={{ padding: 16 }}>
+                    Failed to load components: {error.message}
+                  </div>
+                ) : undefined
+              }
+            />
+            <DeleteDialog
+              open={!!deleteTarget}
+              entity={deleteTarget}
+              onClose={() => setDeleteTarget(null)}
+              onDeleted={() => {
+                setDeleteTarget(null);
+                handleRefresh();
+              }}
+            />
+          </>
+        )}
+
+        {activeTab === 1 && <TokenManagementTab />}
       </Content>
     </Page>
   );

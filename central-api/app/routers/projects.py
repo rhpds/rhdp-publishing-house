@@ -319,6 +319,7 @@ def _require_stage(workflow_id: str, allowed: list[str]) -> str:
 
 def _check_github_write_access(repo_url: str, github_user: str | None) -> None:
     """Verify the GitHub user has write or admin access to the repo. Reusable across stages."""
+    logger.info("github write-access check: user=%r repo=%s", github_user, repo_url)
     if not github_user:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

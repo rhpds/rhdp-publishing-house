@@ -1,10 +1,11 @@
-"""Auth router — key management, token exchange, workspace setup."""
+"""Auth router — key management, token exchange, workspace setup, token management."""
 import base64
 import json
 import logging
+from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, HTTPException, Security
+from fastapi import APIRouter, Depends, HTTPException, Query, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from ..auth.oidc import get_oidc_validator
@@ -12,11 +13,23 @@ from ..auth.groups import (
     GROUP_BITS, ALL_GROUPS_MASK,
     compute_bitmask, lookup_user_groups, create_signed_key, decode_signed_key,
 )
+from ..auth.token_cache import (
+    cache_token, get_cached_token,
+    revoke_token, revoke_all_tokens, list_tokens, search_tokens,
+)
 from ..config import get_settings
 
 logger = logging.getLogger(__name__)
+audit = logging.getLogger("ph.audit")
 router = APIRouter(prefix="/auth", tags=["auth"])
 _bearer = HTTPBearer(auto_error=False)
+
+
+def _token_expiry_iso(token: str) -> str:
+    padded = token.split(".")[0] + "=" * (-len(token.split(".")[0]) % 4)
+    payload = base64.urlsafe_b64decode(padded).decode()
+    exp = int(payload.split("|")[2])
+    return datetime.fromtimestamp(exp, tz=timezone.utc).isoformat()
 
 
 # ── Schemas ──────────────────────────────────────────────────────────────────
@@ -66,19 +79,11 @@ async def oidc_key(
     email = result["email"]
     mask = compute_bitmask(result["groups"])
     token = create_signed_key(email, mask)
-
-    padded = token.split(".")[0] + "=" * (-len(token.split(".")[0]) % 4)
-    payload = base64.urlsafe_b64decode(padded).decode()
-    expiry = payload.split("|")[2]
-
-    from datetime import datetime, timezone
-    exp_dt = datetime.fromtimestamp(int(expiry), tz=timezone.utc)
+    cache_token(email, token, mask, "oidc")
 
     return ExchangeResponse(
-        token=token,
-        email=email,
-        groups_bitmask=mask,
-        expires_at=exp_dt.isoformat(),
+        token=token, email=email,
+        groups_bitmask=mask, expires_at=_token_expiry_iso(token),
     )
 
 
@@ -130,20 +135,24 @@ async def exchange_token(
         mask = compute_bitmask(groups)
         logger.info("backstage exchange for %s: groups=%s mask=%d", email, groups, mask)
 
+    cached = get_cached_token(email)
+    if cached is not None:
+        audit.info(json.dumps({
+            "audit": "token_cached_hit", "email": email,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }))
+        return ExchangeResponse(
+            token=cached.token, email=email,
+            groups_bitmask=cached.groups_bitmask,
+            expires_at=_token_expiry_iso(cached.token),
+        )
+
     token = create_signed_key(email, mask)
-
-    padded = token.split(".")[0] + "=" * (-len(token.split(".")[0]) % 4)
-    payload = base64.urlsafe_b64decode(padded).decode()
-    expiry = payload.split("|")[2]
-
-    from datetime import datetime, timezone
-    exp_dt = datetime.fromtimestamp(int(expiry), tz=timezone.utc)
+    cache_token(email, token, mask, "exchange")
 
     return ExchangeResponse(
-        token=token,
-        email=email,
-        groups_bitmask=mask,
-        expires_at=exp_dt.isoformat(),
+        token=token, email=email,
+        groups_bitmask=mask, expires_at=_token_expiry_iso(token),
     )
 
 
@@ -203,8 +212,116 @@ async def anonymous_key(
     if not email:
         raise HTTPException(status_code=401, detail="Invalid OpenShift token")
 
+    cached = get_cached_token(email)
+    if cached is not None:
+        audit.info(json.dumps({
+            "audit": "token_cached_hit", "email": email,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }))
+        logger.info("workspace key cache hit for %s", email)
+        return WorkspaceResponse(api_key=cached.token, user_email=email)
+
     mask = lookup_user_groups(email)
     signed = create_signed_key(email, mask)
+    cache_token(email, signed, mask, "anonymous")
 
     logger.info("workspace key created for %s (mask=%d)", email, mask)
     return WorkspaceResponse(api_key=signed, user_email=email)
+
+
+# ── Token management (admin-only) ─────────────────────────────────────────
+
+
+def _require_auth(
+    credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
+) -> tuple[str, int]:
+    settings = get_settings()
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Bearer token required")
+    token = credentials.credentials
+    if token == settings.ph_api_key:
+        return "service", ALL_GROUPS_MASK
+    result = decode_signed_key(token)
+    if result:
+        return result
+    raise HTTPException(status_code=401, detail="Invalid API key")
+
+
+def _require_group(groups: int, required: int, group_name: str):
+    if not (groups & required):
+        raise HTTPException(status_code=403, detail=f"Requires membership in {group_name}")
+
+
+class TokenInfo(BaseModel):
+    email: str
+    groups_bitmask: int
+    group_names: list[str]
+    issued_at: str
+    expires_at: str
+    source: str
+
+
+class TokenListResponse(BaseModel):
+    tokens: list[TokenInfo]
+    count: int
+
+
+class RevokeResponse(BaseModel):
+    revoked: bool
+    email: str | None = None
+
+
+class RevokeAllResponse(BaseModel):
+    revoked_count: int
+
+
+def _to_token_info(entry: dict) -> TokenInfo:
+    names = [g for g, b in GROUP_BITS.items() if entry["groups_bitmask"] & b]
+    return TokenInfo(
+        email=entry["email"],
+        groups_bitmask=entry["groups_bitmask"],
+        group_names=names,
+        issued_at=datetime.fromtimestamp(entry["issued_at"], tz=timezone.utc).isoformat(),
+        expires_at=datetime.fromtimestamp(entry["expires"], tz=timezone.utc).isoformat(),
+        source=entry.get("source", "unknown"),
+    )
+
+
+@router.get("/tokens", response_model=TokenListResponse)
+async def get_active_tokens(auth: tuple[str, int] = Depends(_require_auth)):
+    _, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-administrators"], "rhdp-administrators")
+    entries = list_tokens()
+    tokens = [_to_token_info(e) for e in entries]
+    return TokenListResponse(tokens=tokens, count=len(tokens))
+
+
+@router.get("/tokens/search", response_model=TokenListResponse)
+async def search_active_tokens(
+    q: str = Query(..., min_length=1),
+    auth: tuple[str, int] = Depends(_require_auth),
+):
+    _, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-administrators"], "rhdp-administrators")
+    entries = search_tokens(q)
+    tokens = [_to_token_info(e) for e in entries]
+    return TokenListResponse(tokens=tokens, count=len(tokens))
+
+
+@router.delete("/tokens/{email}", response_model=RevokeResponse)
+async def revoke_user_token(
+    email: str,
+    auth: tuple[str, int] = Depends(_require_auth),
+):
+    _, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-administrators"], "rhdp-administrators")
+    removed = revoke_token(email)
+    return RevokeResponse(revoked=removed, email=email)
+
+
+@router.delete("/tokens", response_model=RevokeAllResponse)
+async def revoke_all_active_tokens(auth: tuple[str, int] = Depends(_require_auth)):
+    _, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-administrators"], "rhdp-administrators")
+    count = revoke_all_tokens()
+    return RevokeAllResponse(revoked_count=count)
