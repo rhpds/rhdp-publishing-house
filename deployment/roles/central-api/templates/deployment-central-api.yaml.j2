@@ -98,6 +98,8 @@ spec:
             - name: validation-policy
               mountPath: /etc/ph-policy
               readOnly: true
+            - name: data
+              mountPath: /data
           resources:
             requests:
               memory: 256Mi
@@ -121,3 +123,6 @@ spec:
         - name: validation-policy
           configMap:
             name: ph-validation-policy
+        - name: data
+          persistentVolumeClaim:
+            claimName: central-api-data

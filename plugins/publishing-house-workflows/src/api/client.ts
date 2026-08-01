@@ -53,8 +53,8 @@ export function createPhWorkflowsClient(options: {
   const { centralApiUrl, discoveryApi, fetchApi, identityApi } = options;
 
   async function getUserToken(): Promise<string | undefined> {
-    const cached = localStorage.getItem(TOKEN_STORAGE_KEY);
-    const expiry = Number(localStorage.getItem(EXPIRY_STORAGE_KEY) || '0');
+    const cached = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    const expiry = Number(sessionStorage.getItem(EXPIRY_STORAGE_KEY) || '0');
     if (cached && Date.now() / 1000 < expiry - 60) {
       return cached;
     }
@@ -83,8 +83,8 @@ export function createPhWorkflowsClient(options: {
     if (!resp.ok) return undefined;
 
     const data = await resp.json();
-    localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
-    localStorage.setItem(EXPIRY_STORAGE_KEY, String(new Date(data.expires_at).getTime() / 1000));
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+    sessionStorage.setItem(EXPIRY_STORAGE_KEY, String(new Date(data.expires_at).getTime() / 1000));
     return data.token;
   }
 
@@ -95,10 +95,15 @@ export function createPhWorkflowsClient(options: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers as Record<string, string> | undefined),
     };
-    return globalThis.fetch(`${centralApiUrl}/api/v1${path}`, {
+    const resp = await globalThis.fetch(`${centralApiUrl}/api/v1${path}`, {
       ...init,
       headers,
     });
+    if (resp.status === 401 && token) {
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+      sessionStorage.removeItem(EXPIRY_STORAGE_KEY);
+    }
+    return resp;
   }
 
   async function getWorkflows(): Promise<WorkflowSummary[]> {

@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # API Configuration
     api_title: str = "Publishing House Central API"
-    api_version: str = "1.14.0"
+    api_version: str = "1.14.1"
     api_prefix: str = "/api/v1"
 
     # Authentication
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     api_key_ttl_days: int = 7
 
     # Token cache encrypted backup path
-    token_cache_path: str = "/data/token-cache.enc"
+    token_cache_path: str = "/data/token-cache.db"
 
     # RCARS integration
     rcars_url: str = "https://rcars-api.apps.ocpv-infra01.dal12.infra.demo.redhat.com"

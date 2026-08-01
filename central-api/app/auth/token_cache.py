@@ -1,15 +1,10 @@
-"""In-memory token cache with TTL eviction, audit logging, and encrypted backup."""
-import base64
-import hashlib
+"""SQLite-backed token cache shared across uvicorn workers, with audit logging."""
 import json
 import logging
 import os
-import threading
+import sqlite3
 import time
 from typing import NamedTuple, Optional
-
-from cachetools import TTLCache
-from cryptography.fernet import Fernet, InvalidToken
 
 from ..config import get_settings
 
@@ -24,25 +19,7 @@ class CacheEntry(NamedTuple):
     source: str
 
 
-_cache: Optional[TTLCache] = None
-_lock = threading.Lock()
-
-
-def _get_cache() -> TTLCache:
-    global _cache
-    if _cache is None:
-        settings = get_settings()
-        ttl = settings.api_key_ttl_days * 86400
-        _cache = TTLCache(maxsize=10000, ttl=ttl)
-    return _cache
-
-
-def _fernet() -> Fernet:
-    settings = get_settings()
-    key = base64.urlsafe_b64encode(
-        hashlib.sha256(settings.ph_api_key.encode()).digest()
-    )
-    return Fernet(key)
+_db_path: Optional[str] = None
 
 
 def _iso(ts: float) -> str:
@@ -50,14 +27,64 @@ def _iso(ts: float) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
 
 
+def _get_db_path() -> str:
+    global _db_path
+    if _db_path is None:
+        settings = get_settings()
+        _db_path = settings.token_cache_path.replace(".enc", ".db")
+    return _db_path
+
+
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(_get_db_path(), timeout=5.0)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=3000")
+    return conn
+
+
+def init_db() -> None:
+    """Create the tokens table if it doesn't exist."""
+    path = _get_db_path()
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    conn = _connect()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tokens (
+                email TEXT PRIMARY KEY,
+                token TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                expires_at REAL NOT NULL,
+                groups_bitmask INTEGER NOT NULL,
+                source TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+    finally:
+        conn.close()
+    logger.info("token cache DB initialized at %s", path)
+
+
+def _purge_expired(conn: sqlite3.Connection) -> None:
+    conn.execute("DELETE FROM tokens WHERE expires_at <= ?", (time.time(),))
+
+
 # ── Public API ──────────────────────────────────────────────────────────────
 
 
 def cache_token(email: str, token: str, groups_bitmask: int, source: str) -> None:
     now = time.time()
-    entry = CacheEntry(token=token, created_at=now, groups_bitmask=groups_bitmask, source=source)
-    with _lock:
-        _get_cache()[email] = entry
+    ttl = get_settings().api_key_ttl_days * 86400
+    expires_at = now + ttl
+    conn = _connect()
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO tokens (email, token, created_at, expires_at, groups_bitmask, source) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (email, token, now, expires_at, groups_bitmask, source),
+        )
+        conn.commit()
+    finally:
+        conn.close()
     audit.info(json.dumps({
         "audit": "token_issued",
         "email": email,
@@ -68,8 +95,18 @@ def cache_token(email: str, token: str, groups_bitmask: int, source: str) -> Non
 
 
 def get_cached_token(email: str) -> Optional[CacheEntry]:
-    with _lock:
-        return _get_cache().get(email)
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT token, created_at, groups_bitmask, source FROM tokens "
+            "WHERE email = ? AND expires_at > ?",
+            (email, time.time()),
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return None
+    return CacheEntry(token=row[0], created_at=row[1], groups_bitmask=row[2], source=row[3])
 
 
 def is_token_in_cache(token: str, email: str) -> bool:
@@ -80,47 +117,58 @@ def is_token_in_cache(token: str, email: str) -> bool:
 
 
 def revoke_token(email: str) -> bool:
-    with _lock:
-        cache = _get_cache()
-        if email in cache:
-            del cache[email]
-            audit.info(json.dumps({
-                "audit": "token_revoked",
-                "email": email,
-                "timestamp": _iso(time.time()),
-            }))
-            return True
-    return False
-
-
-def revoke_all_tokens() -> int:
-    with _lock:
-        cache = _get_cache()
-        entries = list(cache.items())
-        cache.clear()
-    for email, _ in entries:
+    conn = _connect()
+    try:
+        cursor = conn.execute("DELETE FROM tokens WHERE email = ?", (email,))
+        conn.commit()
+        removed = cursor.rowcount > 0
+    finally:
+        conn.close()
+    if removed:
         audit.info(json.dumps({
             "audit": "token_revoked",
             "email": email,
             "timestamp": _iso(time.time()),
         }))
-    return len(entries)
+    return removed
+
+
+def revoke_all_tokens() -> int:
+    conn = _connect()
+    try:
+        rows = conn.execute("SELECT email FROM tokens").fetchall()
+        conn.execute("DELETE FROM tokens")
+        conn.commit()
+    finally:
+        conn.close()
+    for (email,) in rows:
+        audit.info(json.dumps({
+            "audit": "token_revoked",
+            "email": email,
+            "timestamp": _iso(time.time()),
+        }))
+    return len(rows)
 
 
 def list_tokens() -> list[dict]:
-    with _lock:
-        cache = _get_cache()
-        items = list(cache.items())
-    ttl = get_settings().api_key_ttl_days * 86400
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            "SELECT email, groups_bitmask, created_at, expires_at, source FROM tokens "
+            "WHERE expires_at > ?",
+            (time.time(),),
+        ).fetchall()
+    finally:
+        conn.close()
     return [
         {
-            "email": email,
-            "groups_bitmask": entry.groups_bitmask,
-            "issued_at": entry.created_at,
-            "expires": entry.created_at + ttl,
-            "source": entry.source,
+            "email": r[0],
+            "groups_bitmask": r[1],
+            "issued_at": r[2],
+            "expires": r[3],
+            "source": r[4],
         }
-        for email, entry in items
+        for r in rows
     ]
 
 
@@ -129,78 +177,24 @@ def search_tokens(query: str) -> list[dict]:
     return [t for t in list_tokens() if q in t["email"].lower()]
 
 
-# ── Encrypted backup ───────────────────────────────────────────────────────
+# ── Backup compat (called from main.py lifespan) ──────────────────────────
 
 
 def save_backup() -> None:
-    settings = get_settings()
-    path = settings.token_cache_path
-    with _lock:
-        cache = _get_cache()
-        items = list(cache.items())
-
-    if not items:
-        if os.path.exists(path):
-            os.remove(path)
-        return
-
-    records = [
-        {
-            "email": email,
-            "token": entry.token,
-            "created_at": entry.created_at,
-            "groups_bitmask": entry.groups_bitmask,
-            "source": entry.source,
-        }
-        for email, entry in items
-    ]
-
-    try:
-        encrypted = _fernet().encrypt(json.dumps(records).encode())
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        with open(path, "wb") as f:
-            f.write(encrypted)
-        logger.info("token cache backup saved: %d entries", len(records))
-    except Exception as exc:
-        logger.error("failed to save token cache backup: %s", exc)
+    """No-op — SQLite file IS the persistent store."""
+    pass
 
 
 def load_backup() -> int:
-    settings = get_settings()
-    path = settings.token_cache_path
-    if not os.path.exists(path):
-        logger.info("no token cache backup found at %s", path)
-        return 0
-
+    """Initialize DB and count active (non-expired) entries."""
+    init_db()
+    conn = _connect()
     try:
-        with open(path, "rb") as f:
-            encrypted = f.read()
-        decrypted = _fernet().decrypt(encrypted)
-        records = json.loads(decrypted)
-    except InvalidToken:
-        logger.warning("token cache backup unreadable (API key changed?), starting fresh")
-        return 0
-    except Exception as exc:
-        logger.error("failed to load token cache backup: %s", exc)
-        return 0
-
-    ttl = settings.api_key_ttl_days * 86400
-    now = time.time()
-    loaded = 0
-    with _lock:
-        cache = _get_cache()
-        for rec in records:
-            age = now - rec["created_at"]
-            if age >= ttl:
-                continue
-            entry = CacheEntry(
-                token=rec["token"],
-                created_at=rec["created_at"],
-                groups_bitmask=rec["groups_bitmask"],
-                source=rec["source"],
-            )
-            cache[rec["email"]] = entry
-            loaded += 1
-
-    logger.info("token cache restored: %d/%d entries (expired %d)", loaded, len(records), len(records) - loaded)
-    return loaded
+        count = conn.execute(
+            "SELECT COUNT(*) FROM tokens WHERE expires_at > ?",
+            (time.time(),),
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    logger.info("token cache DB: %d active entries", count)
+    return count
