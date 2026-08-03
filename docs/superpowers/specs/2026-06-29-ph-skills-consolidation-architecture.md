@@ -25,6 +25,46 @@
 
 ---
 
+## Content vs Scaffolding Boundary
+
+PH development skills handle **content** — writing and reviewing `.adoc` module files inside an already-scaffolded showroom repo. They never touch showroom infrastructure files.
+
+Showroom **scaffolding** — the repo structure, config files, and platform plumbing — is Andrew Jones's domain (RHDPCD-172).
+
+### What is CONTENT (PH development owns)
+
+- Writing `.adoc` module files (`content/modules/ROOT/pages/*.adoc`)
+- Updating `nav.adoc` with module entries
+- Reviewing `.adoc` quality (spec alignment, Red Hat style, AsciiDoc correctness)
+- Generating automation code (Ansible roles, GitOps manifests)
+
+Agents involved: `showroom:module-writing-helper`, `showroom:module-reviewer`
+
+### What is SCAFFOLDING (Andrew owns — NOT part of this migration)
+
+- Cloning the nookbag template repo
+- Creating/configuring `site.yml` (showroom title, lab_type, tabs, consoles)
+- Creating/configuring `ui-config.yml` (theme, branding, custom CSS)
+- Creating/configuring `antora.yml` (component name, version, nav)
+- Setting up `runtime-automation/` skeleton (buttons.js, solve/validate structure)
+- Creating directory structure (`content/modules/ROOT/pages/`, `assets/`, etc.)
+- Tab and console configuration (terminal, IDE, web consoles)
+- GitHub Pages deployment (`gh-pages.yml`, `supplemental-ui/`)
+
+Agents involved: `showroom:config-helper`, `showroom:config-reviewer`, `showroom:scaffold-checker`
+
+### Why this boundary matters
+
+The existing `showroom:create-lab` skill mixes both concerns — Phase 2.5 does scaffolding, Phase 3 does content generation. In the new architecture:
+
+- **PH development:writer** spawns `showroom:module-writing-helper` directly — content only, no scaffolding
+- **PH development:editor** spawns `showroom:module-reviewer` directly — content review only
+- Scaffolding is a prerequisite handled separately before PH development begins
+
+This means a showroom repo must already be scaffolded (by Andrew's tools, manually, or via `showroom:create-lab` from the marketplace) before PH development skills can write content into it.
+
+---
+
 ## Model Policy — No Hardcoded Models
 
 Skills and agents MUST NOT hardcode model IDs (e.g., `claude-sonnet-4-6`, `claude-opus-4-6`). The `model:` field is omitted from all frontmatter. Skills and agents inherit the model from the user's Claude Code session.
@@ -127,8 +167,8 @@ rhdp-publishing-house-skills/           ← ONE repo, users clone once
 │   ├── intake/SKILL.md
 │   ├── development/SKILL.md            ← calls showroom agents + gitops/ansible skills directly
 │   │   ├── procedures/
-│   │   │   ├── writer.md               ← spawns showroom:module-writing-helper agent
-│   │   │   ├── editor.md               ← spawns showroom:module-reviewer agent
+│   │   │   ├── writer.md               ← spawns showroom:module-writing-helper agent (CONTENT)
+│   │   │   ├── editor.md               ← spawns showroom:module-reviewer agent (CONTENT)
 │   │   │   └── automation.md           ← dispatches to gitops/ansible helpers
 │   │   └── references/
 │   │       ├── writing-standards.md
@@ -151,13 +191,13 @@ rhdp-publishing-house-skills/           ← ONE repo, users clone once
 │   ├── .claude-plugin/
 │   │   └── plugin.json                 ← name: "showroom" (MUST keep this name)
 │   ├── agents/
-│   │   ├── module-writing-helper.md    ← was file-generator.md (renamed)
-│   │   ├── module-reviewer.md          ← name unchanged
-│   │   ├── scaffold-checker.md         ← Andrew's — included in full copy
+│   │   ├── module-writing-helper.md    ← was file-generator.md (renamed, CONTENT agent)
+│   │   ├── module-reviewer.md          ← name unchanged (CONTENT agent)
+│   │   ├── scaffold-checker.md         ← Andrew's — included in full copy (SCAFFOLDING)
 │   │   ├── score-aggregator.md         ← Andrew's — included in full copy
 │   │   ├── doc-writer.md              ← Andrew's — included in full copy
 │   │   └── diagram-generator.md       ← Andrew's — included in full copy
-│   ├── skills/                         ← Andrew's skills — included in full copy
+│   ├── skills/                         ← Andrew's skills — included in full copy (SCAFFOLDING)
 │   ├── docs/
 │   │   └── SKILL-COMMON-RULES.md      ← AsciiDoc rules (@showroom/docs/ references work)
 │   ├── prompts/
@@ -286,3 +326,4 @@ The following remain in `rhdp-skills-marketplace` and are NOT part of this migra
 - Do NOT rename `showroom` plugin name — see constraint above
 - Do NOT copy agnosticv into this repo — it stays in marketplace
 - Do NOT hardcode model IDs — all skills and agents inherit from session
+- Do NOT mix scaffolding into PH development skills — scaffolding is Andrew's domain (RHDPCD-172)
