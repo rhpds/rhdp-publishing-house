@@ -43,16 +43,17 @@ No `model:` field in any SKILL.md or agent frontmatter. All skills and agents in
 
 Both skills MUST follow the same skeleton used by intake, development, and all other PH skills. This ensures pre-flight auth, workflow stage gating, and tool boundaries are consistent across the repo.
 
+All metadata goes in a single frontmatter block:
+
 ```yaml
 ---
 name: rhdp-publishing-house:<skill-name>
 description: This skill should be used when the user asks to "..."
----
-
----
 context: main
 ---
 ```
+
+No `model:` field — skills inherit from the user's session.
 
 ```markdown
 # <Skill Name>
@@ -120,9 +121,6 @@ rhdp-publishing-house-skills/
 ---
 name: rhdp-publishing-house:gitops-helper
 description: This skill should be used when the user asks to "write GitOps automation", "create Helm charts", "set up ArgoCD for this lab", or "build GitOps deployment". Handles GitOps (Helm + ArgoCD) automation authoring for RHDP lab environments.
----
-
----
 context: main
 ---
 ```
@@ -179,9 +177,6 @@ rhdp-publishing-house-skills/
 ---
 name: rhdp-publishing-house:ansible-helper
 description: This skill should be used when the user asks to "write Ansible automation", "create playbooks", "build Ansible roles", or "automate the lab environment with Ansible". Handles Ansible automation authoring for RHDP lab environments.
----
-
----
 context: main
 ---
 ```
@@ -228,7 +223,7 @@ Both Juliano and Mitesh follow the same contribution process.
 **Juliano:**
 ```
 skills/gitops-helper/
-  ├── SKILL.md              ← must follow standard skeleton above (no model: field)
+  ├── SKILL.md              ← single frontmatter block, no model: field
   └── references/
       └── gitops-patterns.md
 ```
@@ -236,7 +231,7 @@ skills/gitops-helper/
 **Mitesh:**
 ```
 skills/ansible-helper/
-  ├── SKILL.md              ← must follow standard skeleton above (no model: field)
+  ├── SKILL.md              ← single frontmatter block, no model: field
   └── references/
       └── ansible-patterns.md
 ```
@@ -244,7 +239,7 @@ skills/ansible-helper/
 ### PR process
 
 1. Branch from `main`
-2. Create `SKILL.md` following the standard skeleton (pre-flight, workflow check, tool boundaries, no model field)
+2. Create `SKILL.md` following the standard skeleton (single frontmatter block, pre-flight, workflow check, tool boundaries)
 3. Create `references/` directory with domain-specific patterns file
 4. PR title: `[RHDPCD-111] Add rhdp-publishing-house:gitops-helper` (or RHDPCD-110 for Mitesh)
 5. Reviewer: Prakhar Srivastava
@@ -257,6 +252,7 @@ skills/ansible-helper/
 - Do NOT create a new plugin or repo — these go into the existing `rhdp-publishing-house` plugin
 - Do NOT skip pre-flight or workflow check — every PH skill must verify project auth and stage
 - Do NOT add a `model:` field — skills inherit from the user's session
+- Do NOT use double frontmatter blocks — all metadata in one `---` block
 
 ---
 
