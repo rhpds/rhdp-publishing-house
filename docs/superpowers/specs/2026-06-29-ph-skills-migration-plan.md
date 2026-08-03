@@ -49,31 +49,31 @@ Andrew delivers these independently after cutover:
 
 ## Development Skill Integration
 
-The PH `development` skill is the single entry point for content and automation work. It calls agents directly — no `ph_payload` sub-skill invocation.
+The PH `development` skill is the single entry point for content and automation work. It calls agents directly — no intermediate showroom sub-skill invocation.
 
-### spec.yaml is the source of truth
+### Three data sources for content generation
 
-`publishing-house/spec.yaml` in the author's project repo contains all data needed for content generation. The development skill reads it directly and passes fields to agents — no separate payload construction interface.
+The writer procedure reads three complementary files from the author's project repo:
 
-Key fields consumed from spec.yaml:
-- `spec.title` → lab name
-- `spec.learning_objectives` → objectives passed to each module agent
-- `spec.modules[]` → id, title, duration_min per module
-- `approval_checklist.content.module_summaries[]` → per-module design overview
-- `spec.environment` → ocp_version, topology, cloud_provider, cluster_type
-- `spec.audience`, `spec.duration_hours`
-- `project.content_type`, `project.showroom_type`
+| File | Role |
+|---|---|
+| `publishing-house/spec.yaml` | Machine-readable metadata: environment (ocp_version, topology, cloud_provider), module list, audience, duration, compliance |
+| `publishing-house/spec/design.md` | Human-readable narrative: overview, target audience, prerequisites, products & technologies, business scenario — approved by author at intake |
+| `publishing-house/spec/modules/module-NN-*.md` | Detailed step-by-step outline for each module: exercises, commands, verification steps — primary input for writing .adoc content |
+
+All three are written by the intake skill during earlier phases. None replaces the others.
 
 ### Writer procedure (content authoring)
 
-Development's `writer.md` reads spec.yaml and spawns `showroom:module-writing-helper` per module:
+Development's `writer.md` reads all three sources and spawns `showroom:module-writing-helper` per module:
 
 ```
 development:writer
-  → reads publishing-house/spec.yaml
-  → for each module in spec.modules:
-      → spawns showroom:module-writing-helper with spec fields
-      → spawns showroom:module-reviewer on generated .adoc
+  → reads publishing-house/spec.yaml          (env attributes, module list)
+  → reads publishing-house/spec/design.md     (narrative context, audience, products)
+  → reads publishing-house/spec/modules/NN    (detailed step outline for this module)
+  → spawns showroom:module-writing-helper with combined context
+  → spawns showroom:module-reviewer on generated .adoc
   → commits result
 ```
 
@@ -136,16 +136,14 @@ cat ftl/.claude-plugin/plugin.json
 
 In `skills/development/procedures/writer.md`:
 
-- **Remove:** any invocation of a showroom sub-skill via ph_payload
-- **Add:** read `publishing-house/spec.yaml` to extract spec fields
-- **Add:** direct spawn of `showroom:module-writing-helper` agent, passing spec fields (title, learning_objectives, module outline, module summary, environment, audience, content_type, showroom_type)
+- **Remove:** any invocation of a showroom sub-skill
+- **Add:** read all three data sources (spec.yaml, design.md, module outline) before spawning agent
+- **Add:** direct spawn of `showroom:module-writing-helper` agent with combined context from all three files
 - **Add:** direct spawn of `showroom:module-reviewer` agent on each generated .adoc file
-
-The agent receives data directly from spec.yaml — no intermediate payload format needed.
 
 ### Step 1.4: Update development editor procedure
 
-In `skills/development/procedures/editor.md`, replace any showroom skill invocations with direct `showroom:module-reviewer` agent calls, passing the .adoc file path and spec context.
+In `skills/development/procedures/editor.md`, replace any showroom skill invocations with direct `showroom:module-reviewer` agent calls.
 
 ### Step 1.5: Update PH plugin.json
 
@@ -189,7 +187,7 @@ Create `skills/ansible-helper/SKILL.md` — tracked in RHDPCD-110.
 
 ### Step 2.3: Wire automation procedure
 
-Update `skills/development/procedures/automation.md` to dispatch to `gitops-helper` or `ansible-helper` based on `spec.yaml` automation approach field.
+Update `skills/development/procedures/automation.md` to dispatch to `gitops-helper` or `ansible-helper` based on the automation approach in `spec.yaml`.
 
 ---
 
@@ -198,7 +196,7 @@ Update `skills/development/procedures/automation.md` to dispatch to `gitops-help
 **PR title:** `[RHDPCD-120] Add ftl plugin, showroom content agents, and automation skills`
 
 PR description should:
-- Explain the direct-agent integration model (spec.yaml → agent, no ph_payload sub-skill)
+- Explain the direct-agent integration model (three data sources → agent, no sub-skill)
 - Document agent rename: file-generator → module-writing-helper (module-reviewer name unchanged)
 - List all new files added
 - Include test evidence (Phase 1 Step 1.6 output)
