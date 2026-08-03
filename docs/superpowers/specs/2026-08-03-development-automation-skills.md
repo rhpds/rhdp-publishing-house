@@ -14,9 +14,9 @@ The PH `development` skill orchestrates three phases: content writing (writer.md
 
 ---
 
-## Proposed Architecture (Option A)
+## Architecture
 
-`automation.md` reads `spec.yaml` to determine the automation approach, then dispatches to the appropriate skill. Both skills are self-contained and can also be invoked standalone.
+`automation.md` reads `publishing-house/spec/automation-manifest.yaml` to determine the automation approach, then dispatches to the appropriate skill. Both skills are self-contained and can also be invoked standalone.
 
 ```
 development skill
@@ -32,13 +32,97 @@ The automation manifest (`publishing-house/spec/automation-manifest.yaml`) is ge
 
 ---
 
+## Standard PH SKILL.md Skeleton
+
+Both skills MUST follow the same skeleton used by intake, development, and all other PH skills. This ensures pre-flight auth, workflow stage gating, and tool boundaries are consistent across the repo.
+
+```yaml
+---
+name: rhdp-publishing-house:<skill-name>
+description: This skill should be used when the user asks to "..."
+---
+
+---
+context: main
+model: claude-sonnet-4-6
+---
+```
+
+```markdown
+# <Skill Name>
+
+**RULE: If any `publishing-house/tools/` script exits with a non-zero exit code, STOP immediately.**
+Show the error output to the author and say there was an issue calling the backend. Do not continue.
+
+## Tool Boundaries
+
+**Do NOT use** Central API tools directly. You work locally: read files, write content.
+**Do NOT use** MCP tools. All external interactions go through `publishing-house/tools/` scripts.
+
+## Steps 1–3 — Pre-flight
+
+Follow @rhdp-publishing-house/skills/common/pre-flight.md (Steps 1–3: verify project, read identity, check auth).
+
+## Step 4 — Workflow check
+
+**RULE: This sequence runs every invocation. No exceptions. No skipping.**
+
+**4a.** Get workflow data:
+python publishing-house/tools/ph-workflow-data.py
+If this fails → set offline_mode = true, skip to Step 5.
+If this succeeds → extract workflow_id. Set offline_mode = false.
+
+**4b.** Get workflow state (skip if offline):
+python publishing-house/tools/ph-workflow-state.py WORKFLOW_ID
+If stage is not development → STOP.
+If offline → assume development.
+
+**4c.** Sync (skip if offline):
+python publishing-house/tools/ph-sync.py
+
+## Step 5 — Read project context
+
+[Skill-specific inputs listed below]
+
+## Main work
+
+[Skill-specific logic]
+```
+
+---
+
 ## Skill 1: gitops-helper (Juliano — RHDPCD-111)
 
 ### Responsibility
 
 Writes GitOps automation for RHDP lab environments — Helm charts, ArgoCD applications, and supporting manifests that provision the lab environment pre-student.
 
-### Input
+### Directory structure
+
+```
+rhdp-publishing-house-skills/
+└── skills/
+    └── gitops-helper/
+        ├── SKILL.md
+        └── references/
+            └── gitops-patterns.md    ← Helm/ArgoCD conventions for RHDP
+```
+
+### SKILL.md frontmatter
+
+```yaml
+---
+name: rhdp-publishing-house:gitops-helper
+description: This skill should be used when the user asks to "write GitOps automation", "create Helm charts", "set up ArgoCD for this lab", or "build GitOps deployment". Handles GitOps (Helm + ArgoCD) automation authoring for RHDP lab environments.
+---
+
+---
+context: main
+model: claude-sonnet-4-6
+---
+```
+
+### Step 5 — Read project context (gitops-specific)
 
 Reads from the author's project repo:
 - `publishing-house/spec/automation-manifest.yaml` — what needs to be pre-provisioned
@@ -52,30 +136,12 @@ Writes to the author's project repo:
 - `automation/argocd/` — ArgoCD Application manifests
 - `automation/README.md` — deployment instructions
 
-### Skill location in repo
-
-```
-rhdp-publishing-house-skills/
-└── skills/
-    └── gitops-helper/
-        └── SKILL.md     ← name: rhdp-publishing-house:gitops-helper
-```
-
-### SKILL.md frontmatter
-
-```yaml
----
-name: rhdp-publishing-house:gitops-helper
-description: This skill should be used when the user asks to "write GitOps automation", "create Helm charts", "set up ArgoCD for this lab", or "build GitOps deployment". Handles GitOps (Helm + ArgoCD) automation authoring for RHDP lab environments.
----
-```
-
 ### Scope (what Juliano owns)
 
 - Helm chart structure and values patterns for RHDP lab components
 - ArgoCD Application manifest generation
 - Reference to RHDP GitOps golden repo patterns (Juliano's domain expertise)
-- Integration with `automation.md` dispatch (via the SKILL.md being callable)
+- `references/gitops-patterns.md` — Juliano writes and maintains this reference file
 
 ### Out of scope
 
@@ -91,7 +157,32 @@ description: This skill should be used when the user asks to "write GitOps autom
 
 Writes Ansible automation for RHDP lab environments — roles, playbooks, and collections that configure the environment pre-student or handle student-facing automation.
 
-### Input
+### Directory structure
+
+```
+rhdp-publishing-house-skills/
+└── skills/
+    └── ansible-helper/
+        ├── SKILL.md
+        └── references/
+            └── ansible-patterns.md    ← Ansible role conventions for RHDP
+```
+
+### SKILL.md frontmatter
+
+```yaml
+---
+name: rhdp-publishing-house:ansible-helper
+description: This skill should be used when the user asks to "write Ansible automation", "create playbooks", "build Ansible roles", or "automate the lab environment with Ansible". Handles Ansible automation authoring for RHDP lab environments.
+---
+
+---
+context: main
+model: claude-sonnet-4-6
+---
+```
+
+### Step 5 — Read project context (ansible-specific)
 
 Reads from the author's project repo:
 - `publishing-house/spec/automation-manifest.yaml` — what needs to be automated
@@ -104,30 +195,12 @@ Writes to the author's project repo:
 - `automation/ansible/` — Ansible roles and playbooks
 - `automation/ansible/README.md` — how to run it
 
-### Skill location in repo
-
-```
-rhdp-publishing-house-skills/
-└── skills/
-    └── ansible-helper/
-        └── SKILL.md     ← name: rhdp-publishing-house:ansible-helper
-```
-
-### SKILL.md frontmatter
-
-```yaml
----
-name: rhdp-publishing-house:ansible-helper
-description: This skill should be used when the user asks to "write Ansible automation", "create playbooks", "build Ansible roles", or "automate the lab environment with Ansible". Handles Ansible automation authoring for RHDP lab environments.
----
-```
-
 ### Scope (what Mitesh owns)
 
 - Ansible role structure following AgnosticD/RHDP conventions
 - Playbook generation from automation manifest
 - Reference to RHDP Ansible golden patterns (Mitesh's domain expertise)
-- Integration with `automation.md` dispatch
+- `references/ansible-patterns.md` — Mitesh writes and maintains this reference file
 
 ### Out of scope
 
@@ -139,40 +212,46 @@ description: This skill should be used when the user asks to "write Ansible auto
 
 ## Contribution Pattern
 
-Both Juliano and Mitesh follow the same contribution process — identical to Andrew Jones's showroom:config-helper pattern.
+Both Juliano and Mitesh follow the same contribution process.
 
 ### Repo and branch
 
 - **Target repo:** `rhdp-publishing-house-skills` (NOT a new repo)
 - **Branch naming:** `RHDPCD-111-gitops-helper` (Juliano), `RHDPCD-110-ansible-helper` (Mitesh)
 
-### Directory structure to create
+### What to create
 
 **Juliano:**
-```bash
-mkdir -p skills/gitops-helper/
-# Create skills/gitops-helper/SKILL.md
+```
+skills/gitops-helper/
+  ├── SKILL.md              ← must follow standard skeleton above
+  └── references/
+      └── gitops-patterns.md
 ```
 
 **Mitesh:**
-```bash
-mkdir -p skills/ansible-helper/
-# Create skills/ansible-helper/SKILL.md
+```
+skills/ansible-helper/
+  ├── SKILL.md              ← must follow standard skeleton above
+  └── references/
+      └── ansible-patterns.md
 ```
 
 ### PR process
 
 1. Branch from `main`
-2. Create `SKILL.md` with correct frontmatter (name, description, model, content)
-3. PR title: `[RHDPCD-111] Add rhdp-publishing-house:gitops-helper` (or RHDPCD-110 for Mitesh)
-4. Reviewer: Prakhar Srivastava
-5. After merge: Prakhar updates `skills/development/procedures/automation.md` to wire the dispatch
+2. Create `SKILL.md` following the standard skeleton (pre-flight, workflow check, tool boundaries, two frontmatter blocks)
+3. Create `references/` directory with domain-specific patterns file
+4. PR title: `[RHDPCD-111] Add rhdp-publishing-house:gitops-helper` (or RHDPCD-110 for Mitesh)
+5. Reviewer: Prakhar Srivastava
+6. After merge: Prakhar updates `skills/development/procedures/automation.md` to wire the dispatch
 
 ### What each person does NOT need to do
 
 - Do NOT update `automation.md` — Prakhar wires the dispatch after each skill merges
 - Do NOT update `plugin.json` — no version bump needed for adding skills within the existing plugin
 - Do NOT create a new plugin or repo — these go into the existing `rhdp-publishing-house` plugin
+- Do NOT skip pre-flight or workflow check — every PH skill must verify project auth and stage
 
 ---
 
@@ -197,7 +276,7 @@ Pass the automation manifest path and spec.yaml path to the invoked skill.
 
 ## Open Questions (for discussion with Juliano and Mitesh)
 
-1. **automation-manifest.yaml schema** — does the current format in the repo have enough detail for Helm chart generation? Juliano to review `ocp-tssc-lab-02/publishing-house/spec/automation-manifest.yaml`.
+1. **automation-manifest.yaml schema** — does the current format have enough detail for Helm chart generation? Juliano to review a real manifest from an existing PH project.
 
 2. **Output directory** — `automation/helm/` and `automation/ansible/` are proposals. Should these follow an existing RHDP convention?
 
@@ -205,7 +284,7 @@ Pass the automation manifest path and spec.yaml path to the invoked skill.
 
 4. **Model choice** — Both skills proposed to use `claude-sonnet-4-6`. Is Haiku sufficient for either given the structured output they produce?
 
-5. **Sequencing** — If `automation_approach: both`, ansible before gitops or parallel? Current proposal is sequential (ansible first). Does this match how RHDP labs are actually built?
+5. **Sequencing** — If `automation_approach: both`, ansible before gitops or parallel? Current proposal is sequential (ansible first).
 
 ---
 
@@ -213,7 +292,7 @@ Pass the automation manifest path and spec.yaml path to the invoked skill.
 
 | Milestone | Owner | Target |
 |---|---|---|
-| Giuliano reviews spec + confirms gitops scope | Juliano | TBD |
+| Juliano reviews spec + confirms gitops scope | Juliano | TBD |
 | Mitesh reviews spec + confirms ansible scope | Mitesh | TBD |
 | RHDPCD-120 migration complete (showroom + ftl in PH repo) | Prakhar | TBD |
 | gitops-helper SKILL.md PR | Juliano | After RHDPCD-120 |
