@@ -14,8 +14,8 @@
 | Component | Decision | Reason |
 |---|---|---|
 | **ftl plugin** | Move — full copy | Zero direct PH→FTL edges today; included for future integration |
-| **showroom:module-writing-helper** (`file-generator`) | Move — renamed | Development skill calls directly; writes .adoc content |
-| **showroom:module-review-helper** (`module-reviewer`) | Move — renamed | Development skill calls directly; reviews .adoc content |
+| **showroom:module-writing-helper** (was `file-generator`) | Move — renamed | Development skill calls directly; writes .adoc content |
+| **showroom:module-reviewer** | Move — name unchanged | Development skill calls directly; reviews .adoc content |
 | **showroom skills** | **NOT moving** | Andrew Jones owns platform plumbing; development skill absorbs content generation directly |
 | **showroom:config-helper, showroom:config-reviewer** | **NOT moving** | Andrew Jones owns (RHDPCD-172) — scaffold and config review |
 | **scaffold agents** (`score-aggregator`, `format-detector`, `zero-scaffold-checker`, `zero-content-reviewer`) | **NOT moving** | Andrew's territory |
@@ -34,12 +34,12 @@
 | `showroom:config-helper` | Scaffolds showroom structure: site.yml, ui-config.yml, tabs, nav, runtime-automation skeleton |
 | `showroom:config-reviewer` | Reviews showroom config quality — validates site.yml, ui-config.yml, antora.yml |
 
-### showroom Agents — Moving into PH repo (renamed)
+### showroom Agents — Moving into PH repo
 
 | Old name | New name | Model | Role |
 |---|---|---|---|
 | `showroom:file-generator` | `showroom:module-writing-helper` | Sonnet | Generates one AsciiDoc file per invocation — called directly by development:writer |
-| `showroom:module-reviewer` | `showroom:module-review-helper` | Sonnet | Reviews AsciiDoc quality — called directly by development:editor |
+| `showroom:module-reviewer` | `showroom:module-reviewer` (unchanged) | Sonnet | Reviews AsciiDoc quality — called directly by development:editor |
 
 ### showroom Agents — NOT moving (Andrew's domain)
 
@@ -85,7 +85,7 @@ PH skills hard-depend on marketplace skills. If a user installs PH without marke
 
 ## Solution
 
-Add ftl, two showroom content agents (renamed), and two new automation skills directly to `rhdp-publishing-house-skills`. One `--plugin-dir` install covers the PH content lifecycle.
+Add ftl, two showroom content agents, and two new automation skills directly to `rhdp-publishing-house-skills`. One `--plugin-dir` install covers the PH content lifecycle.
 
 ## Critical Constraint: Plugin Names Cannot Change
 
@@ -109,7 +109,7 @@ rhdp-publishing-house-skills/           ← ONE repo, users clone once
 │
 ├── agents/
 │   ├── module-writing-helper.md        ← was showroom:file-generator
-│   └── module-review-helper.md         ← was showroom:module-reviewer
+│   └── module-reviewer.md              ← showroom:module-reviewer (name unchanged)
 │
 ├── docs/
 │   └── showroom/
@@ -135,7 +135,7 @@ The `development` skill is the single entry point for all content and automation
 development skill
   └── writer procedure
         → spawns showroom:module-writing-helper (writes .adoc modules)
-        → spawns showroom:module-review-helper (reviews generated .adoc)
+        → spawns showroom:module-reviewer (reviews generated .adoc)
   └── automation procedure
         → calls rhdp-publishing-house:gitops-helper (GitOps path)
         → calls rhdp-publishing-house:ansible-helper (Ansible path)
