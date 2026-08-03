@@ -103,17 +103,31 @@ rhdp-publishing-house-skills/           ← ONE repo, users clone once
 │   ├── orchestrator/SKILL.md
 │   ├── intake/SKILL.md
 │   ├── development/SKILL.md            ← calls showroom agents + gitops/ansible skills directly
+│   │   ├── procedures/
+│   │   │   ├── writer.md               ← spawns showroom:module-writing-helper agent
+│   │   │   ├── editor.md               ← spawns showroom:module-reviewer agent
+│   │   │   └── automation.md           ← dispatches to gitops/ansible helpers
+│   │   └── references/
+│   │       ├── writing-standards.md
+│   │       ├── editing-checklist.md
+│   │       ├── automation-patterns.md
+│   │       ├── automation-manifest-format.md
+│   │       ├── ansible-automation-guide.md
+│   │       ├── gitops-automation-guide.md
+│   │       └── SKILL-COMMON-RULES.md   ← AsciiDoc rules (moved from showroom/docs/)
 │   ├── worklog/SKILL.md
-│   ├── gitops-helper/SKILL.md          ← NEW (RHDPCD-111)
-│   └── ansible-helper/SKILL.md         ← NEW (RHDPCD-110)
+│   ├── gitops-helper/                  ← NEW (RHDPCD-111, Juliano)
+│   │   ├── SKILL.md                    ← follows standard PH SKILL.md skeleton
+│   │   └── references/
+│   │       └── gitops-patterns.md
+│   └── ansible-helper/                 ← NEW (RHDPCD-110, Mitesh)
+│       ├── SKILL.md                    ← follows standard PH SKILL.md skeleton
+│       └── references/
+│           └── ansible-patterns.md
 │
-├── agents/
+├── agents/                             ← showroom content agents (subagent pattern)
 │   ├── module-writing-helper.md        ← was showroom:file-generator
 │   └── module-reviewer.md              ← showroom:module-reviewer (name unchanged)
-│
-├── docs/
-│   └── showroom/
-│       └── SKILL-COMMON-RULES.md       ← AsciiDoc rules used by both agents
 │
 └── ftl/                                ← NEW — copied from marketplace
     ├── .claude-plugin/
@@ -127,6 +141,10 @@ rhdp-publishing-house-skills/           ← ONE repo, users clone once
     └── docs/
 ```
 
+### Why `agents/` is at repo root (not under `skills/`)
+
+Intake and development use **procedures** (sequential steps the skill follows via `@`-includes) and **references** (rules/checklists). Showroom agents are a different concept — they are **subagents** spawned by writer.md and editor.md with their own model, tool constraints, and independent context. Claude Code resolves agents from the `agents/` directory at plugin root. This is not a pattern break — it's a different mechanism serving a different purpose.
+
 ## Development Skill Integration Model
 
 The `development` skill is the single entry point for all content and automation work. It calls agents and sub-skills directly — no intermediate showroom sub-skill invocation.
@@ -135,6 +153,7 @@ The `development` skill is the single entry point for all content and automation
 development skill
   └── writer procedure
         → spawns showroom:module-writing-helper (writes .adoc modules)
+  └── editor procedure
         → spawns showroom:module-reviewer (reviews generated .adoc)
   └── automation procedure
         → calls rhdp-publishing-house:gitops-helper (GitOps path)
@@ -143,6 +162,52 @@ development skill
 ```
 
 No `ph_payload` sub-skill invocation. Development owns the content pipeline directly.
+
+## Standard PH SKILL.md Skeleton
+
+Every skill in this repo follows this structure. New skills (gitops-helper, ansible-helper) and contributor skills (Andrew's config-helper/config-reviewer) MUST follow this skeleton:
+
+```yaml
+---
+name: rhdp-publishing-house:<skill-name>
+description: This skill should be used when the user asks to "..."
+---
+
+---
+context: main
+model: claude-sonnet-4-6
+---
+```
+
+```markdown
+# <Skill Name>
+
+**RULE: If any `publishing-house/tools/` script exits with a non-zero exit code, STOP immediately.**
+
+## Tool Boundaries
+
+**Do NOT use** Central API tools directly. You work locally: read files, write content, update spec.yaml.
+**Do NOT use** MCP tools. All external interactions go through `publishing-house/tools/` scripts.
+
+## Steps 1–3 — Pre-flight
+
+Follow @rhdp-publishing-house/skills/common/pre-flight.md (Steps 1–3: verify project, read identity, check auth).
+
+## Step 4 — Workflow check
+
+**4a.** Get workflow data → extract workflow_id
+**4b.** Get workflow state → verify stage is `development` (STOP if not)
+**4c.** Sync → pull Central API data, commit if needed
+**4d.** Handle rejections if any
+
+## Step 5 — Read project context
+
+Read spec.yaml, design.md, and any other inputs specific to this skill.
+
+## Dispatch / Main work
+
+[Skill-specific logic here]
+```
 
 ## What Stays in Marketplace
 
