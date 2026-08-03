@@ -4,7 +4,7 @@
 **Updated:** 2026-08-03
 **Status:** Draft
 **Author:** Prakhar Srivastava
-**Scope:** Step-by-step plan to add ftl plugin, showroom content agents (renamed), and new gitops-helper + ansible-helper skills to rhdp-publishing-house-skills. agnosticv stays in marketplace.
+**Scope:** Step-by-step plan to add ftl plugin, showroom content agents, and new gitops-helper + ansible-helper skills to rhdp-publishing-house-skills. agnosticv stays in marketplace.
 **Architecture:** See [PH Skills Consolidation — Architecture Spec](2026-06-29-ph-skills-consolidation-architecture.md) for plugin structure, naming reference, and integration model.
 
 ---
@@ -22,11 +22,11 @@ After this migration:
 
 ## Scope Summary
 
-| Component | Action | New name |
+| Component | Action | Name |
 |---|---|---|
 | ftl plugin | Copy from marketplace — full copy | unchanged |
 | `showroom:file-generator` agent | Copy + rename | `showroom:module-writing-helper` |
-| `showroom:module-reviewer` agent | Copy + rename | `showroom:module-review-helper` |
+| `showroom:module-reviewer` agent | Copy — name unchanged | `showroom:module-reviewer` |
 | `showroom/docs/SKILL-COMMON-RULES.md` | Copy — AsciiDoc rules used by both agents | unchanged |
 | `gitops-helper` skill | Create new (RHDPCD-111) | `rhdp-publishing-house:gitops-helper` |
 | `ansible-helper` skill | Create new (RHDPCD-110) | `rhdp-publishing-house:ansible-helper` |
@@ -58,7 +58,7 @@ Development's `writer.md` spawns `showroom:module-writing-helper` directly:
 ```
 development:writer
   → spawns showroom:module-writing-helper (writes one .adoc module)
-  → spawns showroom:module-review-helper (reviews generated .adoc)
+  → spawns showroom:module-reviewer (reviews generated .adoc)
   → commits result
 ```
 
@@ -87,26 +87,25 @@ Before starting:
 **Branch:** `RHDPCD-120-content-agents-and-ftl`
 **Repo:** `rhdp-publishing-house-skills`
 
-### Step 1.1: Copy and rename showroom content agents
+### Step 1.1: Copy showroom content agents
 
 ```bash
 cd ~/work/code/rhdp-publishing-house-skills
 
 mkdir -p agents/
-# Copy and rename
+# Rename file-generator → module-writing-helper
 cp ~/work/code/rhdp-skills-marketplace/showroom/agents/file-generator.md agents/module-writing-helper.md
-cp ~/work/code/rhdp-skills-marketplace/showroom/agents/module-reviewer.md agents/module-review-helper.md
+# module-reviewer keeps its name
+cp ~/work/code/rhdp-skills-marketplace/showroom/agents/module-reviewer.md agents/module-reviewer.md
 
 # Copy AsciiDoc rules reference
 mkdir -p docs/showroom/
 cp ~/work/code/rhdp-skills-marketplace/showroom/docs/SKILL-COMMON-RULES.md docs/showroom/
 ```
 
-Update frontmatter in each agent file:
-- `module-writing-helper.md` → update `description:` to reflect new name
-- `module-review-helper.md` → update `description:` to reflect new name
+Update `module-writing-helper.md` frontmatter `description:` to reflect new name.
 
-Update any `@showroom/docs/` references in the agent files to `@rhdp-publishing-house/docs/showroom/`.
+Update any `@showroom/docs/` references in both agent files to `@rhdp-publishing-house/docs/showroom/`.
 
 ### Step 1.2: Copy ftl plugin
 
@@ -120,15 +119,15 @@ cat ftl/.claude-plugin/plugin.json
 
 ### Step 1.3: Update development writer procedure
 
-In `skills/development/procedures/writer.md`, replace any `showroom:create-lab` or `showroom:lab-writing-helper` invocations with direct agent calls:
+In `skills/development/procedures/writer.md`, replace any showroom sub-skill invocations with direct agent calls:
 
 - Remove: invocation of showroom skill via ph_payload
 - Add: direct spawn of `showroom:module-writing-helper` agent with spec data
-- Add: direct spawn of `showroom:module-review-helper` agent on each generated file
+- Add: direct spawn of `showroom:module-reviewer` agent on each generated file
 
 ### Step 1.4: Update development editor procedure
 
-In `skills/development/procedures/editor.md`, replace any showroom skill invocations with direct `showroom:module-review-helper` agent calls.
+In `skills/development/procedures/editor.md`, replace any showroom skill invocations with direct `showroom:module-reviewer` agent calls.
 
 ### Step 1.5: Update PH plugin.json
 
@@ -182,7 +181,7 @@ Update `skills/development/procedures/automation.md` to dispatch to `gitops-help
 
 PR description should:
 - Explain the direct-agent integration model (no ph_payload sub-skill)
-- Document agent renames: file-generator → module-writing-helper, module-reviewer → module-review-helper
+- Document agent rename: file-generator → module-writing-helper (module-reviewer name unchanged)
 - List all new files added
 - Include test evidence (Phase 1 Step 1.6 output)
 - Note: agnosticv stays in marketplace
@@ -198,12 +197,12 @@ Andrew — final naming for your RHDPCD-172 skills:
   showroom:config-helper    — showroom scaffolding (site.yml, ui-config.yml, tabs, nav)
   showroom:config-reviewer  — showroom config quality review
 
-Content agents (now in PH repo, not showroom plugin):
-  showroom:module-writing-helper  — writes AsciiDoc modules
-  showroom:module-review-helper   — reviews AsciiDoc content
+Content agents (now in PH repo):
+  showroom:module-writing-helper  — writes AsciiDoc modules (was file-generator)
+  showroom:module-reviewer        — reviews AsciiDoc content (name unchanged)
 
 Your skills go into the showroom plugin at rhdp-publishing-house-skills/showroom/
-Build config-helper and config-reviewer independently — do not reference existing scaffold work.
+Build config-helper and config-reviewer independently.
 ```
 
 ---
@@ -212,7 +211,7 @@ Build config-helper and config-reviewer independently — do not reference exist
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| Agent `@` reference paths break after copy | Medium | High | Verify and update all `@showroom/docs/` refs in agent files to `@rhdp-publishing-house/docs/showroom/` |
+| Agent `@` reference paths break after copy | Medium | High | Verify and update all `@showroom/docs/` refs to `@rhdp-publishing-house/docs/showroom/` |
 | Andrew's skills land mid-migration | Medium | Low | Coordinate timing on RHDPCD-172 |
 | FTL plugin has undocumented marketplace dependencies | Low | Medium | Read ftl plugin.json and agent files before copying |
 | User still has marketplace showroom in pluginDirectories | Medium | Low | Agents are not skills — no name collision risk |
