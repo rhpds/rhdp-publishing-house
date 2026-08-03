@@ -228,15 +228,14 @@ No `ph_payload` sub-skill invocation anywhere. Development owns the content pipe
 
 ## Standard PH SKILL.md Skeleton
 
-Every skill in this repo follows this structure. New skills (gitops-helper, ansible-helper) and contributor skills (Andrew's config-helper/config-reviewer) MUST follow this skeleton:
+Every skill in this repo follows this structure. New skills (gitops-helper, ansible-helper) and contributor skills MUST follow this skeleton.
+
+All metadata goes in a single frontmatter block:
 
 ```yaml
 ---
 name: rhdp-publishing-house:<skill-name>
 description: This skill should be used when the user asks to "..."
----
-
----
 context: main
 ---
 ```
