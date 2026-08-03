@@ -63,12 +63,7 @@ Nothing from showroom or ftl exists in this repo yet.
 
 ## Andrew Jones Skills (RHDPCD-172 — NOT part of this migration)
 
-Andrew delivers these independently into the showroom plugin after cutover:
-
-| Skill | Role |
-|---|---|
-| `showroom:config-helper` | Scaffolds showroom structure: site.yml, ui-config.yml, tabs, nav |
-| `showroom:config-reviewer` | Reviews showroom config quality |
+Andrew delivers `showroom:config-helper` and `showroom:config-reviewer` independently after RHDPCD-120 cutover. See [How Andrew Contributes His Skills](#how-andrew-contributes-his-skills) below for the exact contribution pattern.
 
 ---
 
@@ -219,16 +214,73 @@ agnosticv is unchanged — still from rhdp-skills-marketplace.
 
 ## Phase 4: Notify Andrew Jones
 
-Post on RHDPCD-172 after PR merges:
+Post on RHDPCD-172 after PR merges with the contribution pattern below.
+
+---
+
+## How Andrew Contributes His Skills
+
+After RHDPCD-120 cutover, Andrew adds `showroom:config-helper` and `showroom:config-reviewer` via PR against `rhdp-publishing-house-skills`. The showroom plugin is already in the repo — he slots his skills into it.
+
+### Target directory structure
 
 ```
-Andrew — final naming for your RHDPCD-172 skills:
-  showroom:config-helper    — showroom scaffolding (site.yml, ui-config.yml, tabs, nav)
-  showroom:config-reviewer  — showroom config quality review
-
-These go into the showroom plugin at rhdp-publishing-house-skills/showroom/skills/
-Build independently — do not reference existing scaffold work.
+rhdp-publishing-house-skills/
+└── showroom/
+    └── skills/
+        ├── create-lab/           ← existing
+        ├── verify-content/       ← existing
+        ├── create-demo/          ← existing
+        ├── blog-generate/        ← existing
+        ├── config-helper/        ← Andrew adds this (RHDPCD-172)
+        │   └── SKILL.md
+        └── config-reviewer/      ← Andrew adds this (RHDPCD-172)
+            └── SKILL.md
 ```
+
+### SKILL.md frontmatter pattern
+
+`showroom/skills/config-helper/SKILL.md`:
+```yaml
+---
+name: showroom:config-helper
+description: This skill should be used when the user asks to "set up showroom", "configure showroom tabs", "create site.yml", "set up ui-config.yml", or "scaffold the showroom structure".
+---
+```
+
+`showroom/skills/config-reviewer/SKILL.md`:
+```yaml
+---
+name: showroom:config-reviewer
+description: This skill should be used when the user asks to "review my showroom config", "check site.yml", "validate ui-config.yml", or "verify my showroom setup".
+---
+```
+
+### plugin.json version bump
+
+After adding his skills, Andrew bumps `showroom/.claude-plugin/plugin.json` version (minor bump):
+```json
+{
+  "name": "showroom",
+  "version": "2.15.0"
+}
+```
+
+### PR process
+
+1. Fork or branch `rhdp-publishing-house-skills` → branch name: `RHDPCD-172-config-helper-config-reviewer`
+2. Add `showroom/skills/config-helper/SKILL.md`
+3. Add `showroom/skills/config-reviewer/SKILL.md`
+4. Bump `showroom/.claude-plugin/plugin.json` version
+5. PR title: `[RHDPCD-172] Add showroom:config-helper and showroom:config-reviewer`
+6. Reviewer: Prakhar Srivastava
+
+### Constraints for Andrew
+
+- **Do NOT** reference or copy existing scaffold work from `showroom/skills/create-lab/references/showroom-scaffold.md` — build config-helper from scratch
+- **Do NOT** create a new repo — skills go into the existing `showroom/` directory in this repo
+- **Do NOT** modify `showroom/.claude-plugin/plugin.json` `name` field — it must stay `"showroom"`
+- Agent files (`.md` in `showroom/agents/`) are owned by Prakhar — do not modify unless discussed
 
 ---
 
@@ -240,3 +292,4 @@ Build independently — do not reference existing scaffold work.
 | Andrew's skills land mid-migration | Medium | Low | Coordinate timing on RHDPCD-172 |
 | User has both marketplace + PH installed (duplicate showroom plugin) | Medium | Medium | Document: remove rhdp-skills-marketplace from pluginDirectories after cutover |
 | writer.md update breaks existing PH projects mid-intake | Low | Medium | writer.md only invoked during development phase — projects in intake/review are unaffected |
+| Andrew modifies existing agents or scaffold files | Low | Medium | Clear constraints documented above — Prakhar reviews PR |
