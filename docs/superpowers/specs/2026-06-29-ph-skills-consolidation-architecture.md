@@ -14,10 +14,12 @@
 | Component | Decision | Reason |
 |---|---|---|
 | **ftl plugin** | Move — full copy | Zero direct PH→FTL edges today; included for future integration |
-| **showroom agents** (`file-generator`, `module-reviewer`) | Move — agents only | Development skill calls agents directly; no intermediate sub-skill needed |
-| **showroom skills** (`lab-writing-helper`, `lab-review-helper`, etc.) | **NOT moving** | Andrew Jones owns platform plumbing (showroom:config-generator, RHDPCD-172); development skill absorbs content generation directly |
-| **showroom scaffold agents** (`scaffold-checker`, `zero-scaffold-checker`, `score-aggregator`, `format-detector`) | **NOT moving** | Andrew's territory — belongs with showroom:config-generator |
-| **agnosticv plugin** | **Removed from scope** | Agnosticv remains in marketplace; automation.md procedure calls it from there |
+| **showroom:module-writing-helper** (`file-generator`) | Move — renamed | Development skill calls directly; writes .adoc content |
+| **showroom:module-review-helper** (`module-reviewer`) | Move — renamed | Development skill calls directly; reviews .adoc content |
+| **showroom skills** | **NOT moving** | Andrew Jones owns platform plumbing; development skill absorbs content generation directly |
+| **showroom:config-helper, showroom:config-reviewer** | **NOT moving** | Andrew Jones owns (RHDPCD-172) — scaffold and config review |
+| **scaffold agents** (`score-aggregator`, `format-detector`, `zero-scaffold-checker`, `zero-content-reviewer`) | **NOT moving** | Andrew's territory |
+| **agnosticv plugin** | **Removed from scope** | Stays in marketplace; automation.md procedure calls it from there |
 | **gitops-helper** | New skill (RHDPCD-111) | Automation phase — GitOps (Helm + ArgoCD) content authoring |
 | **ansible-helper** | New skill (RHDPCD-110) | Automation phase — Ansible automation authoring |
 
@@ -25,20 +27,24 @@
 
 ## Complete Naming Reference
 
-All final names after this migration. Single source of truth.
+### showroom Skills — Andrew Jones (RHDPCD-172, NOT part of this migration)
 
-### showroom Agents (moving into PH repo)
+| Skill | Role |
+|---|---|
+| `showroom:config-helper` | Scaffolds showroom structure: site.yml, ui-config.yml, tabs, nav, runtime-automation skeleton |
+| `showroom:config-reviewer` | Reviews showroom config quality — validates site.yml, ui-config.yml, antora.yml |
 
-| Agent | Model | Role |
-|---|---|---|
-| `showroom:file-generator` | Sonnet | Generates one AsciiDoc file per invocation — called directly by development:writer |
-| `showroom:module-reviewer` | Sonnet | Reviews AsciiDoc quality — called directly by development:editor |
+### showroom Agents — Moving into PH repo (renamed)
 
-### showroom Agents (NOT moving — Andrew's domain)
+| Old name | New name | Model | Role |
+|---|---|---|---|
+| `showroom:file-generator` | `showroom:module-writing-helper` | Sonnet | Generates one AsciiDoc file per invocation — called directly by development:writer |
+| `showroom:module-reviewer` | `showroom:module-review-helper` | Sonnet | Reviews AsciiDoc quality — called directly by development:editor |
+
+### showroom Agents — NOT moving (Andrew's domain)
 
 | Agent | Owner | Role |
 |---|---|---|
-| `showroom:scaffold-checker` | Andrew Jones | Validates site.yml, ui-config.yml, antora.yml |
 | `showroom:score-aggregator` | Andrew Jones | Aggregates review scores |
 | `showroom:format-detector` | Andrew Jones | Detects classic vs zero-touch from repo structure |
 | `showroom:zero-scaffold-checker` | Andrew Jones | Validates ZT scaffold |
@@ -79,7 +85,7 @@ PH skills hard-depend on marketplace skills. If a user installs PH without marke
 
 ## Solution
 
-Add ftl, two showroom content agents, and two new automation skills directly to `rhdp-publishing-house-skills`. One `--plugin-dir` install covers the PH content lifecycle.
+Add ftl, two showroom content agents (renamed), and two new automation skills directly to `rhdp-publishing-house-skills`. One `--plugin-dir` install covers the PH content lifecycle.
 
 ## Critical Constraint: Plugin Names Cannot Change
 
@@ -102,8 +108,8 @@ rhdp-publishing-house-skills/           ← ONE repo, users clone once
 │   └── ansible-helper/SKILL.md         ← NEW (RHDPCD-110)
 │
 ├── agents/
-│   ├── file-generator.md               ← from showroom (content writing only)
-│   └── module-reviewer.md              ← from showroom (content review only)
+│   ├── module-writing-helper.md        ← was showroom:file-generator
+│   └── module-review-helper.md         ← was showroom:module-reviewer
 │
 ├── docs/
 │   └── showroom/
@@ -128,8 +134,8 @@ The `development` skill is the single entry point for all content and automation
 ```
 development skill
   └── writer procedure
-        → spawns showroom:file-generator agent (writes .adoc modules)
-        → spawns showroom:module-reviewer agent (reviews generated .adoc)
+        → spawns showroom:module-writing-helper (writes .adoc modules)
+        → spawns showroom:module-review-helper (reviews generated .adoc)
   └── automation procedure
         → calls rhdp-publishing-house:gitops-helper (GitOps path)
         → calls rhdp-publishing-house:ansible-helper (Ansible path)
@@ -143,8 +149,7 @@ No `ph_payload` sub-skill invocation. Development owns the content pipeline dire
 The following remain in `rhdp-skills-marketplace` and are NOT part of this migration:
 
 - `agnosticv` plugin (catalog-builder, validator, all agents)
-- `showroom` plugin skills (lab-writing-helper, lab-review-helper, demo-writing-helper, blog-writing-helper)
-- `showroom` scaffold agents (scaffold-checker, format-detector, zero-scaffold-checker, zero-content-reviewer, score-aggregator, doc-writer, diagram-generator)
+- `showroom` plugin skills and scaffold agents
 - `health` plugin
 - `sandbox-cli` plugin
 
@@ -153,5 +158,4 @@ The following remain in `rhdp-skills-marketplace` and are NOT part of this migra
 - Do NOT rename `ftl` plugin name — see constraint above
 - Do NOT copy agnosticv into this repo — it stays in marketplace
 - Do NOT copy showroom skills — development absorbs orchestration directly
-- Do NOT copy showroom scaffold agents — Andrew Jones owns those (RHDPCD-172)
-- Do NOT include `showroom:config-generator` in this migration — Andrew Jones owns it independently
+- Do NOT copy showroom scaffold/config agents — Andrew Jones owns those (RHDPCD-172)
