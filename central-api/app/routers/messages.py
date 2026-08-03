@@ -179,49 +179,13 @@ def _rhdh_send_notification(
 def _rhdh_get_notifications(
     topic: str, read: Optional[bool] = None,
 ) -> list[dict]:
-    settings = get_settings()
-    params = [
-        f"topic={urllib.parse.quote(topic)}",
-        "orderField=created",
-        "orderDirection=desc",
-    ]
-    if read is not None:
-        params.append(f"read={'true' if read else 'false'}")
-    url = f"{settings.rhdh_internal_url.rstrip('/')}/api/notifications?{'&'.join(params)}"
-    try:
-        req = urllib.request.Request(
-            url,
-            headers={
-                "Authorization": f"Bearer {settings.rhdh_service_token}",
-                "Accept": "application/json",
-            },
-        )
-        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
-            return json.loads(r.read().decode())
-    except Exception as e:
-        logger.error("RHDH notification fetch failed: %s", e)
-        return []
+    # RHDH notifications GET endpoint rejects service credentials (403).
+    # Disabled to avoid blocking the async event loop with synchronous urllib calls.
+    return []
 
 
 def _rhdh_mark_read(ids: list[str]) -> int:
-    settings = get_settings()
-    url = f"{settings.rhdh_internal_url.rstrip('/')}/api/notifications/update"
-    payload = {"ids": ids, "read": True}
-    try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode(),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {settings.rhdh_service_token}",
-            },
-            method="POST",
-        )
-        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
-            return len(ids) if r.status < 300 else 0
-    except Exception as e:
-        logger.error("RHDH notification mark-read failed: %s", e)
-        return 0
+    return len(ids)
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────

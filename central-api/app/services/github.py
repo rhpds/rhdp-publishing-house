@@ -83,7 +83,7 @@ class GitHubService:
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE,
             )
-            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=90)
             if proc.returncode != 0:
                 raise RuntimeError(f"git clone failed: {stderr.decode().strip()}")
 

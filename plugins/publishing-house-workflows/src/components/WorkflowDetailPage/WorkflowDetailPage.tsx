@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAsync } from 'react-use';
 import {
   Content,
@@ -35,8 +35,9 @@ import BugReportIcon from '@material-ui/icons/BugReport';
 import RefreshIcon from '@material-ui/icons/Refresh';
 import ReplayIcon from '@material-ui/icons/Replay';
 import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
+import MenuBookIcon from '@material-ui/icons/MenuBook';
 import { createPhWorkflowsClient } from '../../api/client';
-import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport, ReviewMessage } from '../../api/types';
+import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
 import { useUserGroups } from '../../hooks/useUserGroups';
 
@@ -110,6 +111,7 @@ function DetailField({ label, value }: { label: string; value: string }) {
 export function WorkflowDetailPage() {
   const classes = useStyles();
   const { workflowId } = useParams<{ workflowId: string }>();
+  const navigate = useNavigate();
   const configApi = useApi(configApiRef);
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
@@ -182,8 +184,6 @@ export function WorkflowDetailPage() {
   const [reasonsPopover, setReasonsPopover] = useState<{ anchorEl: HTMLElement | null; reasons: { id: number; text: string }[] }>({ anchorEl: null, reasons: [] });
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [messages, setMessages] = useState<ReviewMessage[]>([]);
-  const [messagesLoading, setMessagesLoading] = useState(false);
 
   const handleApprove = async (stage: WorkflowStage) => {
     if (!result) return;
@@ -284,7 +284,6 @@ export function WorkflowDetailPage() {
       await client.sendMessage(result.summary.projectId, text, result.summary.stage);
       setMessageDialogOpen(false);
       setSnackbar({ open: true, severity: 'success', message: 'Message sent to author.' });
-      loadMessages();
     } catch (err: any) {
       setSnackbar({ open: true, severity: 'error', message: `Send failed: ${err.message}` });
     } finally {
@@ -292,22 +291,6 @@ export function WorkflowDetailPage() {
     }
   };
 
-  const loadMessages = useCallback(async () => {
-    if (!result) return;
-    setMessagesLoading(true);
-    try {
-      const msgs = await client.getMessages(result.summary.projectId);
-      setMessages(msgs);
-    } catch {
-      setMessages([]);
-    } finally {
-      setMessagesLoading(false);
-    }
-  }, [result, client]);
-
-  React.useEffect(() => {
-    if (result) loadMessages();
-  }, [result, loadMessages]);
 
   if (loading) {
     return (
@@ -362,6 +345,14 @@ export function WorkflowDetailPage() {
       </Header>
       <Content>
         <div className={classes.linkButtons}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<MenuBookIcon />}
+            onClick={() => navigate(`/catalog/default/component/${summary.projectId}`)}
+          >
+            Catalog
+          </Button>
           {summary.repoUrl && (
             <Button
               variant="outlined"
@@ -476,39 +467,6 @@ export function WorkflowDetailPage() {
           </InfoCard>
         )}
 
-        {activeTab === 0 && messages.length > 0 && (
-          <InfoCard title={`Messages (${messages.length})`}>
-            {messagesLoading ? (
-              <CircularProgress size={20} />
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
-                    <th style={{ padding: '6px 8px' }}>When</th>
-                    <th style={{ padding: '6px 8px' }}>From</th>
-                    <th style={{ padding: '6px 8px' }}>Stage</th>
-                    <th style={{ padding: '6px 8px' }}>Message</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {messages.map(msg => (
-                    <tr key={msg.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', opacity: msg.read ? 0.6 : 1 }}>
-                      <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>
-                        {msg.timestamp ? new Date(msg.timestamp).toLocaleString() : '—'}
-                      </td>
-                      <td style={{ padding: '6px 8px' }}>{msg.origin || '—'}</td>
-                      <td style={{ padding: '6px 8px' }}>{STAGE_LABELS[msg.stage as WorkflowStage] || msg.stage || '—'}</td>
-                      <td style={{ padding: '6px 8px' }}>
-                        {!msg.read && <Chip label="New" size="small" style={{ backgroundColor: '#1976d2', color: '#fff', marginRight: 6, fontSize: '0.7rem', height: 18 }} />}
-                        {msg.text}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </InfoCard>
-        )}
 
         {hasReviewTab && activeTab === 1 && (
           <>

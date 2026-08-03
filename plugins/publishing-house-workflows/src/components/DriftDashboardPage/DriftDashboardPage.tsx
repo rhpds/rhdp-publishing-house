@@ -113,7 +113,7 @@ function DriftDetailPanel({
         <Alert severity="error">{state.error}</Alert>
       ) : state.report && !state.report.has_drift ? (
         <Alert severity="success" className={classes.resolvedBanner}>
-          Drift has been resolved. The current HEAD matches the baseline.
+          Drift appears to have been resolved by the developer. You can approve to clear the drift flag.
         </Alert>
       ) : state.report ? (
         <>

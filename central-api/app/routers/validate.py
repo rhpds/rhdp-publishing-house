@@ -56,7 +56,10 @@ async def validate_spec(
         raise HTTPException(status_code=500, detail="GITHUB_TOKEN not configured on Central API")
 
     github = GitHubService(token=settings.github_token)
-    result = await run_validation(github, body.repo_url, body.branch, stage)
+    try:
+        result = await run_validation(github, body.repo_url, body.branch, stage)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Validation failed: {e}")
 
     if not result.passed:
         from fastapi.responses import JSONResponse

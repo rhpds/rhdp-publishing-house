@@ -474,7 +474,7 @@ async def submit_development(
     from fastapi.responses import JSONResponse
     from ..services.github import GitHubService
     from ..services.validation.runner import run_validation
-    from ..services.drift import check_drift_semantic
+    from ..services.drift import check_drift_semantic, drift_cache_evict
 
     owner, groups = auth
     _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
@@ -534,6 +534,7 @@ async def submit_development(
             drift_result = await check_drift_semantic(
                 github, body.repo_url, body.branch, baseline_sha,
                 settings.litellm_api_url, settings.ph_internal_ai_api_key,
+                slug=project_slug,
             )
             if drift_result.has_drift:
                 _patch_workflow_data(wf_uuid, {"hasDrift": True}, settings=settings)
@@ -582,7 +583,7 @@ async def submit_testing(
     from fastapi.responses import JSONResponse
     from ..services.github import GitHubService
     from ..services.validation.runner import run_validation
-    from ..services.drift import check_drift_semantic
+    from ..services.drift import check_drift_semantic, drift_cache_evict
 
     owner, groups = auth
     _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
@@ -640,6 +641,7 @@ async def submit_testing(
             drift_result = await check_drift_semantic(
                 github, body.repo_url, body.branch, baseline_sha,
                 settings.litellm_api_url, settings.ph_internal_ai_api_key,
+                slug=project_slug,
             )
             if drift_result.has_drift:
                 _patch_workflow_data(wf_uuid, {"hasDrift": True}, settings=settings)
@@ -861,6 +863,7 @@ async def approve_drift(
         raise HTTPException(status_code=502, detail="Failed to fetch HEAD SHA from GitHub")
 
     from .drift import _get_review_history
+    from ..services.drift import drift_cache_evict
     history = _get_review_history(wd["workflow_id"], settings=settings)
     history.append({
         "stage": "DriftReview",
@@ -875,6 +878,7 @@ async def approve_drift(
         {"hasDrift": False, "baselineSha": head_sha, "reviewHistory": history},
         settings=settings,
     )
+    drift_cache_evict(slug)
     logger.info("drift approved for %s by %s — baselineSha=%s", slug, owner, head_sha[:8])
 
     epic_key = wd.get("epic_key", "")

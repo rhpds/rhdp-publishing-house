@@ -24,6 +24,9 @@ spec:
           ports:
             - containerPort: 8000
               name: http
+          envFrom:
+            - configMapRef:
+                name: central-api-config
           env:
             - name: PH_API_KEY
               valueFrom:
@@ -55,18 +58,6 @@ spec:
                 secretKeyRef:
                   name: publishing-house-credentials
                   key: jira-api-token
-            - name: JIRA_PROJECT_KEY
-              value: "{{ jira_project_key | default('RHDPCD') }}"
-            - name: SONATAFLOW_URL
-              value: "http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local:80"
-            - name: SONATAFLOW_GRAPHQL_URL
-              value: "http://sonataflow-platform-data-index-service.{{ app_namespace }}.svc.cluster.local:80"
-            - name: CORS_ORIGINS
-              value: "https://central-publishing-house-{{ app_namespace }}.{{ ocp_apps_domain }}"
-            - name: OIDC_ISSUER_URL
-              value: "https://keycloak-keycloak.{{ keycloak_domain | default(ocp_apps_domain) }}/realms/publishing-house"
-            - name: OIDC_CLIENT_ID
-              value: "central-api"
             - name: GITHUB_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -92,8 +83,6 @@ spec:
                 secretKeyRef:
                   name: ph-developer-hub-env
                   key: RHDH_SERVICE_TOKEN
-            - name: RHDH_INTERNAL_URL
-              value: "http://backstage-developer-hub.{{ app_namespace }}.svc.cluster.local"
           volumeMounts:
             - name: validation-policy
               mountPath: /etc/ph-policy
@@ -102,10 +91,10 @@ spec:
               mountPath: /data
           resources:
             requests:
-              memory: 256Mi
+              memory: 512Mi
               cpu: 100m
             limits:
-              memory: 512Mi
+              memory: 1Gi
               cpu: 500m
           livenessProbe:
             httpGet:

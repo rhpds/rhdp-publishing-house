@@ -1,6 +1,7 @@
 """Drift detection — structural (spec.yaml field diff) and semantic (LLM design.md comparison)."""
 import json
 import logging
+import time
 from typing import Optional
 
 import httpx
@@ -8,6 +9,7 @@ import yaml
 from pydantic import BaseModel
 
 from .github import GitHubService
+from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,35 @@ STRUCTURAL_FIELDS = [
     "spec.environment.ai_requirement",
     "spec.environment.ai_model_tier",
 ]
+
+_drift_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}
+
+
+def drift_cache_get(slug: str, baseline: str, head: str) -> dict | None:
+    key = (slug, baseline, head)
+    entry = _drift_cache.get(key)
+    if not entry:
+        return None
+    ts, response = entry
+    ttl = get_settings().drift_cache_ttl_seconds
+    if time.time() - ts > ttl:
+        del _drift_cache[key]
+        return None
+    logger.debug("drift cache hit for %s (%s..%s)", slug, baseline[:8], head[:8])
+    return response
+
+
+def drift_cache_set(slug: str, baseline: str, head: str, response: dict) -> None:
+    _drift_cache[(slug, baseline, head)] = (time.time(), response)
+
+
+def drift_cache_evict(slug: str) -> None:
+    keys = [k for k in _drift_cache if k[0] == slug]
+    for k in keys:
+        del _drift_cache[k]
+    if keys:
+        logger.info("evicted %d drift cache entries for %s", len(keys), slug)
+
 
 SEMANTIC_SYSTEM_PROMPT = """You are a technical document reviewer. You will receive two versions of a design document (BASELINE and CURRENT). Compare them and identify meaningful changes, organized by section.
 
@@ -157,10 +188,17 @@ async def check_drift_semantic(
     baseline_sha: str,
     litellm_api_url: str,
     ph_internal_ai_api_key: str,
+    slug: str = "",
 ) -> DriftResponse:
+    current_sha = await github.get_head_sha(repo_url, branch) or ""
+
+    if slug and current_sha:
+        cached = drift_cache_get(slug, baseline_sha, current_sha)
+        if cached is not None:
+            return DriftResponse(**cached)
+
     baseline_md = await github.get_file_content(repo_url, DESIGN_PATH, baseline_sha)
     current_md = await github.get_file_content(repo_url, DESIGN_PATH, branch)
-    current_sha = await github.get_head_sha(repo_url, branch) or ""
 
     if not baseline_md and not current_md:
         return _empty_response(baseline_sha, current_sha, "design.md not found in either commit")
@@ -169,7 +207,10 @@ async def check_drift_semantic(
         return _empty_response(baseline_sha, current_sha, "design.md was added after the baseline commit", has_drift=True)
 
     if baseline_md == current_md:
-        return _empty_response(baseline_sha, current_sha, "No changes to design.md")
+        resp = _empty_response(baseline_sha, current_sha, "No changes to design.md")
+        if slug and current_sha:
+            drift_cache_set(slug, baseline_sha, current_sha, resp.model_dump())
+        return resp
 
     user_prompt = f"""## BASELINE VERSION (commit {baseline_sha[:8]}):
 
@@ -220,13 +261,16 @@ async def check_drift_semantic(
             for c in result.get("changes", [])
         ]
 
-        return DriftResponse(
+        resp = DriftResponse(
             has_drift=result.get("has_drift", False),
             baseline_sha=baseline_sha,
             current_sha=current_sha,
             summary=result.get("summary", ""),
             changes=changes,
         )
+        if slug and current_sha:
+            drift_cache_set(slug, baseline_sha, current_sha, resp.model_dump())
+        return resp
 
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse LLM drift response: {e}")

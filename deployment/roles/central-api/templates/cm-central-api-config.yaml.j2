@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: central-api-config
+  namespace: "{{ app_namespace }}"
+  labels:
+    app: central-api
+    component: backend
+data:
+  JIRA_PROJECT_KEY: "{{ jira_project_key | default('RHDPCD') }}"
+  SONATAFLOW_URL: "http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local:80"
+  SONATAFLOW_GRAPHQL_URL: "http://sonataflow-platform-data-index-service.{{ app_namespace }}.svc.cluster.local:80"
+  CORS_ORIGINS: "https://central-publishing-house-{{ app_namespace }}.{{ ocp_apps_domain }}"
+  OIDC_ISSUER_URL: "https://keycloak-keycloak.{{ keycloak_domain | default(ocp_apps_domain) }}/realms/publishing-house"
+  OIDC_CLIENT_ID: "central-api"
+  RHDH_INTERNAL_URL: "http://backstage-developer-hub.{{ app_namespace }}.svc.cluster.local"
+  DRIFT_CACHE_TTL_SECONDS: "259200"

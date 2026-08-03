@@ -11,7 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from ..auth.groups import decode_signed_key
 from ..config import get_settings
 from ..services.github import GitHubService
-from ..services.drift import DriftResponse, check_drift_structural, check_drift_semantic
+from ..services.drift import DriftResponse, check_drift_structural, check_drift_semantic, drift_cache_evict
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/spec/drift", tags=["drift"])
@@ -109,6 +109,7 @@ async def detect_drift(
         baseline_sha,
         settings.litellm_api_url,
         settings.ph_internal_ai_api_key,
+        slug=slug,
     )
 
 

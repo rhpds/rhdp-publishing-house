@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # API Configuration
     api_title: str = "Publishing House Central API"
-    api_version: str = "1.14.1"
+    api_version: str = "1.16.0"
     api_prefix: str = "/api/v1"
 
     # Authentication
@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # RCARS integration
     rcars_url: str = "https://rcars-api.apps.ocpv-infra01.dal12.infra.demo.redhat.com"
     rcars_api_key: str = ""
+
+    # Drift semantic cache TTL (seconds, default 3 days)
+    drift_cache_ttl_seconds: int = 259200
 
     # CORS (comma-separated origins for direct browser→API calls)
     cors_origins: str = ""

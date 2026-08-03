@@ -128,6 +128,21 @@ commands:
         AUTH_FILE=/home/user/.config/publishing-house/auth.json
         mkdir -p /home/user/.local/bin /home/user/.claude
 
+        # Disable VS Code workspace trust at user level
+        VSCODE_USER_SETTINGS=/home/user/.config/Code/User/settings.json
+        mkdir -p "$(dirname "$VSCODE_USER_SETTINGS")"
+        if [ -f "$VSCODE_USER_SETTINGS" ]; then
+          python3 -c "
+import json, pathlib
+p = pathlib.Path('$VSCODE_USER_SETTINGS')
+d = json.loads(p.read_text()) if p.stat().st_size > 0 else {}
+d['security.workspace.trust.enabled'] = False
+p.write_text(json.dumps(d, indent=2))
+" 2>/dev/null
+        else
+          echo '{"security.workspace.trust.enabled": false}' > "$VSCODE_USER_SETTINGS"
+        fi
+
         # apiKeyHelper script (reads API key from auth.json)
         cat > /home/user/.local/bin/claude-api-key-helper.sh << 'HELPEREOF'
         #!/bin/bash
