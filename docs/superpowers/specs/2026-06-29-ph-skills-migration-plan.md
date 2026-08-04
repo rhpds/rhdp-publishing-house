@@ -244,7 +244,7 @@ Post on RHDPCD-172 after PR merges with the contribution pattern below.
 
 ## How Andrew Contributes His Skills
 
-After RHDPCD-120 cutover, Andrew adds `rhdp-publishing-house:config-helper` and `rhdp-publishing-house:config-reviewer` via PR against `rhdp-publishing-house-skills`. Both agents go in the top-level `agents/` directory.
+Andrew adds his agents on the `RHDPCD-120-showroom-ftl-migration` branch (not main). After RHDPCD-120 merges, Andrew adds `rhdp-publishing-house:config-helper` and `rhdp-publishing-house:config-reviewer` via PR against `rhdp-publishing-house-skills`. Both agents go in the top-level `agents/` directory.
 
 ### Target directory structure
 
@@ -286,7 +286,7 @@ Note: Agent `.md` files do NOT have a `name:` field — the name is derived as `
 
 ### PR process
 
-1. Fork or branch `rhdp-publishing-house-skills` → branch name: `RHDPCD-172-config-helper-config-reviewer`
+1. Branch from `RHDPCD-120-showroom-ftl-migration` in `rhdp-publishing-house-skills` → branch name: `RHDPCD-172-config-helper-config-reviewer`
 2. Create `agents/config-helper.md`
 3. Create `agents/config-reviewer.md`
 4. PR title: `[RHDPCD-172] Add rhdp-publishing-house:config-helper and rhdp-publishing-house:config-reviewer`
