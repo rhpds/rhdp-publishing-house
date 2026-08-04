@@ -13,13 +13,13 @@
 
 | Component | Decision | Reason |
 |---|---|---|
-| **showroom:module-writing-helper** (was `file-generator`) | Move — renamed | Development skill calls directly; writes .adoc content |
-| **showroom:module-reviewer** | Move — name unchanged | Development skill calls directly; reviews .adoc content |
+| **rhdp-publishing-house:module-writing-helper** (was `showroom:file-generator`) | Move — renamed + namespace change | Agents live at top-level `agents/` under `rhdp-publishing-house` plugin; writes .adoc content |
+| **rhdp-publishing-house:module-reviewer** (was `showroom:module-reviewer`) | Move — namespace change | Agents live at top-level `agents/`; reviews .adoc content |
 | **showroom skills** (`create-lab`, `create-demo`, `verify-content`, `blog-generate`) | **Delete after copy** | Andrew Jones owns platform plumbing; PH development calls agents directly |
 | **scaffold agents** (`scaffold-checker`, `score-aggregator`, `doc-writer`, `diagram-generator`, `format-detector`, `zero-scaffold-checker`, `zero-content-reviewer`) | **Delete after copy** | Andrew's territory (RHDPCD-172) |
-| **showroom:config-helper** | **NOT moving** | Andrew Jones owns (RHDPCD-172) — creates scaffold |
-| **showroom:config-reviewer** | **NOT moving** | Andrew Jones owns (RHDPCD-172) — validates scaffold |
-| **ftl plugin** | Move — full copy, unchanged | Mitesh owns FTL validation going forward |
+| **rhdp-publishing-house:config-helper** | **NOT moving yet** | Andrew Jones owns (RHDPCD-172) — creates scaffold; will be added as top-level agent |
+| **rhdp-publishing-house:config-reviewer** | **NOT moving yet** | Andrew Jones owns (RHDPCD-172) — validates scaffold; will be added as top-level agent |
+| **ftl plugin** | **Removed** | Mitesh owns FTL validation separately — not part of PH install |
 | **agnosticv plugin** | **NOT in scope** | Stays in marketplace; NOT called by PH automation |
 | **gitops-helper** | New skill (RHDPCD-111) | Automation phase — GitOps (Helm + ArgoCD) content authoring |
 | **ansible-helper** | New skill (RHDPCD-110) | Automation phase — Ansible automation authoring |
@@ -45,11 +45,11 @@ User
       │   rhdp-publishing-house:development                        │
       │                                                            │
       │   Step 1: Scaffold check (PREREQUISITE)                    │
-      │   └─ Run showroom:config-reviewer                          │
+      │   └─ Run rhdp-publishing-house:config-reviewer             │
       │      ├─ PASS → proceed to Step 1b                          │
       │      └─ FAIL → report issues to user                       │
       │               └─ User says "help me" / "fix it"            │
-      │                  → invoke showroom:config-helper            │
+      │                  → invoke rhdp-publishing-house:config-helper│
       │                    (Andrew, RHDPCD-172)                     │
       │               └─ User says "I'll handle it"                │
       │                  → STOP. User scaffolds manually.           │
@@ -64,12 +64,12 @@ User
       │   ├─ "write"  → writer.md                                  │
       │   │   ├─ reads: spec.yaml + design.md + module outline     │
       │   │   ├─ presents plan → waits for approval                │
-      │   │   ├─ [Task] showroom:module-writing-helper (AGENT)     │
+      │   │   ├─ [Task] rhdp-publishing-house:module-writing-helper│
       │   │   └─ status: not_started → in_progress → complete      │
       │   │       └─ Sequential: N blocked until 1..N-1 complete   │
       │   │                                                        │
       │   ├─ "edit"   → editor.md                                  │
-      │   │   ├─ [Task] showroom:module-reviewer (AGENT)           │
+      │   │   ├─ [Task] rhdp-publishing-house:module-reviewer      │
       │   │   └─ SA-1→RS-2 spec alignment checks                   │
       │   │                                                        │
       │   └─ "automate" → automation.md                            │
@@ -98,7 +98,7 @@ Showroom **scaffolding** — the repo structure, config files, and platform plum
 - Reviewing `.adoc` quality (spec alignment, Red Hat style, AsciiDoc correctness)
 - Generating automation code (Ansible roles, GitOps manifests)
 
-Agents involved: `showroom:module-writing-helper`, `showroom:module-reviewer`
+Agents involved: `rhdp-publishing-house:module-writing-helper`, `rhdp-publishing-house:module-reviewer`
 
 ### What is SCAFFOLDING (Andrew owns — NOT part of this migration)
 
@@ -111,23 +111,23 @@ Agents involved: `showroom:module-writing-helper`, `showroom:module-reviewer`
 - Tab and console configuration (terminal, IDE, web consoles)
 - GitHub Pages deployment (`gh-pages.yml`, `supplemental-ui/`)
 
-Skills/agents involved: `showroom:config-reviewer` (checks), `showroom:config-helper` (creates)
+Skills/agents involved: `rhdp-publishing-house:config-reviewer` (checks), `rhdp-publishing-house:config-helper` (creates)
 
 ### Scaffold check flow (Step 1 of development)
 
-1. Development skill runs `showroom:config-reviewer` automatically — no user prompt needed
+1. Development skill runs `rhdp-publishing-house:config-reviewer` automatically — no user prompt needed
 2. config-reviewer checks if the repo has the required scaffold files (`site.yml`, `antora.yml`, `content/modules/ROOT/nav.adoc`) and validates them against the spec
 3. If PASS → proceed to module status check and dispatch
 4. If FAIL → report the specific issues to the user. Do NOT auto-fix.
-   - If user says "help me" / "fix it" → invoke `showroom:config-helper` (Andrew, RHDPCD-172)
+   - If user says "help me" / "fix it" → invoke `rhdp-publishing-house:config-helper` (Andrew, RHDPCD-172)
    - If user says "I'll handle it" → STOP. User scaffolds manually.
 
 ### Why this boundary matters
 
 The existing `showroom:create-lab` skill mixes both concerns — Phase 2.5 does scaffolding, Phase 3 does content generation. In the new architecture:
 
-- **PH development:writer** spawns `showroom:module-writing-helper` directly — content only, no scaffolding
-- **PH development:editor** spawns `showroom:module-reviewer` directly — content review only
+- **PH development:writer** spawns `rhdp-publishing-house:module-writing-helper` directly — content only, no scaffolding
+- **PH development:editor** spawns `rhdp-publishing-house:module-reviewer` directly — content review only
 - Scaffolding is a prerequisite check (Step 1) inside development, not a separate phase
 
 This means a showroom repo must already be scaffolded (by Andrew's tools, manually, or via `showroom:create-lab` from the marketplace) before PH development skills can write content into it.
@@ -154,7 +154,7 @@ Before dispatching to any procedure, development skill checks if any module has 
 1. Read spec.yaml, design.md, and module outlines (3 data sources)
 2. Present a plan: "Here's what I'll write for module N: [summary]. Ready to proceed?"
 3. Wait for user approval — never auto-generate
-4. Spawn `showroom:module-writing-helper` agent
+4. Spawn `rhdp-publishing-house:module-writing-helper` agent
 5. After completion, update module status in spec.yaml to `complete`
 
 ---
@@ -174,21 +174,23 @@ This ensures:
 
 ## Complete Naming Reference
 
-### showroom Skills — Andrew Jones (RHDPCD-172, NOT part of this migration)
+### Andrew Jones Skills (RHDPCD-172, NOT part of this migration)
 
-| Skill | Role |
+These agents will live at the top-level `agents/` directory in `rhdp-publishing-house-skills` once Andrew's PR lands:
+
+| Agent | Role |
 |---|---|
-| `showroom:config-helper` | Scaffolds showroom structure: site.yml, ui-config.yml, tabs, nav, runtime-automation skeleton |
-| `showroom:config-reviewer` | Reviews showroom config quality — validates site.yml, ui-config.yml, antora.yml against spec |
+| `rhdp-publishing-house:config-helper` | Scaffolds showroom structure: site.yml, ui-config.yml, tabs, nav, runtime-automation skeleton |
+| `rhdp-publishing-house:config-reviewer` | Reviews showroom config quality — validates site.yml, ui-config.yml, antora.yml against spec |
 
-### showroom Agents — Moving into PH repo (content only)
+### Content Agents — In PH repo (top-level `agents/`)
 
 | Old name | New name | Role |
 |---|---|---|
-| `showroom:file-generator` | `showroom:module-writing-helper` | Generates one AsciiDoc file per invocation — called directly by development:writer |
-| `showroom:module-reviewer` | `showroom:module-reviewer` (unchanged) | Reviews AsciiDoc quality — called directly by development:editor |
+| `showroom:file-generator` | `rhdp-publishing-house:module-writing-helper` | Generates one AsciiDoc file per invocation — called directly by development:writer |
+| `showroom:module-reviewer` | `rhdp-publishing-house:module-reviewer` | Reviews AsciiDoc quality — called directly by development:editor |
 
-### showroom Agents — NOT moving (Andrew's domain, deleted from copy)
+### Scaffold Agents — NOT moving (Andrew's domain, deleted from copy)
 
 | Agent | Owner | Role |
 |---|---|---|
@@ -207,16 +209,6 @@ This ensures:
 | `rhdp-publishing-house:gitops-helper` | RHDPCD-111 | GitOps (Helm + ArgoCD) automation authoring |
 | `rhdp-publishing-house:ansible-helper` | RHDPCD-110 | Ansible automation authoring |
 
-### ftl Plugin (moving — full copy, unchanged, Mitesh owns)
-
-| Agent/Skill | Role |
-|---|---|
-| `ftl:content-reader` | Reads AsciiDoc lab content, classifies steps for FTL processing |
-| `ftl:solve-writer` | Writes solve.yml Ansible playbooks from content analysis |
-| `ftl:validate-writer` | Writes validate.yml Ansible playbooks from content analysis |
-| `ftl:env-connector` | Connects to live RHDP showroom, runs and validates full solve/validate cycle |
-| `ftl:rhdp-lab-validator` | E2E lab validator — orchestrates full solve/validate test against live lab |
-
 ---
 
 ## Problem
@@ -229,23 +221,17 @@ PH skills hard-depend on marketplace skills. If a user installs PH without marke
 
 ## Solution
 
-Add ftl, two showroom content agents, and two new automation skills directly to `rhdp-publishing-house-skills`. One `--plugin-dir` install covers the PH content lifecycle.
-
-## Critical Constraint: Plugin Names Cannot Change
-
-Claude Code resolves skill calls as `<plugin-name>:<skill-name>`. The plugin name comes from `.claude-plugin/plugin.json` → `"name"` field.
-
-If skills moved into the `rhdp-publishing-house` plugin namespace, ALL call sites in PH SKILL.md files would break. Therefore: **each plugin MUST retain its original name in its own plugin.json**.
+Add two showroom content agents and two new automation skills directly to `rhdp-publishing-house-skills`. One `--plugin-dir` install covers the PH content lifecycle.
 
 ## Agent Name Resolution
 
 Claude Code derives agent names from `<plugin-name>:<filename>` — the plugin name comes from the nearest parent `.claude-plugin/plugin.json`, and the filename is the `.md` file without extension.
 
-This means agents MUST live inside the correct plugin directory to get the right name:
-- `showroom/agents/module-writing-helper.md` → resolves to `showroom:module-writing-helper` ✅
-- `agents/module-writing-helper.md` (repo root) → resolves to `rhdp-publishing-house:module-writing-helper` ❌
+Agents live at the top-level `agents/` directory alongside `.claude-plugin/plugin.json` (name: `rhdp-publishing-house`):
+- `agents/module-writing-helper.md` → resolves to `rhdp-publishing-house:module-writing-helper` ✅
+- `agents/module-reviewer.md` → resolves to `rhdp-publishing-house:module-reviewer` ✅
 
-The showroom content agents stay inside `showroom/agents/` so their `showroom:*` names are preserved.
+The showroom sub-plugin (`showroom/.claude-plugin/`) has been removed — all content agents now live at the top level.
 
 ## Target Structure
 
@@ -253,13 +239,16 @@ The showroom content agents stay inside `showroom/agents/` so their `showroom:*`
 rhdp-publishing-house-skills/           ← ONE repo, users clone once
 ├── .claude-plugin/
 │   └── plugin.json                     ← name: "rhdp-publishing-house"
+├── agents/                             ← all agents at top level
+│   ├── module-writing-helper.md        ← rhdp-publishing-house:module-writing-helper (CONTENT)
+│   └── module-reviewer.md              ← rhdp-publishing-house:module-reviewer (CONTENT)
 ├── skills/                             ← PH orchestration skills
 │   ├── orchestrator/SKILL.md
 │   ├── intake/SKILL.md
-│   ├── development/SKILL.md            ← calls showroom agents + ansible/gitops skills
+│   ├── development/SKILL.md            ← calls agents + ansible/gitops skills
 │   │   ├── procedures/
-│   │   │   ├── writer.md               ← spawns showroom:module-writing-helper (CONTENT)
-│   │   │   ├── editor.md               ← spawns showroom:module-reviewer (CONTENT)
+│   │   │   ├── writer.md               ← spawns rhdp-publishing-house:module-writing-helper
+│   │   │   ├── editor.md               ← spawns rhdp-publishing-house:module-reviewer
 │   │   │   └── automation.md           ← dispatches to ansible-helper / gitops-helper
 │   │   └── references/
 │   │       ├── writing-standards.md
@@ -279,45 +268,30 @@ rhdp-publishing-house-skills/           ← ONE repo, users clone once
 │       └── references/
 │           └── ansible-patterns.md
 │
-├── showroom/                           ← copied from marketplace, scaffold deleted
-│   ├── .claude-plugin/
-│   │   └── plugin.json                 ← name: "showroom" (MUST keep this name)
-│   ├── agents/
-│   │   ├── module-writing-helper.md    ← was file-generator.md (renamed, CONTENT)
-│   │   └── module-reviewer.md          ← name unchanged (CONTENT)
-│   ├── docs/
-│   │   └── SKILL-COMMON-RULES.md      ← AsciiDoc rules (@showroom/docs/ references work)
-│   ├── prompts/                        ← content-related prompts only
-│   └── templates/                      ← AsciiDoc templates for content generation
-│
-└── ftl/                                ← copied from marketplace (full plugin, Mitesh owns)
-    ├── .claude-plugin/
-    │   └── plugin.json                 ← name: "ftl" (MUST keep this name)
-    ├── agents/
-    │   ├── content-reader.md
-    │   ├── solve-writer.md
-    │   ├── validate-writer.md
-    │   └── env-connector.md
-    └── skills/
-        └── rhdp-lab-validator/
+└── showroom/                           ← content resources only (no sub-plugin, no agents)
+    ├── docs/
+    │   └── SKILL-COMMON-RULES.md      ← AsciiDoc rules (@showroom/docs/ references work)
+    ├── prompts/                        ← content-related prompts only
+    └── templates/                      ← AsciiDoc templates for content generation
 ```
 
 **What is NOT in showroom/ after migration:**
+- No `showroom/.claude-plugin/` — sub-plugin removed; agents are at top-level `agents/`
+- No `showroom/agents/` — agents moved to top-level
 - No `showroom/skills/` directory — all showroom skills deleted (Andrew's domain)
-- No scaffold agents (`scaffold-checker`, `score-aggregator`, `doc-writer`, `diagram-generator`, `format-detector`, `zero-scaffold-checker`, `zero-content-reviewer`) — all deleted
-- Only 2 agents remain: `module-writing-helper` and `module-reviewer`
+- No scaffold agents
 
 ## Development Skill Integration Model
 
 The `development` skill is the single entry point for all content and automation work.
 
-### Writer procedure → showroom:module-writing-helper
+### Writer procedure → rhdp-publishing-house:module-writing-helper
 
 writer.md spawns the agent via Task tool with `subagent_type`. The agent receives all context via prompt — no file reads at spawn time.
 
 ```
 Task tool:
-  subagent_type: showroom:module-writing-helper
+  subagent_type: rhdp-publishing-house:module-writing-helper
   prompt: |
     TARGET_FILE: <path to .adoc file>
     FILE_TYPE: module
@@ -329,13 +303,13 @@ Task tool:
 
 One agent per module, run sequentially (each depends on the previous for story continuity).
 
-### Editor procedure → showroom:module-reviewer
+### Editor procedure → rhdp-publishing-house:module-reviewer
 
 editor.md spawns the agent the same way:
 
 ```
 Task tool:
-  subagent_type: showroom:module-reviewer
+  subagent_type: rhdp-publishing-house:module-reviewer
   prompt: |
     MODULE_FILE: <path to .adoc file>
     CONTENT_TYPE: <workshop|demo>
@@ -416,8 +390,6 @@ The following remain in `rhdp-skills-marketplace` and are NOT part of this migra
 
 ## Non-Goals
 
-- Do NOT rename `ftl` plugin name — see constraint above
-- Do NOT rename `showroom` plugin name — see constraint above
 - Do NOT copy agnosticv into this repo — it stays in marketplace
 - Do NOT call agnosticv skills from PH automation — automation uses ansible-helper and gitops-helper only
 - Do NOT hardcode model IDs — all skills and agents inherit from session
