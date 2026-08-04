@@ -11,7 +11,7 @@
 
 ## Context
 
-The PH `development` skill orchestrates three phases: content writing (writer.md), content review (editor.md), and automation (automation.md). The automation phase currently wraps `agnosticv:catalog-builder` for catalog creation and references automation guides inline. This spec introduces two new standalone skills to handle the actual automation code authoring — one per automation approach.
+The PH `development` skill orchestrates three phases: content writing (writer.md), content review (editor.md), and automation (automation.md). The automation phase previously wrapped `agnosticv:catalog-builder` for catalog creation and referenced automation guides inline; PH now generates catalog entry configuration via PH-native ansible-helper instead. This spec introduces two new standalone skills to handle the actual automation code authoring — one per automation approach.
 
 ---
 
@@ -148,7 +148,7 @@ Writes to the author's project repo:
 
 ### Out of scope
 
-- AgnosticV catalog creation — that's `agnosticv:catalog-builder` called by automation.md Phase 7b
+- Catalog entry generation — that's `rhdp-publishing-house:ansible-helper` called by automation.md Phase 7b
 - Ansible playbooks — that's ansible-helper (Mitesh)
 - Infrastructure sizing decisions — those come from spec.yaml
 
@@ -204,7 +204,7 @@ Writes to the author's project repo:
 ### Out of scope
 
 - GitOps/Helm — that's gitops-helper (Juliano)
-- AgnosticV catalog — that's `agnosticv:catalog-builder`
+- Catalog entry generation — that's `rhdp-publishing-house:ansible-helper` (Phase 7b)
 - Infrastructure sizing — comes from spec.yaml
 
 ---
@@ -293,7 +293,7 @@ Pass the automation manifest path and spec.yaml path to the invoked skill.
 |---|---|---|
 | Juliano reviews spec + confirms gitops scope | Juliano | TBD |
 | Mitesh reviews spec + confirms ansible scope | Mitesh | TBD |
-| RHDPCD-120 migration complete (showroom + ftl in PH repo) | Prakhar | TBD |
+| RHDPCD-120 migration complete (showroom agents in PH repo) | Prakhar | TBD |
 | gitops-helper SKILL.md PR | Juliano | After RHDPCD-120 |
 | ansible-helper SKILL.md PR | Mitesh | After RHDPCD-120 |
 | automation.md wired for both | Prakhar | After both skills merge |
