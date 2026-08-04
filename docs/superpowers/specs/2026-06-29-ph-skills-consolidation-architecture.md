@@ -4,7 +4,7 @@
 **Updated:** 2026-08-04
 **Status:** Draft
 **Author:** Prakhar Srivastava
-**Scope:** Add showroom content agents and new gitops-helper + ansible-helper skills to rhdp-publishing-house-skills. Copy ftl plugin as-is. Remove marketplace dependency for PH users.
+**Scope:** Add showroom content agents, Andrew's showroom config skills (RHDPCD-172), and new gitops-helper + ansible-helper skills to rhdp-publishing-house-skills. Remove marketplace dependency for PH users.
 **Migration Steps:** See [PH Skills Migration Plan](2026-06-29-ph-skills-migration-plan.md) for the step-by-step execution plan, phase ordering, and cutover communication.
 
 ---
@@ -13,12 +13,12 @@
 
 | Component | Decision | Reason |
 |---|---|---|
-| **rhdp-publishing-house:module-writing-helper** (was `showroom:file-generator`) | Move — renamed + namespace change | Agents live at top-level `agents/` under `rhdp-publishing-house` plugin; writes .adoc content |
-| **rhdp-publishing-house:module-reviewer** (was `showroom:module-reviewer`) | Move — namespace change | Agents live at top-level `agents/`; reviews .adoc content |
+| **rhdp-publishing-house:module-writing-helper** | Move — renamed + namespace change | Agents live at top-level `agents/` under `rhdp-publishing-house` plugin; writes .adoc content |
+| **rhdp-publishing-house:module-reviewer** | Move — namespace change | Agents live at top-level `agents/`; reviews .adoc content |
 | **showroom skills** (`create-lab`, `create-demo`, `verify-content`, `blog-generate`) | **Delete after copy** | Andrew Jones owns platform plumbing; PH development calls agents directly |
 | **scaffold agents** (`scaffold-checker`, `score-aggregator`, `doc-writer`, `diagram-generator`, `format-detector`, `zero-scaffold-checker`, `zero-content-reviewer`) | **Delete after copy** | Andrew's territory (RHDPCD-172) |
-| **rhdp-publishing-house:config-helper** | **NOT moving yet** | Andrew Jones owns (RHDPCD-172) — creates scaffold; will be added as top-level agent |
-| **rhdp-publishing-house:config-reviewer** | **NOT moving yet** | Andrew Jones owns (RHDPCD-172) — validates scaffold; will be added as top-level agent |
+| **rhdp-publishing-house:config-helper** | **Delivered** (RHDPCD-172) | Andrew Jones — skill at `skills/config-helper/`, sets up showroom repos |
+| **rhdp-publishing-house:config-reviewer** | **Delivered** (RHDPCD-172) | Andrew Jones — skill at `skills/config-reviewer/`, validates showroom config |
 | **ftl plugin** | **Removed** | Mitesh owns FTL validation separately — not part of PH install |
 | **agnosticv plugin** | **NOT in scope** | Stays in marketplace; NOT called by PH automation |
 | **gitops-helper** | New skill (RHDPCD-111) | Automation phase — GitOps (Helm + ArgoCD) content authoring |
@@ -32,50 +32,51 @@ Scaffold is Step 1 INSIDE the development phase — NOT a separate phase. Module
 
 ```
 User
-  │
-  └─ /rhdp-publishing-house (SKILL)
-      │
-      ├─ intake phase ─────────────────────────────────────────────┐
-      │   rhdp-publishing-house:intake                             │
-      │   └─ 02-discovery → 03-design-doc → 04-module-outlines    │
-      │      → 05-infrastructure → 06-finalize                    │
-      └────────────────────────────────────────────────────────────┘
-      │
-      ├─ development phase ────────────────────────────────────────┐
-      │   rhdp-publishing-house:development                        │
-      │                                                            │
-      │   Step 1: Scaffold check (PREREQUISITE)                    │
-      │   └─ Run rhdp-publishing-house:config-reviewer             │
-      │      ├─ PASS → proceed to Step 1b                          │
-      │      └─ FAIL → report issues to user                       │
-      │               └─ User says "help me" / "fix it"            │
-      │                  → invoke rhdp-publishing-house:config-helper│
-      │                    (Andrew, RHDPCD-172)                     │
-      │               └─ User says "I'll handle it"                │
-      │                  → STOP. User scaffolds manually.           │
-      │                                                            │
-      │   Step 1b: Module status validation                        │
-      │   └─ Read spec.yaml module statuses                        │
-      │      ├─ Any in_progress? → warn user, ask to continue      │
-      │      ├─ All complete + "write"? → "All done, edit instead?"│
-      │      └─ Otherwise → proceed to Step 2                      │
-      │                                                            │
-      │   Step 2: Dispatch                                         │
-      │   ├─ "write"  → writer.md                                  │
-      │   │   ├─ reads: spec.yaml + design.md + module outline     │
-      │   │   ├─ presents plan → waits for approval                │
-      │   │   ├─ [Task] rhdp-publishing-house:module-writing-helper│
-      │   │   └─ status: not_started → in_progress → complete      │
-      │   │       └─ Sequential: N blocked until 1..N-1 complete   │
-      │   │                                                        │
-      │   ├─ "edit"   → editor.md                                  │
-      │   │   ├─ [Task] rhdp-publishing-house:module-reviewer      │
-      │   │   └─ SA-1→RS-2 spec alignment checks                   │
-      │   │                                                        │
-      │   └─ "automate" → automation.md                            │
-      │       ├─ [Skill] ansible-helper  (FUTURE — RHDPCD-110)     │
-      │       └─ [Skill] gitops-helper   (FUTURE — RHDPCD-111)     │
-      └────────────────────────────────────────────────────────────┘
+  |
+  +-- /rhdp-publishing-house (SKILL)
+      |
+      +-- intake phase --------------------------------------------+
+      |   rhdp-publishing-house:intake                             |
+      |   +-- 02-discovery -> 03-design-doc -> 04-module-outlines  |
+      |      -> 05-infrastructure -> 06-finalize                   |
+      +------------------------------------------------------------+
+      |
+      +-- development phase ----------------------------------------+
+      |   rhdp-publishing-house:development                         |
+      |                                                             |
+      |   Step 1: Scaffold check (PREREQUISITE)                     |
+      |   +-- [Skill] rhdp-publishing-house:config-reviewer         |
+      |      +-- PASS -> proceed to Step 1b                         |
+      |      +-- FAIL -> report issues to user                      |
+      |               +-- User says "help me" / "fix it"            |
+      |                  -> [Skill] rhdp-publishing-house:config-helper
+      |                    (Andrew, RHDPCD-172)                      |
+      |               +-- User says "I'll handle it"                |
+      |                  -> STOP. User scaffolds manually.           |
+      |                                                             |
+      |   Step 1b: Module status validation                         |
+      |   +-- Read spec.yaml module statuses                        |
+      |      +-- Any in_progress? -> warn user, ask to continue     |
+      |      +-- All complete + "write"? -> "All done, edit instead?"|
+      |      +-- Otherwise -> proceed to Step 2                     |
+      |                                                             |
+      |   Step 2: Dispatch                                          |
+      |   +-- "write"  -> writer.md                                 |
+      |   |   +-- reads: spec.yaml + design.md + module outline     |
+      |   |   +-- presents plan -> waits for approval               |
+      |   |   +-- [Task] rhdp-publishing-house:module-writing-helper |
+      |   |   +-- auto-run [Task] module-reviewer (HARD STOP)       |
+      |   |   +-- status: not_started -> in_progress -> complete    |
+      |   |       +-- Sequential: N blocked until 1..N-1 complete   |
+      |   |                                                         |
+      |   +-- "edit"   -> editor.md                                 |
+      |   |   +-- [Task] rhdp-publishing-house:module-reviewer      |
+      |   |   +-- SA-1->RS-2 spec alignment checks                  |
+      |   |                                                         |
+      |   +-- "automate" -> automation.md                           |
+      |       +-- [Skill] ansible-helper  (FUTURE -- RHDPCD-110)    |
+      |       +-- [Skill] gitops-helper   (FUTURE -- RHDPCD-111)    |
+      +-------------------------------------------------------------+
 
 Legend:
   [Task]  = agent invocation (Task tool + subagent_type)
@@ -100,9 +101,8 @@ Showroom **scaffolding** — the repo structure, config files, and platform plum
 
 Agents involved: `rhdp-publishing-house:module-writing-helper`, `rhdp-publishing-house:module-reviewer`
 
-### What is SCAFFOLDING (Andrew owns — NOT part of this migration)
+### What is SCAFFOLDING (Andrew owns — RHDPCD-172, delivered)
 
-- Cloning the nookbag template repo
 - Creating/configuring `site.yml` (showroom title, lab_type, tabs, consoles)
 - Creating/configuring `ui-config.yml` (theme, branding, custom CSS)
 - Creating/configuring `antora.yml` (component name, version, nav)
@@ -111,16 +111,16 @@ Agents involved: `rhdp-publishing-house:module-writing-helper`, `rhdp-publishing
 - Tab and console configuration (terminal, IDE, web consoles)
 - GitHub Pages deployment (`gh-pages.yml`, `supplemental-ui/`)
 
-Skills/agents involved: `rhdp-publishing-house:config-reviewer` (checks), `rhdp-publishing-house:config-helper` (creates)
+Skills involved: `rhdp-publishing-house:config-reviewer` (validates), `rhdp-publishing-house:config-helper` (creates/fixes)
 
 ### Scaffold check flow (Step 1 of development)
 
-1. Development skill runs `rhdp-publishing-house:config-reviewer` automatically — no user prompt needed
-2. config-reviewer checks if the repo has the required scaffold files (`site.yml`, `antora.yml`, `content/modules/ROOT/nav.adoc`) and validates them against the spec
-3. If PASS → proceed to module status check and dispatch
-4. If FAIL → report the specific issues to the user. Do NOT auto-fix.
-   - If user says "help me" / "fix it" → invoke `rhdp-publishing-house:config-helper` (Andrew, RHDPCD-172)
-   - If user says "I'll handle it" → STOP. User scaffolds manually.
+1. Development skill invokes `rhdp-publishing-house:config-reviewer` via **Skill tool** automatically — no user prompt needed
+2. config-reviewer checks config files (`site.yml`, `ui-config.yml`, `antora.yml`, `nav.adoc`) with 30 rules across 5 categories, severity-rated findings
+3. If PASS — proceed to module status check and dispatch
+4. If FAIL — report the specific issues to the user. Do NOT auto-fix.
+   - If user says "help me" / "fix it" — invoke `rhdp-publishing-house:config-helper` via **Skill tool**
+   - If user says "I'll handle it" — STOP. User scaffolds manually.
 
 ### Why this boundary matters
 
@@ -130,7 +130,7 @@ The existing `showroom:create-lab` skill mixes both concerns — Phase 2.5 does 
 - **PH development:editor** spawns `rhdp-publishing-house:module-reviewer` directly — content review only
 - Scaffolding is a prerequisite check (Step 1) inside development, not a separate phase
 
-This means a showroom repo must already be scaffolded (by Andrew's tools, manually, or via `showroom:create-lab` from the marketplace) before PH development skills can write content into it.
+This means a showroom repo must already be scaffolded (by Andrew's config-helper, manually, or via `showroom:create-lab` from the marketplace) before PH development skills can write content into it.
 
 ---
 
@@ -149,13 +149,18 @@ Module N cannot start until modules 1 through N-1 are ALL `complete`. writer.md 
 
 Before dispatching to any procedure, development skill checks if any module has `status: in_progress`. If so, it warns the user and asks whether to continue that module before starting new work.
 
-### Writer interaction flow
+### Writer interaction flow (human-in-the-loop)
 
 1. Read spec.yaml, design.md, and module outlines (3 data sources)
 2. Present a plan: "Here's what I'll write for module N: [summary]. Ready to proceed?"
 3. Wait for user approval — never auto-generate
-4. Spawn `rhdp-publishing-house:module-writing-helper` agent
-5. After completion, update module status in spec.yaml to `complete`
+4. Spawn `rhdp-publishing-house:module-writing-helper` agent — set module status to `in_progress`
+5. After write completes, auto-run `rhdp-publishing-house:module-reviewer` (mandatory, not user-triggered)
+6. Present reviewer findings as guidance — not all findings need fixing, author uses judgment
+7. **HARD STOP** — do NOT mark complete. Author reviews the file and chooses:
+   - **"review again"** — re-run reviewer on current file (loop back to step 5)
+   - **"module N is done"** — mark status `complete`, unlock next module
+   - Ask AI to fix specific items — apply changes, then back to step 5
 
 ---
 
@@ -174,21 +179,21 @@ This ensures:
 
 ## Complete Naming Reference
 
-### Andrew Jones Skills (RHDPCD-172, NOT part of this migration)
+### Andrew Jones Skills (RHDPCD-172 — delivered)
 
-These agents will live at the top-level `agents/` directory in `rhdp-publishing-house-skills` once Andrew's PR lands:
+Skills at `skills/config-helper/` and `skills/config-reviewer/` with reference docs:
 
-| Agent | Role |
-|---|---|
-| `rhdp-publishing-house:config-helper` | Scaffolds showroom structure: site.yml, ui-config.yml, tabs, nav, runtime-automation skeleton |
-| `rhdp-publishing-house:config-reviewer` | Reviews showroom config quality — validates site.yml, ui-config.yml, antora.yml against spec |
+| Skill | Role | References |
+|---|---|---|
+| `rhdp-publishing-house:config-helper` | Sets up showroom repos: site.yml, ui-config.yml, tabs, antora.yml, runtime-automation. Detects `project.showroom_type` from spec.yaml. Supports Open, Guided, ZT Guided. | `showroom-patterns.md`, `config-files.md` |
+| `rhdp-publishing-house:config-reviewer` | Validates showroom config with 30 rules across 5 categories (site.yml, ui-config.yml, antora.yml, nav.adoc, cross-file), severity levels, auto-fix suggestions | `validation-rules.md` |
 
 ### Content Agents — In PH repo (top-level `agents/`)
 
-| Old name | New name | Role |
-|---|---|---|
-| `showroom:file-generator` | `rhdp-publishing-house:module-writing-helper` | Generates one AsciiDoc file per invocation — called directly by development:writer |
-| `showroom:module-reviewer` | `rhdp-publishing-house:module-reviewer` | Reviews AsciiDoc quality — called directly by development:editor |
+| Agent | Role |
+|---|---|
+| `rhdp-publishing-house:module-writing-helper` | Generates one AsciiDoc file per invocation — called directly by development:writer |
+| `rhdp-publishing-house:module-reviewer` | Reviews AsciiDoc quality — called directly by development:editor |
 
 ### Scaffold Agents — NOT moving (Andrew's domain, deleted from copy)
 
@@ -221,58 +226,64 @@ PH skills hard-depend on marketplace skills. If a user installs PH without marke
 
 ## Solution
 
-Add two showroom content agents and two new automation skills directly to `rhdp-publishing-house-skills`. One `--plugin-dir` install covers the PH content lifecycle.
+Add two showroom content agents, two config skills, and two new automation skills directly to `rhdp-publishing-house-skills`. One `--plugin-dir` install covers the PH content lifecycle.
 
 ## Agent Name Resolution
 
 Claude Code derives agent names from `<plugin-name>:<filename>` — the plugin name comes from the nearest parent `.claude-plugin/plugin.json`, and the filename is the `.md` file without extension.
 
 Agents live at the top-level `agents/` directory alongside `.claude-plugin/plugin.json` (name: `rhdp-publishing-house`):
-- `agents/module-writing-helper.md` → resolves to `rhdp-publishing-house:module-writing-helper` ✅
-- `agents/module-reviewer.md` → resolves to `rhdp-publishing-house:module-reviewer` ✅
+- `agents/module-writing-helper.md` resolves to `rhdp-publishing-house:module-writing-helper`
+- `agents/module-reviewer.md` resolves to `rhdp-publishing-house:module-reviewer`
 
-The showroom sub-plugin (`showroom/.claude-plugin/`) has been removed — all content agents now live at the top level.
+Skills resolve by frontmatter `name:` field in SKILL.md:
+- `skills/config-helper/SKILL.md` has `name: rhdp-publishing-house:config-helper`
+- `skills/config-reviewer/SKILL.md` has `name: rhdp-publishing-house:config-reviewer`
+
+The showroom sub-plugin (`showroom/.claude-plugin/`) has been removed — all content agents live at the top level.
 
 ## Target Structure
 
 ```
-rhdp-publishing-house-skills/           ← ONE repo, users clone once
-├── .claude-plugin/
-│   └── plugin.json                     ← name: "rhdp-publishing-house"
-├── agents/                             ← all agents at top level
-│   ├── module-writing-helper.md        ← rhdp-publishing-house:module-writing-helper (CONTENT)
-│   └── module-reviewer.md              ← rhdp-publishing-house:module-reviewer (CONTENT)
-├── skills/                             ← PH orchestration skills
-│   ├── orchestrator/SKILL.md
-│   ├── intake/SKILL.md
-│   ├── development/SKILL.md            ← calls agents + ansible/gitops skills
-│   │   ├── procedures/
-│   │   │   ├── writer.md               ← spawns rhdp-publishing-house:module-writing-helper
-│   │   │   ├── editor.md               ← spawns rhdp-publishing-house:module-reviewer
-│   │   │   └── automation.md           ← dispatches to ansible-helper / gitops-helper
-│   │   └── references/
-│   │       ├── writing-standards.md
-│   │       ├── editing-checklist.md
-│   │       ├── workflow-diagram.md
-│   │       ├── automation-patterns.md
-│   │       ├── automation-manifest-format.md
-│   │       ├── ansible-automation-guide.md
-│   │       └── gitops-automation-guide.md
-│   ├── worklog/SKILL.md
-│   ├── gitops-helper/                  ← NEW (RHDPCD-111, Juliano)
-│   │   ├── SKILL.md
-│   │   └── references/
-│   │       └── gitops-patterns.md
-│   └── ansible-helper/                 ← NEW (RHDPCD-110, Mitesh)
-│       ├── SKILL.md
-│       └── references/
-│           └── ansible-patterns.md
-│
-└── showroom/                           ← content resources only (no sub-plugin, no agents)
-    ├── docs/
-    │   └── SKILL-COMMON-RULES.md      ← AsciiDoc rules (@showroom/docs/ references work)
-    ├── prompts/                        ← content-related prompts only
-    └── templates/                      ← AsciiDoc templates for content generation
+rhdp-publishing-house-skills/           <-- ONE repo, users clone once
++-- .claude-plugin/
+|   +-- plugin.json                     <-- name: "rhdp-publishing-house"
++-- agents/                             <-- content agents at top level
+|   +-- module-writing-helper.md        <-- rhdp-publishing-house:module-writing-helper
+|   +-- module-reviewer.md              <-- rhdp-publishing-house:module-reviewer
++-- skills/                             <-- PH orchestration + config skills
+|   +-- orchestrator/SKILL.md
+|   +-- intake/SKILL.md
+|   +-- development/SKILL.md            <-- calls agents + config/automation skills
+|   |   +-- procedures/
+|   |   |   +-- writer.md               <-- spawns module-writing-helper agent
+|   |   |   +-- editor.md               <-- spawns module-reviewer agent
+|   |   |   +-- automation.md           <-- dispatches to ansible-helper / gitops-helper
+|   |   +-- references/
+|   +-- config-helper/                  <-- Andrew (RHDPCD-172)
+|   |   +-- SKILL.md
+|   |   +-- references/
+|   |       +-- showroom-patterns.md
+|   |       +-- config-files.md
+|   +-- config-reviewer/                <-- Andrew (RHDPCD-172)
+|   |   +-- SKILL.md
+|   |   +-- references/
+|   |       +-- validation-rules.md
+|   +-- worklog/SKILL.md
+|   +-- gitops-helper/                  <-- FUTURE (RHDPCD-111, Juliano)
+|   |   +-- SKILL.md
+|   |   +-- references/
+|   |       +-- gitops-patterns.md
+|   +-- ansible-helper/                 <-- FUTURE (RHDPCD-110, Mitesh)
+|       +-- SKILL.md
+|       +-- references/
+|           +-- ansible-patterns.md
+|
++-- showroom/                           <-- content resources only (no sub-plugin, no agents)
+    +-- docs/
+    |   +-- SKILL-COMMON-RULES.md
+    +-- prompts/
+    +-- templates/
 ```
 
 **What is NOT in showroom/ after migration:**
@@ -285,7 +296,11 @@ rhdp-publishing-house-skills/           ← ONE repo, users clone once
 
 The `development` skill is the single entry point for all content and automation work.
 
-### Writer procedure → rhdp-publishing-house:module-writing-helper
+### Scaffold check (Skill tool)
+
+development SKILL.md invokes `rhdp-publishing-house:config-reviewer` via Skill tool as Step 1. If FAIL, offers `rhdp-publishing-house:config-helper` via Skill tool. config-helper and config-reviewer skip pre-flight/workflow check since the development skill already runs pre-flight before the scaffold gate.
+
+### Writer procedure (agent + human-in-the-loop)
 
 writer.md spawns the agent via Task tool with `subagent_type`. The agent receives all context via prompt — no file reads at spawn time.
 
@@ -301,40 +316,27 @@ Task tool:
     REPO_PATH: <absolute repo path>
 ```
 
-One agent per module, run sequentially (each depends on the previous for story continuity).
+One agent per module, run sequentially (each depends on the previous for story continuity). After write, reviewer runs automatically (mandatory). Author reviews findings and says "module N is done" to mark complete.
 
-### Editor procedure → rhdp-publishing-house:module-reviewer
+### Editor procedure (agent)
 
-editor.md spawns the agent the same way:
+editor.md spawns `rhdp-publishing-house:module-reviewer` via Task tool. After the agent returns, editor.md runs its own spec alignment checks (SA-1 through RS-2). For standalone re-reviews after manual edits.
 
-```
-Task tool:
-  subagent_type: rhdp-publishing-house:module-reviewer
-  prompt: |
-    MODULE_FILE: <path to .adoc file>
-    CONTENT_TYPE: <workshop|demo>
-    LAB_TYPE: <ocp|rhel|vm|ai>
-    SHARED_CONTEXT: <JSON with module_order, defined_attributes, etc.>
-    REPO_PATH: <absolute repo path>
-```
-
-After the agent returns, editor.md runs its own spec alignment checks (SA-1 through RS-2).
-
-### Automation procedure → skills
+### Automation procedure (skills)
 
 automation.md dispatches to skills (not agents) — skills have their own pre-flight and workflow check:
 
 ```
-automation_approach: ansible  → Skill tool: rhdp-publishing-house:ansible-helper
-automation_approach: gitops   → Skill tool: rhdp-publishing-house:gitops-helper
-automation_approach: both     → ansible-helper first, then gitops-helper
+automation_approach: ansible  -> Skill tool: rhdp-publishing-house:ansible-helper
+automation_approach: gitops   -> Skill tool: rhdp-publishing-house:gitops-helper
+automation_approach: both     -> ansible-helper first, then gitops-helper
 ```
 
 No `ph_payload` sub-skill invocation anywhere. No agnosticv skills called. Development owns the content pipeline directly.
 
 ## Standard PH SKILL.md Skeleton
 
-Every skill in this repo follows this structure. New skills (gitops-helper, ansible-helper) and contributor skills MUST follow this skeleton.
+Every skill in this repo follows this structure. New skills and contributor skills MUST follow this skeleton.
 
 All metadata goes in a single frontmatter block:
 
@@ -358,18 +360,18 @@ No `model:` field — skills inherit from the user's session.
 **Do NOT use** Central API tools directly. You work locally: read files, write content, update spec.yaml.
 **Do NOT use** MCP tools. All external interactions go through `publishing-house/tools/` scripts.
 
-## Steps 1–3 — Pre-flight
+## Steps 1-3 -- Pre-flight
 
-Follow @rhdp-publishing-house/skills/common/pre-flight.md (Steps 1–3: verify project, read identity, check auth).
+Follow @rhdp-publishing-house/skills/common/pre-flight.md (Steps 1-3: verify project, read identity, check auth).
 
-## Step 4 — Workflow check
+## Step 4 -- Workflow check
 
-**4a.** Get workflow data → extract workflow_id
-**4b.** Get workflow state → verify stage is `development` (STOP if not)
-**4c.** Sync → pull Central API data, commit if needed
+**4a.** Get workflow data -> extract workflow_id
+**4b.** Get workflow state -> verify stage is `development` (STOP if not)
+**4c.** Sync -> pull Central API data, commit if needed
 **4d.** Handle rejections if any
 
-## Step 5 — Read project context
+## Step 5 -- Read project context
 
 Read spec.yaml, design.md, and any other inputs specific to this skill.
 
@@ -377,6 +379,8 @@ Read spec.yaml, design.md, and any other inputs specific to this skill.
 
 [Skill-specific logic here]
 ```
+
+Note: config-helper and config-reviewer skip pre-flight/workflow check since they are invoked by the development skill which already runs pre-flight before the scaffold gate.
 
 ## What Stays in Marketplace
 
