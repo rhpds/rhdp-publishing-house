@@ -139,15 +139,11 @@ spec:
                 zero_touch_ready:
                   title: I have my own environment set up already
                   type: boolean
-                  default: true
+                  default: false
                   ui:help: Skip the Env Setup stage — your catalog item and CI are already configured.
             - properties:
                 showroom_type:
                   const: classic
-                zero_touch_ready:
-                  type: boolean
-                  default: false
-                  ui:widget: hidden
 
   steps:
     # Step 1: Check if project name is already taken
