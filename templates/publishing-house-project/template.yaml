@@ -130,6 +130,11 @@ spec:
           default: classic
           ui:help: Classic = standard Showroom lab. Zero Touch = embedded runtime/setup automation.
 
+        zero_touch_ready:
+          type: boolean
+          default: false
+          ui:widget: hidden
+
       allOf:
         - if:
             properties:
