@@ -144,6 +144,10 @@ spec:
             - properties:
                 showroom_type:
                   const: classic
+                zero_touch_ready:
+                  type: boolean
+                  default: false
+                  ui:widget: hidden
 
   steps:
     # Step 1: Check if project name is already taken
