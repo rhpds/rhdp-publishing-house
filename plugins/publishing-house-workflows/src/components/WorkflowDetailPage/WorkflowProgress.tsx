@@ -8,7 +8,7 @@ import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
 import FiberManualRecordIcon from '@material-ui/icons/FiberManualRecord';
 import ErrorIcon from '@material-ui/icons/Error';
 import WarningIcon from '@material-ui/icons/Warning';
-import SkipNextIcon from '@material-ui/icons/SkipNext';
+import BlockIcon from '@material-ui/icons/Block';
 import { WorkflowStage } from '../../api/types';
 import { STAGE_ORDER, STAGE_LABELS, stageIndex } from '../../utils/stageMapping';
 
@@ -64,7 +64,7 @@ function NodeIcon({ state }: { state: NodeState }) {
     case 'error':
       return <ErrorIcon className={`${classes.error} ${cls}`} />;
     case 'skipped':
-      return <SkipNextIcon className={`${classes.skipped} ${cls}`} />;
+      return <BlockIcon className={`${classes.skipped} ${cls}`} />;
     default:
       return <RadioButtonUncheckedIcon className={cls} />;
   }
