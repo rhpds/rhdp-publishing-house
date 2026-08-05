@@ -11,6 +11,7 @@ export function useUserGroups() {
       isContentReviewer: refs.some(r => r === 'group:default/rhdp-content-review'),
       isInfraReviewer: refs.some(r => r === 'group:default/rhdp-infra-review'),
       isDeveloper: refs.some(r => r === 'group:default/rhdp-developers'),
+      isContentDeveloper: refs.some(r => r === 'group:default/rhdp-content-developers'),
       isAdmin: refs.some(r => r === 'group:default/rhdp-administrators'),
     };
   }, []);
@@ -19,6 +20,7 @@ export function useUserGroups() {
     isContentReviewer: value?.isContentReviewer ?? false,
     isInfraReviewer: value?.isInfraReviewer ?? false,
     isDeveloper: value?.isDeveloper ?? false,
+    isContentDeveloper: value?.isContentDeveloper ?? false,
     isAdmin: value?.isAdmin ?? false,
     loading,
   };

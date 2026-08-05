@@ -6,3 +6,5 @@ rhdh_operator_source: redhat-operators
 
 rhdh_instance_name: developer-hub
 rhdh_replicas: 1
+
+ph_git_ref: main

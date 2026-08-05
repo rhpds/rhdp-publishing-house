@@ -428,6 +428,25 @@ export function createPhWorkflowsClient(options: {
     return await response.json();
   }
 
+  async function submitStaging(
+    slug: string,
+    agnosticvUrl: string,
+    ciUrl: string,
+  ): Promise<void> {
+    const response = await centralFetch(
+      `/projects/${slug}/staging/submit`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ agnosticv_url: agnosticvUrl, ci_url: ciUrl }),
+      },
+    );
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || `Staging submit failed: ${response.status}`);
+    }
+  }
+
   async function getTokens(): Promise<TokenListResponse> {
     const response = await centralFetch('/auth/tokens');
     if (!response.ok) throw new Error(`Failed to list tokens: ${response.status}`);
@@ -463,6 +482,7 @@ export function createPhWorkflowsClient(options: {
     approveDrift,
     fetchHeadCommitSha,
     deleteProject,
+    submitStaging,
     sendMessage,
     getMessages,
     markMessagesRead,

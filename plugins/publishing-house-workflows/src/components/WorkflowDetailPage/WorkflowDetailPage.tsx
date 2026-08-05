@@ -28,6 +28,7 @@ import {
   Tabs,
   Tab,
   Popover,
+  TextField,
 } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
 import GitHubIcon from '@material-ui/icons/GitHub';
@@ -119,7 +120,7 @@ export function WorkflowDetailPage() {
   const centralApiUrl = configApi.getString('phWorkflows.centralApiUrl');
 
   const client = useMemo(() => createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi }), [centralApiUrl, discoveryApi, fetchApi, identityApi]);
-  const { isContentReviewer, isInfraReviewer, isAdmin } = useUserGroups();
+  const { isContentReviewer, isInfraReviewer, isContentDeveloper, isAdmin } = useUserGroups();
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState(0);
@@ -184,6 +185,9 @@ export function WorkflowDetailPage() {
   const [reasonsPopover, setReasonsPopover] = useState<{ anchorEl: HTMLElement | null; reasons: { id: number; text: string }[] }>({ anchorEl: null, reasons: [] });
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [stagingAgnosticvUrl, setStagingAgnosticvUrl] = useState('');
+  const [stagingCiUrl, setStagingCiUrl] = useState('');
+  const [submittingStaging, setSubmittingStaging] = useState(false);
 
   const handleApprove = async (stage: WorkflowStage) => {
     if (!result) return;
@@ -291,6 +295,25 @@ export function WorkflowDetailPage() {
     }
   };
 
+  const handleStagingSubmit = async () => {
+    if (!result || !stagingAgnosticvUrl.trim() || !stagingCiUrl.trim()) return;
+    setSubmittingStaging(true);
+    try {
+      await client.submitStaging(result.summary.projectId, stagingAgnosticvUrl.trim(), stagingCiUrl.trim());
+      setSnackbar({ open: true, severity: 'success', message: 'Staging info submitted — waiting for workflow to advance...' });
+      const prevStage = result.summary.stage;
+      for (let i = 0; i < 6; i++) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const updated = await client.getWorkflow(result.summary.projectId);
+        if (updated && updated.summary.stage !== prevStage) break;
+      }
+      setRefreshKey(k => k + 1);
+    } catch (err: any) {
+      setSnackbar({ open: true, severity: 'error', message: `Staging submit failed: ${err.message}` });
+    } finally {
+      setSubmittingStaging(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -330,9 +353,13 @@ export function WorkflowDetailPage() {
 
   const isReviewStage = REVIEW_STAGES.includes(summary.stage);
   const hasReviewTab = STAGES_WITH_REVIEW_TAB.includes(summary.stage);
+  const hasStagingTab = summary.stage === 'staging' || Boolean(wd?.agnosticvUrl) || Boolean(wd?.ciUrl);
   const canReview = (summary.stage === 'content_review' && isContentReviewer)
     || (summary.stage === 'infra_review' && isInfraReviewer);
+  const canStaging = summary.stage === 'staging' && (isContentDeveloper || isAdmin);
   const canMessage = isContentReviewer || isInfraReviewer;
+  const stagingTabIndex = hasReviewTab ? 2 : 1;
+  const timelineTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0);
 
   return (
     <Page themeId="tool">
@@ -422,6 +449,7 @@ export function WorkflowDetailPage() {
         >
           <Tab label="Overview" />
           {hasReviewTab && <Tab label="Review" />}
+          {hasStagingTab && <Tab label="Staging" />}
           <Tab label="Timeline" />
         </Tabs>
 
@@ -809,7 +837,61 @@ export function WorkflowDetailPage() {
           </>
         )}
 
-        {activeTab === (hasReviewTab ? 2 : 1) && (
+        {hasStagingTab && activeTab === stagingTabIndex && (
+          <InfoCard title="Catalog Item Staging">
+            <Typography variant="body2" style={{ marginBottom: 16, color: '#757575' }}>
+              Provide the AgnosticV catalog item URL and demo.redhat.com CI link for this project.
+            </Typography>
+            {wd?.agnosticvUrl && !canStaging ? (
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <DetailField label="AgnosticV Catalog Item URL" value={wd.agnosticvUrl} />
+                </Grid>
+                <Grid item xs={12}>
+                  <DetailField label="demo.redhat.com CI Link" value={wd.ciUrl || '—'} />
+                </Grid>
+              </Grid>
+            ) : (
+              <>
+                <TextField
+                  label="AgnosticV Catalog Item URL"
+                  placeholder="https://github.com/rhpds/agnosticv/tree/master/agd_v2/..."
+                  fullWidth
+                  variant="outlined"
+                  value={stagingAgnosticvUrl || wd?.agnosticvUrl || ''}
+                  onChange={e => setStagingAgnosticvUrl(e.target.value)}
+                  disabled={!canStaging || submittingStaging}
+                  style={{ marginBottom: 16 }}
+                />
+                <TextField
+                  label="demo.redhat.com CI Link"
+                  placeholder="https://demo.redhat.com/catalog?item=..."
+                  fullWidth
+                  variant="outlined"
+                  value={stagingCiUrl || wd?.ciUrl || ''}
+                  onChange={e => setStagingCiUrl(e.target.value)}
+                  disabled={!canStaging || submittingStaging}
+                  style={{ marginBottom: 16 }}
+                />
+                {canStaging && (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    style={{ fontWeight: 600 }}
+                    onClick={handleStagingSubmit}
+                    disabled={submittingStaging || !stagingAgnosticvUrl.trim() || !stagingCiUrl.trim()}
+                    startIcon={submittingStaging ? <CircularProgress size={16} color="inherit" /> : undefined}
+                  >
+                    {submittingStaging ? 'Submitting...' : 'Submit'}
+                  </Button>
+                )}
+              </>
+            )}
+          </InfoCard>
+        )}
+
+        {activeTab === timelineTabIndex && (
           <InfoCard title="Timeline">
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>

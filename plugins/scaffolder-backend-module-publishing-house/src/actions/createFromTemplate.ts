@@ -44,7 +44,7 @@ export function createGithubRepoFromTemplateAction(options: {
     schema: {
       input: {
         repoUrl: (z: any) => z.string({ description: 'github.com?owner=X&repo=Y' }),
-        templateRepo: (z: any) => z.string({ description: 'owner/repo of the template' }),
+        templateRepo: (z: any) => z.string({ description: 'Full URL or owner/repo of the template' }),
         description: (z: any) => z.string({ description: 'Repository description' }).optional(),
         defaultBranch: (z: any) => z.string({ description: 'Default branch' }).default('main'),
         repoVisibility: (z: any) => z.enum(['public', 'private']).default('public'),
@@ -84,9 +84,10 @@ export function createGithubRepoFromTemplateAction(options: {
         throw new Error(`Invalid repoUrl: ${repoUrl}`);
       }
 
-      const [templateOwner, templateName] = templateRepo.split('/');
+      const templateUrl = new URL(templateRepo.replace(/\.git$/, ''));
+      const [templateOwner, templateName] = templateUrl.pathname.replace(/^\//, '').split('/');
       if (!templateOwner || !templateName) {
-        throw new Error(`Invalid templateRepo: ${templateRepo}. Expected owner/repo format.`);
+        throw new Error(`Invalid templateRepo URL: ${templateRepo}`);
       }
 
       const integration = integrations.github.byUrl(`https://github.com/${owner}/${repo}`);

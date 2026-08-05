@@ -158,6 +158,7 @@ spec:
           showroom_type: ${{ parameters.showroom_type }}
           devspaces_url: https://devspaces.${{ environment.parameters.baseDomain }}
           central_api_url: https://central-api-publishing-house.${{ environment.parameters.baseDomain }}
+          ph_git_ref: ${{ environment.parameters.phGitRef }}
 
     # Step 3: Set created-at timestamp on catalog-info.yaml
     - id: timestamp
@@ -172,7 +173,7 @@ spec:
       action: publishing-house:create-github-repo
       input:
         repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
-        templateRepo: rhpds/rhdp-publishing-house-template
+        templateRepo: https://github.com/rhpds/rhdp-publishing-house-template
         description: ${{ parameters.project_description }}
         defaultBranch: main
         repoVisibility: public
@@ -261,7 +262,7 @@ spec:
           3. Run `/rhdp-publishing-house` — and you're off!
 
           **Local machine:**
-          1. Install the skills: `git clone https://github.com/rhpds/rhdp-publishing-house-skills.git ~/.claude/skills/publishing-house`
+          1. Install the skills: `git clone -b ${{ environment.parameters.phGitRef }} https://github.com/rhpds/rhdp-publishing-house-skills.git ~/.claude/skills/publishing-house`
           2. Clone the repo: `git clone https://github.com/rhpds/${{ parameters.project_name }}`
           3. `cd ${{ parameters.project_name }}`
           4. Start Claude CLI: `claude`

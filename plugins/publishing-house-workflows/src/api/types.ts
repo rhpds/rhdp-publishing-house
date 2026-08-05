@@ -24,6 +24,8 @@ export interface WorkflowVariables {
     hasDrift?: boolean;
     auditTrailSha?: string;
     reviewHistory?: AuditEntry[];
+    agnosticvUrl?: string;
+    ciUrl?: string;
   };
 }
 
@@ -46,6 +48,7 @@ export type WorkflowStage =
   | 'content_review'
   | 'infra_review'
   | 'jira_sync'
+  | 'staging'
   | 'development'
   | 'testing'
   | 'published'

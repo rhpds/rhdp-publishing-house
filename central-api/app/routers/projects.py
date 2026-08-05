@@ -236,6 +236,7 @@ _STATE_MAP = {
     "infrareview": "infra_review",
     "infrareviewdecision": "infra_review",
     "jirasync": "jira_sync",
+    "staging": "staging",
     "development": "development",
     "testing": "testing",
     "published": "published",
@@ -832,6 +833,39 @@ async def reject_infra_review(
         "reasons": reasons,
     })
     return {"slug": slug, "action": "rejected", "stage": "infra_review"}
+
+
+# ── Staging ─────────────────────────────────────────────────────────────────
+
+class StagingSubmitRequest(BaseModel):
+    agnosticv_url: str
+    ci_url: str
+
+
+@router.post("/{slug}/staging/submit")
+async def submit_staging(
+    slug: str,
+    body: StagingSubmitRequest,
+    auth: tuple[str, int] = Depends(_require_auth),
+):
+    owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-content-developers"], "rhdp-content-developers")
+
+    wd = _get_workflow_data(slug)
+    wf_uuid = wd.get("workflow_id", "")
+    if not wf_uuid:
+        raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
+    _require_stage(wf_uuid, ["staging"])
+
+    _send_cloud_event("ph.staging.complete", slug, {
+        "user": owner,
+        "stage": "staging",
+        "action": "submitted",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "agnosticvUrl": body.agnosticv_url,
+        "ciUrl": body.ci_url,
+    })
+    return {"slug": slug, "action": "submitted", "stage": "staging"}
 
 
 # ── Drift Approve ───────────────────────────────────────────────────────────

@@ -18,6 +18,7 @@ GROUP_BITS = {
     "rhdp-infra-review": 2,
     "rhdp-developers": 4,
     "rhdp-administrators": 8,
+    "rhdp-content-developers": 16,
 }
 
 ALL_GROUPS_MASK = 0xFF
