@@ -37,6 +37,7 @@ import RefreshIcon from '@material-ui/icons/Refresh';
 import ReplayIcon from '@material-ui/icons/Replay';
 import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 import MenuBookIcon from '@material-ui/icons/MenuBook';
+import LaunchIcon from '@material-ui/icons/Launch';
 import { createPhWorkflowsClient } from '../../api/client';
 import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
@@ -402,6 +403,30 @@ export function WorkflowDetailPage() {
               rel="noopener noreferrer"
             >
               {summary.epicKey}
+            </Button>
+          )}
+          {wd?.agnosticvUrl && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<LaunchIcon />}
+              href={wd.agnosticvUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              AgnosticV
+            </Button>
+          )}
+          {wd?.ciUrl && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<LaunchIcon />}
+              href={wd.ciUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              CI Link
             </Button>
           )}
           <IconButton
