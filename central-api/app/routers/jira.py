@@ -372,30 +372,34 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings,
             logger.warning("jira sync bg: epic summary update failed for %s: %s", epic_key, e)
 
         if design_content:
-            desc_content = [
-                {"type": "paragraph", "content": [
-                    {"type": "text", "text": design_content[:30000]}
-                ]},
-            ]
-            if agnosticv_url or ci_url:
-                links_parts = []
-                if agnosticv_url:
-                    links_parts.append({"type": "text", "text": "AgnosticV: "})
-                    links_parts.append({"type": "text", "text": agnosticv_url, "marks": [{"type": "link", "attrs": {"href": agnosticv_url}}]})
-                if agnosticv_url and ci_url:
-                    links_parts.append({"type": "text", "text": " | "})
-                if ci_url:
-                    links_parts.append({"type": "text", "text": "CI: "})
-                    links_parts.append({"type": "text", "text": ci_url, "marks": [{"type": "link", "attrs": {"href": ci_url}}]})
-                desc_content.insert(0, {"type": "paragraph", "content": links_parts})
             desc_adf = {
                 "type": "doc",
                 "version": 1,
-                "content": desc_content,
+                "content": [
+                    {"type": "paragraph", "content": [
+                        {"type": "text", "text": design_content[:30000]}
+                    ]},
+                ],
             }
+            update_fields: dict = {"description": desc_adf}
+            if agnosticv_url or ci_url:
+                env_lines = []
+                if agnosticv_url:
+                    env_lines.append(f"AgnosticV Catalog Item: {agnosticv_url}")
+                if ci_url:
+                    env_lines.append(f"CI Catalog Item: {ci_url}")
+                update_fields["environment"] = {
+                    "type": "doc",
+                    "version": 1,
+                    "content": [
+                        {"type": "paragraph", "content": [
+                            {"type": "text", "text": "\n".join(env_lines)}
+                        ]},
+                    ],
+                }
             req = urllib.request.Request(
                 f"{settings.jira_url}/rest/api/3/issue/{epic_key}",
-                data=json.dumps({"fields": {"description": desc_adf}}).encode(),
+                data=json.dumps({"fields": update_fields}).encode(),
                 headers=headers,
                 method="PUT",
             )
