@@ -139,7 +139,7 @@ spec:
                 zero_touch_ready:
                   title: I have my own environment set up already
                   type: boolean
-                  default: false
+                  default: true
                   ui:help: Skip the Env Setup stage — your catalog item and CI are already configured.
             - properties:
                 showroom_type:
