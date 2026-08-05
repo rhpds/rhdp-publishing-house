@@ -37,7 +37,6 @@ import RefreshIcon from '@material-ui/icons/Refresh';
 import ReplayIcon from '@material-ui/icons/Replay';
 import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 import MenuBookIcon from '@material-ui/icons/MenuBook';
-import LaunchIcon from '@material-ui/icons/Launch';
 import { createPhWorkflowsClient } from '../../api/client';
 import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
@@ -45,7 +44,7 @@ import { useUserGroups } from '../../hooks/useUserGroups';
 
 const REVIEW_STAGES: WorkflowStage[] = ['content_review', 'infra_review'];
 const STAGES_WITH_REVIEW_TAB: WorkflowStage[] = [
-  'content_review', 'infra_review', 'development', 'testing',
+  'content_review', 'infra_review', 'staging', 'development', 'testing',
 ];
 
 const CHECK_GROUP_LABELS: Record<string, string> = {
@@ -403,30 +402,6 @@ export function WorkflowDetailPage() {
               rel="noopener noreferrer"
             >
               {summary.epicKey}
-            </Button>
-          )}
-          {wd?.agnosticvUrl && (
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<LaunchIcon />}
-              href={wd.agnosticvUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              AgnosticV
-            </Button>
-          )}
-          {wd?.ciUrl && (
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<LaunchIcon />}
-              href={wd.ciUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              CI Link
             </Button>
           )}
           <IconButton
@@ -870,10 +845,16 @@ export function WorkflowDetailPage() {
             {wd?.agnosticvUrl && !canStaging ? (
               <Grid container spacing={2}>
                 <Grid item xs={12}>
-                  <DetailField label="AgnosticV Catalog Item URL" value={wd.agnosticvUrl} />
+                  <Typography variant="body2" style={{ color: '#757575', marginBottom: 4 }}>AgnosticV Catalog Item URL</Typography>
+                  <a href={wd.agnosticvUrl} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all' }}>{wd.agnosticvUrl}</a>
                 </Grid>
                 <Grid item xs={12}>
-                  <DetailField label="demo.redhat.com CI Link" value={wd.ciUrl || '—'} />
+                  <Typography variant="body2" style={{ color: '#757575', marginBottom: 4 }}>demo.redhat.com CI Link</Typography>
+                  {wd.ciUrl ? (
+                    <a href={wd.ciUrl} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all' }}>{wd.ciUrl}</a>
+                  ) : (
+                    <Typography variant="body1">—</Typography>
+                  )}
                 </Grid>
               </Grid>
             ) : (
@@ -886,16 +867,20 @@ export function WorkflowDetailPage() {
                   value={stagingAgnosticvUrl || wd?.agnosticvUrl || ''}
                   onChange={e => setStagingAgnosticvUrl(e.target.value)}
                   disabled={!canStaging || submittingStaging}
+                  error={!!stagingAgnosticvUrl && !stagingAgnosticvUrl.match(/^https:\/\/github\.com\/rhpds\/agnosticv\/.+/)}
+                  helperText={stagingAgnosticvUrl && !stagingAgnosticvUrl.match(/^https:\/\/github\.com\/rhpds\/agnosticv\/.+/) ? 'Must start with https://github.com/rhpds/agnosticv/' : ''}
                   style={{ marginBottom: 16 }}
                 />
                 <TextField
                   label="demo.redhat.com CI Link"
-                  placeholder="https://demo.redhat.com/catalog?item=..."
+                  placeholder="https://catalog.demo.redhat.com/catalog/..."
                   fullWidth
                   variant="outlined"
                   value={stagingCiUrl || wd?.ciUrl || ''}
                   onChange={e => setStagingCiUrl(e.target.value)}
                   disabled={!canStaging || submittingStaging}
+                  error={!!stagingCiUrl && !stagingCiUrl.match(/^https:\/\/catalog\.demo\.redhat\.com\/catalog\/.+/)}
+                  helperText={stagingCiUrl && !stagingCiUrl.match(/^https:\/\/catalog\.demo\.redhat\.com\/catalog\/.+/) ? 'Must start with https://catalog.demo.redhat.com/catalog/' : ''}
                   style={{ marginBottom: 16 }}
                 />
                 {canStaging && (
@@ -905,7 +890,7 @@ export function WorkflowDetailPage() {
                     size="large"
                     style={{ fontWeight: 600 }}
                     onClick={handleStagingSubmit}
-                    disabled={submittingStaging || !stagingAgnosticvUrl.trim() || !stagingCiUrl.trim()}
+                    disabled={submittingStaging || !stagingAgnosticvUrl.match(/^https:\/\/github\.com\/rhpds\/agnosticv\/.+/) || !stagingCiUrl.match(/^https:\/\/catalog\.demo\.redhat\.com\/catalog\/.+/)}
                     startIcon={submittingStaging ? <CircularProgress size={16} color="inherit" /> : undefined}
                   >
                     {submittingStaging ? 'Submitting...' : 'Submit'}

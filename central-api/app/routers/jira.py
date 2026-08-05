@@ -133,6 +133,8 @@ def create_epic(
 class SyncRequest(BaseModel):
     repo_url: str
     epic_key: str
+    agnosticv_url: str = ""
+    ci_url: str = ""
 
 
 class SyncResponse(BaseModel):
@@ -315,12 +317,14 @@ async def sync_jira_tasks(
 
     asyncio.get_event_loop().run_in_executor(
         None, _sync_jira_tasks_bg, body.repo_url, body.epic_key, settings,
+        body.agnosticv_url, body.ci_url,
     )
     logger.info("jira sync: accepted for epic %s — running in background", body.epic_key)
     return SyncResponse(epic_key=body.epic_key)
 
 
-def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings):
+def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings,
+                        agnosticv_url: str = "", ci_url: str = ""):
     """Background thread: sync Jira tasks from spec.yaml, design.md, and module outlines."""
     try:
         gh = GitHubService(token=settings.github_token)
@@ -368,14 +372,26 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings):
             logger.warning("jira sync bg: epic summary update failed for %s: %s", epic_key, e)
 
         if design_content:
+            desc_content = [
+                {"type": "paragraph", "content": [
+                    {"type": "text", "text": design_content[:30000]}
+                ]},
+            ]
+            if agnosticv_url or ci_url:
+                links_parts = []
+                if agnosticv_url:
+                    links_parts.append({"type": "text", "text": "AgnosticV: "})
+                    links_parts.append({"type": "text", "text": agnosticv_url, "marks": [{"type": "link", "attrs": {"href": agnosticv_url}}]})
+                if agnosticv_url and ci_url:
+                    links_parts.append({"type": "text", "text": " | "})
+                if ci_url:
+                    links_parts.append({"type": "text", "text": "CI: "})
+                    links_parts.append({"type": "text", "text": ci_url, "marks": [{"type": "link", "attrs": {"href": ci_url}}]})
+                desc_content.insert(0, {"type": "paragraph", "content": links_parts})
             desc_adf = {
                 "type": "doc",
                 "version": 1,
-                "content": [
-                    {"type": "paragraph", "content": [
-                        {"type": "text", "text": design_content[:30000]}
-                    ]},
-                ],
+                "content": desc_content,
             }
             req = urllib.request.Request(
                 f"{settings.jira_url}/rest/api/3/issue/{epic_key}",
