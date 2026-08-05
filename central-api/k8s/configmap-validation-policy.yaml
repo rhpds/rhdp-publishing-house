@@ -162,6 +162,9 @@ data:
       - name: Red Hat Enterprise Linux
         aliases:
           - RHEL
+      - name: Red Hat Hardened Images
+        aliases:
+          - RHHI
       - name: Red Hat build of Keycloak
         aliases:
           - Keycloak

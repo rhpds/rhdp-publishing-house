@@ -48,7 +48,7 @@ export type WorkflowStage =
   | 'content_review'
   | 'infra_review'
   | 'jira_sync'
-  | 'staging'
+  | 'env_setup'
   | 'development'
   | 'testing'
   | 'published'

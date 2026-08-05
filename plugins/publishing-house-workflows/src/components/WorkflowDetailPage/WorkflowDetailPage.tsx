@@ -44,7 +44,7 @@ import { useUserGroups } from '../../hooks/useUserGroups';
 
 const REVIEW_STAGES: WorkflowStage[] = ['content_review', 'infra_review'];
 const STAGES_WITH_REVIEW_TAB: WorkflowStage[] = [
-  'content_review', 'infra_review', 'staging', 'development', 'testing',
+  'content_review', 'infra_review', 'env_setup', 'development', 'testing',
 ];
 
 const CHECK_GROUP_LABELS: Record<string, string> = {
@@ -299,8 +299,8 @@ export function WorkflowDetailPage() {
     if (!result || !stagingAgnosticvUrl.trim() || !stagingCiUrl.trim()) return;
     setSubmittingStaging(true);
     try {
-      await client.submitStaging(result.summary.projectId, stagingAgnosticvUrl.trim(), stagingCiUrl.trim());
-      setSnackbar({ open: true, severity: 'success', message: 'Staging info submitted — waiting for workflow to advance...' });
+      await client.submitEnvSetup(result.summary.projectId, stagingAgnosticvUrl.trim(), stagingCiUrl.trim());
+      setSnackbar({ open: true, severity: 'success', message: 'Env setup info submitted — waiting for workflow to advance...' });
       const prevStage = result.summary.stage;
       for (let i = 0; i < 6; i++) {
         await new Promise(resolve => setTimeout(resolve, 5000));
@@ -309,7 +309,7 @@ export function WorkflowDetailPage() {
       }
       setRefreshKey(k => k + 1);
     } catch (err: any) {
-      setSnackbar({ open: true, severity: 'error', message: `Staging submit failed: ${err.message}` });
+      setSnackbar({ open: true, severity: 'error', message: `Env setup submit failed: ${err.message}` });
     } finally {
       setSubmittingStaging(false);
     }
@@ -353,10 +353,10 @@ export function WorkflowDetailPage() {
 
   const isReviewStage = REVIEW_STAGES.includes(summary.stage);
   const hasReviewTab = STAGES_WITH_REVIEW_TAB.includes(summary.stage);
-  const hasStagingTab = summary.stage === 'staging' || Boolean(wd?.agnosticvUrl) || Boolean(wd?.ciUrl);
+  const hasStagingTab = summary.stage === 'env_setup' || Boolean(wd?.agnosticvUrl) || Boolean(wd?.ciUrl);
   const canReview = (summary.stage === 'content_review' && isContentReviewer)
     || (summary.stage === 'infra_review' && isInfraReviewer);
-  const canStaging = summary.stage === 'staging' && (isContentDeveloper || isAdmin);
+  const canStaging = summary.stage === 'env_setup' && (isContentDeveloper || isAdmin);
   const canMessage = isContentReviewer || isInfraReviewer;
   const stagingTabIndex = hasReviewTab ? 2 : 1;
   const timelineTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0);
@@ -418,6 +418,7 @@ export function WorkflowDetailPage() {
             stage={summary.stage}
             rejectedFrom={rejectedFrom}
             hasDrift={wd?.hasDrift}
+            envSetupSkipped={wd?.showroomType === 'zero_touch' && wd?.zeroTouchReady === true}
           />
         </InfoCard>
 
@@ -449,7 +450,7 @@ export function WorkflowDetailPage() {
         >
           <Tab label="Overview" />
           {hasReviewTab && <Tab label="Review" />}
-          {hasStagingTab && <Tab label="Staging" />}
+          {hasStagingTab && <Tab label="Env Setup" />}
           <Tab label="Timeline" />
         </Tabs>
 
@@ -465,6 +466,10 @@ export function WorkflowDetailPage() {
               <Grid item xs={12} md={6}>
                 <DetailField label="Type" value={summary.contentType} />
                 <DetailField label="Deployment Mode" value={summary.deploymentMode} />
+                <DetailField label="Showroom Type" value={wd?.showroomType === 'zero_touch' ? 'Zero Touch' : 'Classic'} />
+                {wd?.showroomType === 'zero_touch' && (
+                  <DetailField label="AgnosticV Provided" value={wd?.zeroTouchReady ? 'Yes' : 'No'} />
+                )}
                 <DetailField label="State" value={summary.state} />
                 <DetailField label="Current Stage" value={stageLabel} />
               </Grid>
@@ -838,7 +843,7 @@ export function WorkflowDetailPage() {
         )}
 
         {hasStagingTab && activeTab === stagingTabIndex && (
-          <InfoCard title="Catalog Item Staging">
+          <InfoCard title="Catalog Item Env Setup">
             <Typography variant="body2" style={{ marginBottom: 16, color: '#757575' }}>
               Provide the AgnosticV catalog item URL and demo.redhat.com CI link for this project.
             </Typography>
@@ -867,8 +872,6 @@ export function WorkflowDetailPage() {
                   value={stagingAgnosticvUrl || wd?.agnosticvUrl || ''}
                   onChange={e => setStagingAgnosticvUrl(e.target.value)}
                   disabled={!canStaging || submittingStaging}
-                  error={!!stagingAgnosticvUrl && !stagingAgnosticvUrl.match(/^https:\/\/github\.com\/rhpds\/agnosticv\/.+/)}
-                  helperText={stagingAgnosticvUrl && !stagingAgnosticvUrl.match(/^https:\/\/github\.com\/rhpds\/agnosticv\/.+/) ? 'Must start with https://github.com/rhpds/agnosticv/' : ''}
                   style={{ marginBottom: 16 }}
                 />
                 <TextField
@@ -879,8 +882,6 @@ export function WorkflowDetailPage() {
                   value={stagingCiUrl || wd?.ciUrl || ''}
                   onChange={e => setStagingCiUrl(e.target.value)}
                   disabled={!canStaging || submittingStaging}
-                  error={!!stagingCiUrl && !stagingCiUrl.match(/^https:\/\/catalog\.demo\.redhat\.com\/catalog\/.+/)}
-                  helperText={stagingCiUrl && !stagingCiUrl.match(/^https:\/\/catalog\.demo\.redhat\.com\/catalog\/.+/) ? 'Must start with https://catalog.demo.redhat.com/catalog/' : ''}
                   style={{ marginBottom: 16 }}
                 />
                 {canStaging && (
@@ -890,7 +891,7 @@ export function WorkflowDetailPage() {
                     size="large"
                     style={{ fontWeight: 600 }}
                     onClick={handleStagingSubmit}
-                    disabled={submittingStaging || !stagingAgnosticvUrl.match(/^https:\/\/github\.com\/rhpds\/agnosticv\/.+/) || !stagingCiUrl.match(/^https:\/\/catalog\.demo\.redhat\.com\/catalog\/.+/)}
+                    disabled={submittingStaging || !stagingAgnosticvUrl.trim() || !stagingCiUrl.trim()}
                     startIcon={submittingStaging ? <CircularProgress size={16} color="inherit" /> : undefined}
                   >
                     {submittingStaging ? 'Submitting...' : 'Submit'}

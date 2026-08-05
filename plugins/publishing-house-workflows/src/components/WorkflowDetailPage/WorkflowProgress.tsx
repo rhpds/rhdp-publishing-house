@@ -8,6 +8,7 @@ import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
 import FiberManualRecordIcon from '@material-ui/icons/FiberManualRecord';
 import ErrorIcon from '@material-ui/icons/Error';
 import WarningIcon from '@material-ui/icons/Warning';
+import BlockIcon from '@material-ui/icons/Block';
 import { WorkflowStage } from '../../api/types';
 import { STAGE_ORDER, STAGE_LABELS, stageIndex } from '../../utils/stageMapping';
 
@@ -44,10 +45,11 @@ const useStyles = makeStyles(theme => ({
   active: { color: '#4caf50' },
   warning: { color: '#ff9800' },
   error: { color: '#f44336' },
+  skipped: { color: '#9e9e9e' },
   iconLarge: { fontSize: '1.3rem' },
 }));
 
-type NodeState = 'completed' | 'active' | 'pending' | 'error' | 'warning';
+type NodeState = 'completed' | 'active' | 'pending' | 'error' | 'warning' | 'skipped';
 
 function NodeIcon({ state }: { state: NodeState }) {
   const classes = useStyles();
@@ -61,6 +63,8 @@ function NodeIcon({ state }: { state: NodeState }) {
       return <WarningIcon className={`${classes.warning} ${cls}`} />;
     case 'error':
       return <ErrorIcon className={`${classes.error} ${cls}`} />;
+    case 'skipped':
+      return <BlockIcon className={`${classes.skipped} ${cls}`} />;
     default:
       return <RadioButtonUncheckedIcon className={cls} />;
   }
@@ -70,8 +74,10 @@ function getNodeState(
   s: WorkflowStage,
   currentStage: WorkflowStage,
   hasDrift?: boolean,
+  envSetupSkipped?: boolean,
 ): NodeState {
   if (currentStage === 'error') return 'error';
+  if (s === 'env_setup' && envSetupSkipped) return 'skipped';
   if (currentStage === 'published') return 'completed';
 
   const cur = stageIndex(currentStage);
@@ -88,16 +94,17 @@ interface WorkflowProgressProps {
   stage: WorkflowStage;
   rejectedFrom?: WorkflowStage | null;
   hasDrift?: boolean;
+  envSetupSkipped?: boolean;
 }
 
-export function WorkflowProgress({ stage, hasDrift }: WorkflowProgressProps) {
+export function WorkflowProgress({ stage, hasDrift, envSetupSkipped }: WorkflowProgressProps) {
   const classes = useStyles();
 
   return (
     <div className={classes.root}>
       <div className={classes.pipeline}>
         {STAGE_ORDER.map((s, i) => {
-          const st = getNodeState(s, stage, hasDrift);
+          const st = getNodeState(s, stage, hasDrift, envSetupSkipped);
           return (
             <React.Fragment key={s}>
               <div className={classes.node}>
