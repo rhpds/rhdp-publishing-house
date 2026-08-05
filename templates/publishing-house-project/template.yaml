@@ -217,7 +217,7 @@ spec:
           sso_user: ${{ user.entity.metadata.name }}
           sso_email: ${{ user.entity.spec.profile.email }}
           showroom_type: ${{ parameters.showroom_type }}
-          zero_touch_ready: ${{ parameters.zero_touch_ready }}
+          zero_touch_ready: ${{ parameters.showroom_type == 'zero_touch' and parameters.zero_touch_ready }}
 
     # Step 6: Register in catalog
     - id: register
