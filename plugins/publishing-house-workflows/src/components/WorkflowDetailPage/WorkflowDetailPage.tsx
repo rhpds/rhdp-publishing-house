@@ -466,6 +466,10 @@ export function WorkflowDetailPage() {
               <Grid item xs={12} md={6}>
                 <DetailField label="Type" value={summary.contentType} />
                 <DetailField label="Deployment Mode" value={summary.deploymentMode} />
+                <DetailField label="Showroom Type" value={wd?.showroomType === 'zero_touch' ? 'Zero Touch' : 'Classic'} />
+                {wd?.showroomType === 'zero_touch' && (
+                  <DetailField label="AgnosticV Provided" value={wd?.zeroTouchReady ? 'Yes' : 'No'} />
+                )}
                 <DetailField label="State" value={summary.state} />
                 <DetailField label="Current Stage" value={stageLabel} />
               </Grid>
