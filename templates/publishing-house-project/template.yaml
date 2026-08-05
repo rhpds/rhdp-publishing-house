@@ -130,29 +130,20 @@ spec:
           default: classic
           ui:help: Classic = standard Showroom lab. Zero Touch = embedded runtime/setup automation.
 
-        zero_touch_ready:
-          type: boolean
-          default: false
-          ui:widget: hidden
-
-      allOf:
-        - if:
-            properties:
-              showroom_type:
-                const: zero_touch
-          then:
-            properties:
-              zero_touch_ready:
-                title: I have my own environment set up already
-                type: boolean
-                default: true
-                ui:help: Skip the Env Setup stage — your catalog item and CI are already configured.
-          else:
-            properties:
-              zero_touch_ready:
-                type: boolean
-                default: false
-                ui:widget: hidden
+      dependencies:
+        showroom_type:
+          oneOf:
+            - properties:
+                showroom_type:
+                  const: zero_touch
+                zero_touch_ready:
+                  title: I have my own environment set up already
+                  type: boolean
+                  default: true
+                  ui:help: Skip the Env Setup stage — your catalog item and CI are already configured.
+            - properties:
+                showroom_type:
+                  const: classic
 
   steps:
     # Step 1: Check if project name is already taken
