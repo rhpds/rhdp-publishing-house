@@ -428,13 +428,13 @@ export function createPhWorkflowsClient(options: {
     return await response.json();
   }
 
-  async function submitStaging(
+  async function submitEnvSetup(
     slug: string,
     agnosticvUrl: string,
     ciUrl: string,
   ): Promise<void> {
     const response = await centralFetch(
-      `/projects/${slug}/staging/submit`,
+      `/projects/${slug}/env-setup/submit`,
       {
         method: 'POST',
         body: JSON.stringify({ agnosticv_url: agnosticvUrl, ci_url: ciUrl }),
@@ -443,7 +443,7 @@ export function createPhWorkflowsClient(options: {
 
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      throw new Error(body.detail || `Staging submit failed: ${response.status}`);
+      throw new Error(body.detail || `Env setup submit failed: ${response.status}`);
     }
   }
 
@@ -482,7 +482,7 @@ export function createPhWorkflowsClient(options: {
     approveDrift,
     fetchHeadCommitSha,
     deleteProject,
-    submitStaging,
+    submitEnvSetup,
     sendMessage,
     getMessages,
     markMessagesRead,

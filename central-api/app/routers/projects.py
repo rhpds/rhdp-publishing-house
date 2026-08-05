@@ -236,7 +236,7 @@ _STATE_MAP = {
     "infrareview": "infra_review",
     "infrareviewdecision": "infra_review",
     "jirasync": "jira_sync",
-    "staging": "staging",
+    "envsetup": "env_setup",
     "development": "development",
     "testing": "testing",
     "published": "published",
@@ -695,6 +695,8 @@ class StartRequest(BaseModel):
     audit_trail_sha: str = ""
     sso_user: str = ""
     sso_email: str = ""
+    showroom_type: str = ""
+    zero_touch_ready: bool = False
 
 
 def _send_cloud_event(event_type: str, project_slug: str, data: dict):
@@ -835,17 +837,17 @@ async def reject_infra_review(
     return {"slug": slug, "action": "rejected", "stage": "infra_review"}
 
 
-# ── Staging ─────────────────────────────────────────────────────────────────
+# ── Env Setup ──────────────────────────────────────────────────────────────
 
-class StagingSubmitRequest(BaseModel):
+class EnvSetupSubmitRequest(BaseModel):
     agnosticv_url: str
     ci_url: str
 
 
-@router.post("/{slug}/staging/submit")
-async def submit_staging(
+@router.post("/{slug}/env-setup/submit")
+async def submit_env_setup(
     slug: str,
-    body: StagingSubmitRequest,
+    body: EnvSetupSubmitRequest,
     auth: tuple[str, int] = Depends(_require_auth),
 ):
     owner, groups = auth
@@ -855,17 +857,17 @@ async def submit_staging(
     wf_uuid = wd.get("workflow_id", "")
     if not wf_uuid:
         raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
-    _require_stage(wf_uuid, ["staging"])
+    _require_stage(wf_uuid, ["env_setup"])
 
-    _send_cloud_event("ph.staging.complete", slug, {
+    _send_cloud_event("ph.env-setup.complete", slug, {
         "user": owner,
-        "stage": "staging",
+        "stage": "env_setup",
         "action": "submitted",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "agnosticvUrl": body.agnosticv_url,
         "ciUrl": body.ci_url,
     })
-    return {"slug": slug, "action": "submitted", "stage": "staging"}
+    return {"slug": slug, "action": "submitted", "stage": "env_setup"}
 
 
 # ── Drift Approve ───────────────────────────────────────────────────────────
@@ -957,6 +959,9 @@ async def start_workflow(
         wd["projectDescription"] = body.project_description
     if body.audit_trail_sha:
         wd["auditTrailSha"] = body.audit_trail_sha
+    if body.showroom_type:
+        wd["showroomType"] = body.showroom_type
+    wd["zeroTouchReady"] = body.zero_touch_ready
     start_payload = wd
 
     url = f"{settings.sonataflow_url.rstrip('/')}/publishinghouseworkflow?businessKey={urllib.parse.quote(business_key)}"

@@ -130,6 +130,21 @@ spec:
           default: classic
           ui:help: Classic = standard Showroom lab. Zero Touch = embedded runtime/setup automation.
 
+      dependencies:
+        showroom_type:
+          oneOf:
+            - properties:
+                showroom_type:
+                  const: zero_touch
+                zero_touch_ready:
+                  title: I have my own environment set up already
+                  type: boolean
+                  default: false
+                  ui:help: Skip the Env Setup stage — your catalog item and CI are already configured.
+            - properties:
+                showroom_type:
+                  const: classic
+
   steps:
     # Step 1: Check if project name is already taken
     - id: check-catalog
@@ -201,6 +216,8 @@ spec:
           audit_trail_sha: ${{ steps['create-and-push'].output.commitHash }}
           sso_user: ${{ user.entity.metadata.name }}
           sso_email: ${{ user.entity.spec.profile.email }}
+          showroom_type: ${{ parameters.showroom_type }}
+          zero_touch_ready: ${{ parameters.zero_touch_ready }}
 
     # Step 6: Register in catalog
     - id: register

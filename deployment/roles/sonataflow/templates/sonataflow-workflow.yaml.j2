@@ -56,9 +56,9 @@ spec:
           - contextAttributeName: projectid
         dataOnly: true
         kind: consumed
-        name: StagingCompleteEvent
+        name: EnvSetupCompleteEvent
         source: publishing-house
-        type: ph.staging.complete
+        type: ph.env-setup.complete
       - correlation:
           - contextAttributeName: projectid
         dataOnly: true
@@ -106,6 +106,8 @@ spec:
               repoUrl: .repoUrl,
               tags: (.tags // []),
               projectDescription: (.projectDescription // ""),
+              showroomType: (.showroomType // "classic"),
+              zeroTouchReady: (.zeroTouchReady // false),
               reviews: {
                 content: false,
                 infra: false
@@ -281,28 +283,31 @@ spec:
           - condition: "${ .rejection.isRejected == true }"
             transition:
               nextState: ContentReview
+          - condition: "${ .showroomType == \"zero_touch\" and .zeroTouchReady == true }"
+            transition:
+              nextState: JiraSync
         defaultCondition:
           transition:
-            nextState: Staging
-      - name: Staging
+            nextState: EnvSetup
+      - name: EnvSetup
         type: event
         exclusive: true
         onEvents:
           - eventRefs:
-              - StagingCompleteEvent
+              - EnvSetupCompleteEvent
             actions:
-              - name: LogStagingComplete
+              - name: LogEnvSetupComplete
                 functionRef:
                   refName: printMessage
                   arguments:
-                    message: "Staging completed, transitioning to Development"
+                    message: "Env setup completed, transitioning to Development"
             eventDataFilter:
               toStateData: ".latestAudit"
         stateDataFilter:
           input: |
             . + {
               latestAudit: null,
-              reviewHistory: ((.reviewHistory // []) + [{stage: "staging", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.auditTrailSha // "")}])
+              reviewHistory: ((.reviewHistory // []) + [{stage: "env_setup", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.auditTrailSha // "")}])
             }
           output: |
             . + {
