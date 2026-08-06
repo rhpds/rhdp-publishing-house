@@ -136,7 +136,7 @@ class GitHubService:
         await _run("git", "init", tmp_dir)
         await _run("git", "remote", "add", "origin", clone_url, cwd=tmp_dir)
         await _run("git", "sparse-checkout", "set", "--no-cone", *paths, cwd=tmp_dir)
-        await _run("git", "fetch", "--depth", "1", "origin", branch, cwd=tmp_dir)
+        await _run("git", "fetch", "--depth", "1", "--filter=blob:none", "origin", branch, cwd=tmp_dir)
         await _run("git", "checkout", f"origin/{branch}", cwd=tmp_dir)
 
     async def get_head_sha(self, repo_url: str, branch: str = "main") -> Optional[str]:

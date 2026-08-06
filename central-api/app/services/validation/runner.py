@@ -1,5 +1,6 @@
 """Validation runner — maps stages to check groups, orchestrates execution."""
 import logging
+import time
 
 import yaml
 
@@ -60,7 +61,9 @@ async def run_validation(
     groups = STAGE_GROUPS.get(stage, STAGE_GROUPS["intake"])
     policy = load_policy()
 
+    t0 = time.monotonic()
     repo = await github.clone_repo(repo_url, branch, sparse_paths=["publishing-house/"])
+    logger.info("sparse clone took %.1fs", time.monotonic() - t0)
     try:
         files = _read_project_files(repo)
         spec_data = files["spec_data"]
