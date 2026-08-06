@@ -699,7 +699,6 @@ class StartRequest(BaseModel):
     showroom_type: str = ""
     zero_touch_ready: bool = False
     intake_type: str = "new"
-    source_repo: str = ""
 
 
 def _send_cloud_event(event_type: str, project_slug: str, data: dict):
@@ -966,8 +965,6 @@ async def start_workflow(
         wd["showroomType"] = body.showroom_type
     wd["zeroTouchReady"] = body.zero_touch_ready
     wd["intakeType"] = body.intake_type
-    if body.source_repo:
-        wd["sourceRepo"] = body.source_repo
     start_payload = wd
 
     url = f"{settings.sonataflow_url.rstrip('/')}/publishinghouseworkflow?businessKey={urllib.parse.quote(business_key)}"

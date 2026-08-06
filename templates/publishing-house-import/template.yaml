@@ -204,7 +204,6 @@ spec:
           sso_email: ${{ user.entity.spec.profile.email }}
           showroom_type: ${{ parameters.showroom_type }}
           intake_type: migration
-          source_repo: ${{ parameters.source_repo }}
 
     - id: register
       name: Register in Backstage Catalog
