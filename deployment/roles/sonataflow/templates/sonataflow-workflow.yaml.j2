@@ -107,7 +107,6 @@ spec:
               tags: (.tags // []),
               projectDescription: (.projectDescription // ""),
               showroomType: (.showroomType // "classic"),
-              zeroTouchReady: (.zeroTouchReady // false),
               intakeType: (.intakeType // "new"),
               reviews: {
                 content: false,
@@ -284,7 +283,7 @@ spec:
           - condition: "${ .rejection.isRejected == true }"
             transition:
               nextState: ContentReview
-          - condition: "${ .showroomType == \"zero_touch\" and .zeroTouchReady == true }"
+          - condition: "${ .showroomType == \"zero_touch\" }"
             transition:
               nextState: JiraSync
         defaultCondition:

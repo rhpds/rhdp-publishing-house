@@ -130,21 +130,6 @@ spec:
           default: classic
           ui:help: Classic = standard Showroom lab. Zero Touch = embedded runtime/setup automation.
 
-      dependencies:
-        showroom_type:
-          oneOf:
-            - properties:
-                showroom_type:
-                  const: zero_touch
-                zero_touch_ready:
-                  title: I already have my AgnosticV catalog item configured
-                  type: boolean
-                  default: false
-                  ui:help: Check this to skip the Env Setup stage and go straight to Development.
-            - properties:
-                showroom_type:
-                  const: classic
-
   steps:
     # Step 1: Check if project name is already taken
     - id: check-catalog
@@ -218,7 +203,6 @@ spec:
           sso_user: ${{ user.entity.metadata.name }}
           sso_email: ${{ user.entity.spec.profile.email }}
           showroom_type: ${{ parameters.showroom_type }}
-          zero_touch_ready: ${{ parameters.showroom_type == 'zero_touch' and parameters.zero_touch_ready }}
           intake_type: new
 
     # Step 6: Register in catalog

@@ -697,7 +697,6 @@ class StartRequest(BaseModel):
     sso_user: str = ""
     sso_email: str = ""
     showroom_type: str = ""
-    zero_touch_ready: bool = False
     intake_type: str = "new"
 
 
@@ -963,7 +962,6 @@ async def start_workflow(
         wd["auditTrailSha"] = body.audit_trail_sha
     if body.showroom_type:
         wd["showroomType"] = body.showroom_type
-    wd["zeroTouchReady"] = body.zero_touch_ready
     wd["intakeType"] = body.intake_type
     start_payload = wd
 

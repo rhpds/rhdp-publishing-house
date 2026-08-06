@@ -418,7 +418,7 @@ export function WorkflowDetailPage() {
             stage={summary.stage}
             rejectedFrom={rejectedFrom}
             hasDrift={wd?.hasDrift}
-            envSetupSkipped={wd?.showroomType === 'zero_touch' && wd?.zeroTouchReady === true}
+            envSetupSkipped={wd?.showroomType === 'zero_touch'}
           />
         </InfoCard>
 
@@ -467,9 +467,6 @@ export function WorkflowDetailPage() {
                 <DetailField label="Type" value={summary.contentType} />
                 <DetailField label="Deployment Mode" value={summary.deploymentMode} />
                 <DetailField label="Showroom Type" value={wd?.showroomType === 'zero_touch' ? 'Zero Touch' : 'Classic'} />
-                {wd?.showroomType === 'zero_touch' && (
-                  <DetailField label="AgnosticV Provided" value={wd?.zeroTouchReady ? 'Yes' : 'No'} />
-                )}
                 <DetailField label="Intake Type" value={summary.intakeType === 'migration' ? 'Migration' : 'New'} />
                 <DetailField label="State" value={summary.state} />
                 <DetailField label="Current Stage" value={stageLabel} />

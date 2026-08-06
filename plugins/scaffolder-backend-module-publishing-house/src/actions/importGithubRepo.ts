@@ -58,8 +58,7 @@ export function createImportGithubRepoAction(options: {
             access: z.string({ description: 'Permission level' }).default('push'),
           }),
         ).optional(),
-        sourceRepo: (z: any) => z.string({ description: 'Public repo URL whose content/ folder to import' }),
-        sourceContentPath: (z: any) => z.string({ description: 'Path within source repo to copy' }).default('content'),
+        sourceRepo: (z: any) => z.string({ description: 'Public repo URL whose content to import' }),
       },
       output: {
         remoteUrl: (z: any) => z.string({ description: 'Remote URL' }),
@@ -79,7 +78,6 @@ export function createImportGithubRepoAction(options: {
       const gitAuthorEmail = (ctx.input.gitAuthorEmail as string) || 'scaffolder@backstage.io';
       const collaborators = (ctx.input.collaborators as Array<{ user: string; access: string }>) || [];
       const sourceRepo = ctx.input.sourceRepo as string;
-      const sourceContentPath = (ctx.input.sourceContentPath as string) || 'content';
 
       const url = new URL(`https://${repoUrl}`);
       const owner = url.searchParams.get('owner');
@@ -171,23 +169,25 @@ export function createImportGithubRepoAction(options: {
             fs,
             http,
             dir: sourceDir,
-            url: sourceRepo.replace(/\/$/, '') + '.git',
+            url: sourceRepo.replace(/\/$/, '').replace(/\.git$/, '') + '.git',
             ref: 'main',
             singleBranch: true,
             depth: 1,
             onAuth: () => ({ username: 'x-access-token', password: token }),
           });
 
-          const srcContent = path.join(sourceDir, sourceContentPath);
-          if (fs.existsSync(srcContent)) {
-            const destContent = path.join(cloneDir, sourceContentPath);
-            fs.rmdirSync(destContent, { recursive: true });
-            fs.mkdirSync(destContent, { recursive: true });
-            copyDirSync(srcContent, destContent);
-            ctx.logger.info(`Copied ${sourceContentPath}/ from source repo`);
+          for (const dir of ['config', 'content', 'runtime-automation', 'setup-automation', 'utilities']) {
+            const srcDir = path.join(sourceDir, dir);
+            if (fs.existsSync(srcDir) && fs.statSync(srcDir).isDirectory()) {
+              const destDir = path.join(cloneDir, dir);
+              fs.rmdirSync(destDir, { recursive: true });
+              fs.mkdirSync(destDir, { recursive: true });
+              copyDirSync(srcDir, destDir);
+              ctx.logger.info(`Copied ${dir}/ from source repo`);
+            }
           }
 
-          for (const file of ['site.yml', 'default-site.yml', 'ui-config.yml']) {
+          for (const file of ['default-site.yml', 'lab-metadata.yml', 'site.yml', 'ui-config.yml']) {
             const srcFile = path.join(sourceDir, file);
             if (fs.existsSync(srcFile)) {
               fs.copyFileSync(srcFile, path.join(cloneDir, file));
