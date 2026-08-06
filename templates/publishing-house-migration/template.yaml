@@ -6,8 +6,8 @@ metadata:
   description: Migrate an existing Showroom repo into the Publishing House workflow
   tags:
     - publishing-house
-    - import
     - migration
+    - devspaces
 
 spec:
   owner: rhdp-team
@@ -25,7 +25,7 @@ spec:
         project_name:
           title: Project Name
           type: string
-          description: Name for the imported project (letters and hyphens only)
+          description: Name for your lab/demo (letters and hyphens only)
           ui:autofocus: true
           ui:placeholder: "openshift-ai-workshop"
           pattern: '^[a-z0-9-]+$'
@@ -34,15 +34,16 @@ spec:
         project_description:
           title: Project Description
           type: string
-          description: Brief overview of what this project delivers
+          description: Brief overview of what this project will deliver
           ui:widget: textarea
           ui:options:
             rows: 3
+          ui:placeholder: "A hands-on lab teaching developers how to deploy and manage AI workloads on OpenShift using RHOAI"
 
         source_repo:
           title: Source Repository
           type: string
-          description: Public GitHub URL of the existing Showroom repo to import
+          description: Public GitHub URL of the existing Showroom repo to migrate
           ui:placeholder: "https://github.com/rhpds/my-existing-lab"
           pattern: '^https://github\.com/.+/.+$'
           ui:help: The content/, site.yml, and ui-config.yml will be copied from this repo
@@ -63,6 +64,7 @@ spec:
             - RHDP Published (full gates, reviewer required)
             - Self-Published (self-approval allowed)
           default: rhdp_published
+          ui:help: Choose review rigor level
 
         tags:
           title: Tags
@@ -75,6 +77,7 @@ spec:
             type: string
             title: Tag
             ui:placeholder: "e.g. LB1234, openshift, ansible"
+          ui:help: "e.g. LB1234, openshift, ansible"
 
     - title: GitHub Collaborators
       description: Enter your GitHub username first. You can also add collaborators who will have write access to the project repo.
@@ -122,6 +125,7 @@ spec:
             - Summit 2027
             - None
           default: rh1_2027
+          ui:help: Which initiative is this content for?
 
         showroom_type:
           title: Showroom Type
@@ -133,6 +137,22 @@ spec:
             - Classic (standard Showroom)
             - Zero Touch (embedded automation)
           default: classic
+          ui:help: Classic = standard Showroom lab. Zero Touch = embedded runtime/setup automation.
+
+      dependencies:
+        showroom_type:
+          oneOf:
+            - properties:
+                showroom_type:
+                  const: zero_touch
+                zero_touch_ready:
+                  title: I already have my AgnosticV catalog item configured
+                  type: boolean
+                  default: false
+                  ui:help: Check this to skip the Env Setup stage and go straight to Development.
+            - properties:
+                showroom_type:
+                  const: classic
 
   steps:
     - id: check-catalog
@@ -204,6 +224,7 @@ spec:
           sso_user: ${{ user.entity.metadata.name }}
           sso_email: ${{ user.entity.spec.profile.email }}
           showroom_type: ${{ parameters.showroom_type }}
+          zero_touch_ready: ${{ parameters.showroom_type == 'zero_touch' and parameters.zero_touch_ready }}
           intake_type: migration
 
     - id: register
@@ -244,7 +265,7 @@ spec:
 
           A project named **"${{ parameters.project_name }}"** already exists in the catalog. All steps were skipped — no repository was created and no workflow was started. Re-run the template with a different project name.
           {% else %}
-          **Your Publishing House import is live!** Content has been copied from the source repo.
+          **Your Publishing House migration is live!** Content has been copied from the source repo.
 
           **Here's what we set up for you:**
           1. Repository created with content from `${{ parameters.source_repo }}`
