@@ -1,9 +1,9 @@
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
-  name: publishing-house-import
-  title: Publishing House Import
-  description: Import an existing Showroom repo into the Publishing House workflow
+  name: publishing-house-migration
+  title: Publishing House Migration
+  description: Migrate an existing Showroom repo into the Publishing House workflow
   tags:
     - publishing-house
     - import
@@ -147,7 +147,7 @@ spec:
       if: ${{ steps['check-catalog'].output.entity == null }}
       action: fetch:template
       input:
-        url: ../publishing-house-project/skeleton
+        url: ./skeleton
         values:
           project_name: ${{ parameters.project_name }}
           project_description: ${{ parameters.project_description }}
