@@ -60,7 +60,7 @@ async def run_validation(
     groups = STAGE_GROUPS.get(stage, STAGE_GROUPS["intake"])
     policy = load_policy()
 
-    repo = await github.clone_repo(repo_url, branch)
+    repo = await github.clone_repo(repo_url, branch, sparse_paths=["publishing-house/"])
     try:
         files = _read_project_files(repo)
         spec_data = files["spec_data"]

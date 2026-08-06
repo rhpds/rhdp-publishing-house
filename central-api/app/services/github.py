@@ -71,21 +71,34 @@ class GitHubService:
 
         return parts[0], parts[1]
 
-    async def clone_repo(self, repo_url: str, branch: str = "main") -> "ClonedRepo":
-        """Shallow-clone a repo and return a ClonedRepo context manager."""
+    async def clone_repo(
+        self,
+        repo_url: str,
+        branch: str = "main",
+        sparse_paths: list[str] | None = None,
+    ) -> "ClonedRepo":
+        """Shallow-clone a repo and return a ClonedRepo handle.
+
+        When *sparse_paths* is provided, only those top-level directories are
+        checked out — everything else is skipped.  This avoids downloading
+        large folders (e.g. content/) that the caller never reads.
+        """
         owner, repo = self.parse_repo_url(repo_url)
         clone_url = f"https://x-access-token:{self.token}@github.com/{owner}/{repo}.git"
         tmp_dir = tempfile.mkdtemp(prefix="ph-validate-")
         try:
-            proc = await asyncio.create_subprocess_exec(
-                "git", "clone", "--depth", "1", "--branch", branch,
-                "--single-branch", clone_url, tmp_dir,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=90)
-            if proc.returncode != 0:
-                raise RuntimeError(f"git clone failed: {stderr.decode().strip()}")
+            if sparse_paths:
+                await self._sparse_clone(clone_url, branch, tmp_dir, sparse_paths)
+            else:
+                proc = await asyncio.create_subprocess_exec(
+                    "git", "clone", "--depth", "1", "--branch", branch,
+                    "--single-branch", clone_url, tmp_dir,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                _, stderr = await asyncio.wait_for(proc.communicate(), timeout=90)
+                if proc.returncode != 0:
+                    raise RuntimeError(f"git clone failed: {stderr.decode().strip()}")
 
             proc = await asyncio.create_subprocess_exec(
                 "git", "rev-parse", "HEAD",
@@ -100,6 +113,31 @@ class GitHubService:
         except Exception:
             shutil.rmtree(tmp_dir, ignore_errors=True)
             raise
+
+    async def _sparse_clone(
+        self,
+        clone_url: str,
+        branch: str,
+        tmp_dir: str,
+        paths: list[str],
+    ) -> None:
+        """Clone only the specified paths using sparse-checkout."""
+        async def _run(*cmd: str, cwd: str | None = None) -> None:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=cwd,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=90)
+            if proc.returncode != 0:
+                raise RuntimeError(f"{' '.join(cmd[:3])}… failed: {stderr.decode().strip()}")
+
+        await _run("git", "init", tmp_dir)
+        await _run("git", "remote", "add", "origin", clone_url, cwd=tmp_dir)
+        await _run("git", "sparse-checkout", "set", "--no-cone", *paths, cwd=tmp_dir)
+        await _run("git", "fetch", "--depth", "1", "origin", branch, cwd=tmp_dir)
+        await _run("git", "checkout", f"origin/{branch}", cwd=tmp_dir)
 
     async def get_head_sha(self, repo_url: str, branch: str = "main") -> Optional[str]:
         """Fetch the HEAD commit SHA for a branch without cloning."""
