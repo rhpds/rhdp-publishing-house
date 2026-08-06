@@ -33,14 +33,14 @@ async function poll(
   throw new Error('Timed out waiting for repository to be ready');
 }
 
-export function createGithubRepoFromTemplateAction(options: {
+export function createImportGithubRepoAction(options: {
   integrations: ScmIntegrations;
 }) {
   const { integrations } = options;
 
   return createTemplateAction({
-    id: 'publishing-house:create-github-repo',
-    description: 'Create a GitHub repo from a template, overlay workspace files, commit and push',
+    id: 'publishing-house:import-github-repo',
+    description: 'Create a GitHub repo from a template, import content from a source Showroom repo, overlay workspace files, commit and push',
     schema: {
       input: {
         repoUrl: (z: any) => z.string({ description: 'github.com?owner=X&repo=Y' }),
@@ -48,7 +48,7 @@ export function createGithubRepoFromTemplateAction(options: {
         description: (z: any) => z.string({ description: 'Repository description' }).optional(),
         defaultBranch: (z: any) => z.string({ description: 'Default branch' }).default('main'),
         repoVisibility: (z: any) => z.enum(['public', 'private']).default('public'),
-        gitCommitMessage: (z: any) => z.string({ description: 'Commit message' }).default('Add skeleton artifacts'),
+        gitCommitMessage: (z: any) => z.string({ description: 'Commit message' }).default('Import content from source repo'),
         sourcePath: (z: any) => z.string({ description: 'Source path within workspace' }).optional(),
         gitAuthorName: (z: any) => z.string({ description: 'Git author name' }).default('Scaffolder'),
         gitAuthorEmail: (z: any) => z.string({ description: 'Git author email' }).default('scaffolder@backstage.io'),
@@ -58,6 +58,8 @@ export function createGithubRepoFromTemplateAction(options: {
             access: z.string({ description: 'Permission level' }).default('push'),
           }),
         ).optional(),
+        sourceRepo: (z: any) => z.string({ description: 'Public repo URL whose content/ folder to import' }),
+        sourceContentPath: (z: any) => z.string({ description: 'Path within source repo to copy' }).default('content'),
       },
       output: {
         remoteUrl: (z: any) => z.string({ description: 'Remote URL' }),
@@ -71,11 +73,13 @@ export function createGithubRepoFromTemplateAction(options: {
       const description = (ctx.input.description as string) || '';
       const defaultBranch = (ctx.input.defaultBranch as string) || 'main';
       const repoVisibility = (ctx.input.repoVisibility as string) || 'public';
-      const gitCommitMessage = (ctx.input.gitCommitMessage as string) || 'Add skeleton artifacts';
+      const gitCommitMessage = (ctx.input.gitCommitMessage as string) || 'Import content from source repo';
       const sourcePath = ctx.input.sourcePath as string | undefined;
       const gitAuthorName = (ctx.input.gitAuthorName as string) || 'Scaffolder';
       const gitAuthorEmail = (ctx.input.gitAuthorEmail as string) || 'scaffolder@backstage.io';
       const collaborators = (ctx.input.collaborators as Array<{ user: string; access: string }>) || [];
+      const sourceRepo = ctx.input.sourceRepo as string;
+      const sourceContentPath = (ctx.input.sourceContentPath as string) || 'content';
 
       const url = new URL(`https://${repoUrl}`);
       const owner = url.searchParams.get('owner');
@@ -137,7 +141,7 @@ export function createGithubRepoFromTemplateAction(options: {
         15,
       );
 
-      const cloneDir = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffolder-template-'));
+      const cloneDir = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffolder-import-'));
       const remoteUrl = `https://github.com/${owner}/${repo}.git`;
 
       try {
@@ -159,6 +163,40 @@ export function createGithubRepoFromTemplateAction(options: {
 
         ctx.logger.info('Overlaying workspace files...');
         copyDirSync(workspacePath, cloneDir);
+
+        const sourceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffolder-source-'));
+        try {
+          ctx.logger.info(`Cloning source repo: ${sourceRepo}`);
+          await git.clone({
+            fs,
+            http,
+            dir: sourceDir,
+            url: sourceRepo.replace(/\/$/, '') + '.git',
+            ref: 'main',
+            singleBranch: true,
+            depth: 1,
+            onAuth: () => ({ username: 'x-access-token', password: token }),
+          });
+
+          const srcContent = path.join(sourceDir, sourceContentPath);
+          if (fs.existsSync(srcContent)) {
+            const destContent = path.join(cloneDir, sourceContentPath);
+            fs.rmdirSync(destContent, { recursive: true });
+            fs.mkdirSync(destContent, { recursive: true });
+            copyDirSync(srcContent, destContent);
+            ctx.logger.info(`Copied ${sourceContentPath}/ from source repo`);
+          }
+
+          for (const file of ['site.yml', 'default-site.yml', 'ui-config.yml']) {
+            const srcFile = path.join(sourceDir, file);
+            if (fs.existsSync(srcFile)) {
+              fs.copyFileSync(srcFile, path.join(cloneDir, file));
+              ctx.logger.info(`Copied ${file} from source repo`);
+            }
+          }
+        } finally {
+          fs.rmdirSync(sourceDir, { recursive: true });
+        }
 
         await git.add({ fs, dir: cloneDir, filepath: '.' });
 

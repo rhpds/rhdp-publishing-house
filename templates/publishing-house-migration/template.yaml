@@ -192,7 +192,7 @@ spec:
     - id: create-and-push
       name: Create Repository & Import Content
       if: ${{ steps['check-catalog'].output.entity == null }}
-      action: publishing-house:create-github-repo
+      action: publishing-house:import-github-repo
       input:
         repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
         templateRepo: https://github.com/rhpds/rhdp-publishing-house-template
