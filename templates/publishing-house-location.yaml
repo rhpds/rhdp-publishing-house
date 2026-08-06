@@ -4,7 +4,7 @@ metadata:
   name: publishing-house-templates
   description: Publishing House software templates
 spec:
-  type: file
+  type: url
   targets:
     - ./publishing-house-project/template.yaml
     - ./publishing-house-migration/template.yaml
