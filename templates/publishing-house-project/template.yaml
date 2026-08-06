@@ -172,6 +172,7 @@ spec:
           initiative_key: ${{ parameters.initiative_key }}
           showroom_type: ${{ parameters.showroom_type }}
           intake_type: new
+          migrated_repo: ""
           devspaces_url: https://devspaces.${{ environment.parameters.baseDomain }}
           central_api_url: https://central-api-publishing-house.${{ environment.parameters.baseDomain }}
           ph_git_ref: ${{ environment.parameters.phGitRef }}
