@@ -6,72 +6,49 @@ metadata:
 data:
   workflow-cleanup.py: |
     #!/usr/bin/env python3
-    """Delete aborted SonataFlow process instances from the data-index database."""
+    """Cleanup completed and aborted SonataFlow process instances older than N days."""
 
+    import json
     import os
+    import ssl
     import sys
+    import urllib.request
 
-    try:
-        import psycopg2
-    except ImportError:
-        import subprocess
-        subprocess.check_call([
-            sys.executable, "-m", "pip", "install", "--quiet",
-            "--target", "/tmp/pip-packages", "psycopg2-binary",
-        ])
-        sys.path.insert(0, "/tmp/pip-packages")
-        import psycopg2
+    CENTRAL_API_URL = os.environ["CENTRAL_API_URL"].rstrip("/")
+    API_KEY = os.environ["PH_API_KEY"]
+    CLEANUP_DAYS = int(os.environ.get("CLEANUP_DAYS", "7"))
 
-    DB_HOST = os.environ["SONATAFLOW_DB_HOST"]
-    DB_NAME = os.environ["SONATAFLOW_DB_NAME"]
-    DB_USER = os.environ["SONATAFLOW_DB_USER"]
-    DB_PASS = os.environ["SONATAFLOW_DB_PASSWORD"]
-    DB_PORT = int(os.environ.get("SONATAFLOW_DB_PORT", "5432"))
-
-    SCHEMA = "sonataflow-platform-data-index-service"
-    STATE_ABORTED = 3
+    SSL_CTX = ssl.create_default_context()
+    SSL_CTX.check_hostname = False
+    SSL_CTX.verify_mode = ssl.CERT_NONE
 
 
     def main():
         print("=== Workflow Cleanup Job ===")
+        print(f"Cleaning workflows older than {CLEANUP_DAYS} days")
 
-        conn = psycopg2.connect(
-            host=DB_HOST, port=DB_PORT,
-            dbname=DB_NAME, user=DB_USER, password=DB_PASS,
-        )
-        conn.autocommit = True
-        cur = conn.cursor()
+        url = f"{CENTRAL_API_URL}/api/v1/cleanup/completed?days={CLEANUP_DAYS}"
+        req = urllib.request.Request(url, method="POST", headers={
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json",
+        }, data=b"{}")
 
-        s = SCHEMA
-        cur.execute(
-            f'SELECT id, business_key FROM "{s}".processes WHERE state = %s',
-            (STATE_ABORTED,),
-        )
-        aborted = cur.fetchall()
-        print(f"Found {len(aborted)} aborted instance(s)")
+        try:
+            with urllib.request.urlopen(req, context=SSL_CTX, timeout=120) as r:
+                result = json.loads(r.read().decode())
+        except Exception as e:
+            print(f"FAILED: {e}")
+            sys.exit(1)
 
-        if not aborted:
-            print("Nothing to clean up")
-            cur.close()
-            conn.close()
-            return
+        print(f"  Completed found: {result.get('completed_found', 0)}")
+        print(f"  Aborted found:   {result.get('aborted_found', 0)}")
+        print(f"  Cleaned:         {result.get('workflows_cleaned', 0)}")
+        print(f"  LiteLLM keys:    {result.get('litellm_keys_deleted', 0)}")
 
-        for inst_id, bk in aborted:
-            print(f"  deleting {bk} ({inst_id})")
-
-        ids = [row[0] for row in aborted]
-
-        for child in ("milestones", "nodes", "processes_addons", "processes_roles"):
-            col = "process_instance_id" if child in ("milestones", "nodes") else "process_id"
-            cur.execute(f'DELETE FROM "{s}".{child} WHERE {col} = ANY(%s)', (ids,))
-            if cur.rowcount:
-                print(f"  cleaned {cur.rowcount} row(s) from {child}")
-
-        cur.execute(f'DELETE FROM "{s}".processes WHERE id = ANY(%s)', (ids,))
-        print(f"Deleted {cur.rowcount} aborted instance(s)")
-
-        cur.close()
-        conn.close()
+        errors = result.get("errors", [])
+        if errors:
+            for e in errors:
+                print(f"  ERROR: {e}")
 
         print("=== Cleanup complete ===")
 

@@ -27,7 +27,10 @@ spec:
               command: ["python", "/scripts/inactivity-checker.py"]
               env:
                 - name: SONATAFLOW_GRAPHQL_URL
-                  value: "{{ sonataflow_graphql_url }}"
+                  valueFrom:
+                    configMapKeyRef:
+                      name: central-api-config
+                      key: SONATAFLOW_GRAPHQL_URL
                 - name: GITHUB_TOKEN
                   valueFrom:
                     secretKeyRef:
@@ -49,16 +52,25 @@ spec:
                       name: publishing-house-credentials
                       key: jira-api-token
                 - name: RHDH_URL
-                  value: "http://backstage-developer-hub.{{ app_namespace }}.svc.cluster.local"
+                  valueFrom:
+                    configMapKeyRef:
+                      name: central-api-config
+                      key: RHDH_INTERNAL_URL
                 - name: RHDH_SERVICE_TOKEN
                   valueFrom:
                     secretKeyRef:
                       name: ph-developer-hub-env
                       key: RHDH_SERVICE_TOKEN
                 - name: REVIEW_GROUP
-                  value: "{{ inactivity_review_group }}"
+                  valueFrom:
+                    configMapKeyRef:
+                      name: central-api-config
+                      key: INACTIVITY_CHECKER__REVIEW_GROUP
                 - name: INACTIVITY_DAYS
-                  value: "{{ inactivity_threshold_days }}"
+                  valueFrom:
+                    configMapKeyRef:
+                      name: central-api-config
+                      key: INACTIVITY_CHECKER__THRESHOLD_DAYS
               volumeMounts:
                 - name: script
                   mountPath: /scripts

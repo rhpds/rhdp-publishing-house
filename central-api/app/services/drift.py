@@ -1,6 +1,7 @@
 """Drift detection — structural (spec.yaml field diff) and semantic (LLM design.md comparison)."""
 import json
 import logging
+import os
 import time
 from typing import Optional
 
@@ -15,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 SPEC_PATH = "publishing-house/spec.yaml"
 DESIGN_PATH = "publishing-house/spec/design.md"
+MODULES_DIR = "publishing-house/spec/modules"
+PAGES_DIR = "content/modules/ROOT/pages"
 LITELLM_MODEL = "claude-haiku-4-5"
 
 STRUCTURAL_FIELDS = [
@@ -81,6 +84,23 @@ Respond with valid JSON only, no markdown fencing:
 }
 
 Only include sections that have meaningful changes. If no drift, return an empty changes array."""
+
+ALIGNMENT_SYSTEM_PROMPT = """You are a technical content reviewer. You will receive a module outline with learning objectives and the corresponding AsciiDoc content page. Determine whether the learning objectives from the outline are adequately covered in the content.
+
+For each learning objective, check if the content page addresses it with relevant instructions, explanations, or exercises.
+
+Respond with valid JSON only, no markdown fencing:
+{
+  "aligned": true/false,
+  "uncovered_objectives": [
+    {
+      "objective": "the learning objective text",
+      "reason": "brief explanation of why it is not covered"
+    }
+  ]
+}
+
+If all objectives are covered, set aligned to true and return an empty uncovered_objectives array. Only flag objectives that are genuinely missing or inadequately addressed — minor wording differences are fine."""
 
 
 class DriftChange(BaseModel):
@@ -181,6 +201,86 @@ async def check_drift_structural(
     )
 
 
+async def _check_content_alignment(
+    github: GitHubService,
+    repo_url: str,
+    branch: str,
+    litellm_api_url: str,
+    ph_internal_ai_api_key: str,
+) -> list[DriftChange]:
+    """Check if content pages cover the learning objectives from module outlines."""
+    outline_names = await github.list_directory(repo_url, MODULES_DIR, branch)
+    outline_names = [f for f in outline_names if f.startswith("module-") and f.endswith(".md")]
+    if not outline_names:
+        return []
+
+    page_names = await github.list_directory(repo_url, PAGES_DIR, branch)
+    page_stems = {os.path.splitext(f)[0]: f for f in page_names if f.endswith(".adoc")}
+
+    changes: list[DriftChange] = []
+
+    for outline_name in outline_names:
+        stem = os.path.splitext(outline_name)[0]
+        page_name = page_stems.get(stem)
+        if not page_name:
+            continue
+
+        outline_content = await github.get_file_content(repo_url, f"{MODULES_DIR}/{outline_name}", branch)
+        page_content = await github.get_file_content(repo_url, f"{PAGES_DIR}/{page_name}", branch)
+        if not outline_content or not page_content:
+            continue
+
+        user_prompt = f"""## MODULE OUTLINE ({outline_name}):
+
+{outline_content}
+
+---
+
+## CONTENT PAGE ({page_name}):
+
+{page_content}"""
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
+                resp = await client.post(
+                    f"{litellm_api_url}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {ph_internal_ai_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": LITELLM_MODEL,
+                        "messages": [
+                            {"role": "system", "content": ALIGNMENT_SYSTEM_PROMPT},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        "temperature": 0,
+                        "max_tokens": 1024,
+                    },
+                )
+
+            if resp.status_code != 200:
+                logger.error("alignment check failed for %s: %s", outline_name, resp.status_code)
+                continue
+
+            content = resp.json()["choices"][0]["message"]["content"].strip()
+            if content.startswith("```"):
+                content = content.split("\n", 1)[1].rsplit("```", 1)[0]
+
+            result = json.loads(content)
+            if not result.get("aligned", True):
+                for obj in result.get("uncovered_objectives", []):
+                    changes.append(DriftChange(
+                        file=page_name,
+                        comparing=f"{stem}: {obj['objective']}",
+                        difference=obj.get("reason", "Learning objective not covered"),
+                    ))
+        except Exception as e:
+            logger.error("alignment check error for %s: %s", outline_name, e)
+
+    return changes
+
+
 async def check_drift_semantic(
     github: GitHubService,
     repo_url: str,
@@ -207,7 +307,19 @@ async def check_drift_semantic(
         return _empty_response(baseline_sha, current_sha, "design.md was added after the baseline commit", has_drift=True)
 
     if baseline_md == current_md:
-        resp = _empty_response(baseline_sha, current_sha, "No changes to design.md")
+        alignment_changes = await _check_content_alignment(
+            github, repo_url, branch, litellm_api_url, ph_internal_ai_api_key,
+        )
+        if alignment_changes:
+            resp = DriftResponse(
+                has_drift=True,
+                baseline_sha=baseline_sha,
+                current_sha=current_sha,
+                summary=f"Content misaligned: {len(alignment_changes)} uncovered learning objective(s)",
+                changes=alignment_changes,
+            )
+        else:
+            resp = _empty_response(baseline_sha, current_sha, "No changes to design.md")
         if slug and current_sha:
             drift_cache_set(slug, baseline_sha, current_sha, resp.model_dump())
         return resp
@@ -261,11 +373,26 @@ async def check_drift_semantic(
             for c in result.get("changes", [])
         ]
 
+        design_has_drift = result.get("has_drift", False)
+        design_summary = result.get("summary", "")
+
+        # Content alignment check — learning objectives vs page content
+        alignment_changes = await _check_content_alignment(
+            github, repo_url, branch, litellm_api_url, ph_internal_ai_api_key,
+        )
+        changes.extend(alignment_changes)
+
+        has_drift = design_has_drift or len(alignment_changes) > 0
+        if alignment_changes and not design_has_drift:
+            design_summary = f"Content misaligned: {len(alignment_changes)} uncovered learning objective(s)"
+        elif alignment_changes and design_has_drift:
+            design_summary += f"; plus {len(alignment_changes)} uncovered learning objective(s)"
+
         resp = DriftResponse(
-            has_drift=result.get("has_drift", False),
+            has_drift=has_drift,
             baseline_sha=baseline_sha,
             current_sha=current_sha,
-            summary=result.get("summary", ""),
+            summary=design_summary,
             changes=changes,
         )
         if slug and current_sha:

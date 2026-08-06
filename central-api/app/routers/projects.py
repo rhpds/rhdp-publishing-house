@@ -509,12 +509,6 @@ async def submit_development(
 
         _check_github_write_access(body.repo_url, x_github_user)
 
-        # If hasDrift is already set, return immediately without re-checking
-        if wd.get("hasDrift"):
-            return JSONResponse(status_code=422, content=DevelopmentResponse(
-                status=422, stage=stage, error=drift_msg,
-            ).model_dump())
-
         settings = get_settings()
         if not settings.github_token:
             return JSONResponse(status_code=500, content=DevelopmentResponse(
@@ -544,6 +538,9 @@ async def submit_development(
                 return JSONResponse(status_code=422, content=DevelopmentResponse(
                     status=422, stage=stage, error=drift_msg,
                 ).model_dump())
+            elif wd.get("hasDrift"):
+                _patch_workflow_data(wf_uuid, {"hasDrift": False}, settings=settings)
+                logger.info("development: drift cleared for %s", project_slug)
 
         _advance_workflow(
             project_slug, wf_uuid, owner, stage="development",
@@ -618,11 +615,6 @@ async def submit_testing(
 
         _check_github_write_access(body.repo_url, x_github_user)
 
-        if wd.get("hasDrift"):
-            return JSONResponse(status_code=422, content=TestingResponse(
-                status=422, stage=stage, error=drift_msg,
-            ).model_dump())
-
         settings = get_settings()
         if not settings.github_token:
             return JSONResponse(status_code=500, content=TestingResponse(
@@ -651,6 +643,9 @@ async def submit_testing(
                 return JSONResponse(status_code=422, content=TestingResponse(
                     status=422, stage=stage, error=drift_msg,
                 ).model_dump())
+            elif wd.get("hasDrift"):
+                _patch_workflow_data(wf_uuid, {"hasDrift": False}, settings=settings)
+                logger.info("testing: drift cleared for %s", project_slug)
 
         _advance_workflow(
             project_slug, wf_uuid, owner, stage="testing",

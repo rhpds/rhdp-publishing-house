@@ -26,20 +26,21 @@ spec:
               image: "{{ jobs_image }}"
               command: ["python", "/scripts/workflow-cleanup.py"]
               env:
-                - name: SONATAFLOW_DB_HOST
-                  value: "sonataflow-postgresql.{{ app_namespace }}.svc.cluster.local"
-                - name: SONATAFLOW_DB_NAME
-                  value: "{{ sonataflow_db_name }}"
-                - name: SONATAFLOW_DB_USER
+                - name: CENTRAL_API_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: central-api-config
+                      key: CENTRAL_API_URL
+                - name: PH_API_KEY
                   valueFrom:
                     secretKeyRef:
-                      name: sonataflow-postgresql-svcbind
-                      key: username
-                - name: SONATAFLOW_DB_PASSWORD
+                      name: publishing-house-credentials
+                      key: api-key
+                - name: CLEANUP_DAYS
                   valueFrom:
-                    secretKeyRef:
-                      name: sonataflow-postgresql-svcbind
-                      key: password
+                    configMapKeyRef:
+                      name: central-api-config
+                      key: WORKFLOW_CLEANUP__DAYS
               volumeMounts:
                 - name: script
                   mountPath: /scripts

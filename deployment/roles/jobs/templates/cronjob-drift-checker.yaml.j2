@@ -27,11 +27,20 @@ spec:
               command: ["python", "/scripts/drift-checker.py"]
               env:
                 - name: SONATAFLOW_GRAPHQL_URL
-                  value: "{{ sonataflow_graphql_url }}"
+                  valueFrom:
+                    configMapKeyRef:
+                      name: central-api-config
+                      key: SONATAFLOW_GRAPHQL_URL
                 - name: SONATAFLOW_URL
-                  value: "http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local:80"
+                  valueFrom:
+                    configMapKeyRef:
+                      name: central-api-config
+                      key: SONATAFLOW_URL
                 - name: CENTRAL_API_URL
-                  value: "http://central-api.{{ app_namespace }}.svc.cluster.local:8000"
+                  valueFrom:
+                    configMapKeyRef:
+                      name: central-api-config
+                      key: CENTRAL_API_URL
                 - name: PH_API_KEY
                   valueFrom:
                     secretKeyRef:

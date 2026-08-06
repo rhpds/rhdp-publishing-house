@@ -57,6 +57,7 @@ const CHECK_GROUP_LABELS: Record<string, string> = {
   G: 'Automation Manifest',
   H: 'Vocabulary',
   I: 'Auto-Computed',
+  J: 'Content Writing',
   SYS: 'System',
 };
 
@@ -151,7 +152,7 @@ export function WorkflowDetailPage() {
     setValidationLoading(true);
     if (baselineSha) setDriftLoading(true);
 
-    const validationPromise = client.fetchValidationReport(slug, repoUrl, 'main', baselineSha)
+    const validationPromise = client.fetchValidationReport(slug, repoUrl, 'main', baselineSha, stage)
         .then(report => setValidationReport(report))
         .catch((err: any) => setSnackbar({ open: true, severity: 'error', message: `Validation report failed: ${err.message}` }))
         .finally(() => setValidationLoading(false));

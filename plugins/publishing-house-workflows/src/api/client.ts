@@ -293,8 +293,16 @@ export function createPhWorkflowsClient(options: {
     repoUrl: string,
     branch: string = 'main',
     baselineSha?: string,
+    workflowStage?: string,
   ): Promise<ValidationReport> {
-    const params = new URLSearchParams({ stage: 'review' });
+    const stageMap: Record<string, string> = {
+      content_review: 'review',
+      infra_review: 'review',
+      development: 'development',
+      testing: 'testing',
+    };
+    const stage = stageMap[workflowStage ?? ''] ?? 'review';
+    const params = new URLSearchParams({ stage });
     if (baselineSha) {
       params.set('baseline_sha', baselineSha);
     }

@@ -15,3 +15,11 @@ data:
   OIDC_CLIENT_ID: "central-api"
   RHDH_INTERNAL_URL: "http://backstage-developer-hub.{{ app_namespace }}.svc.cluster.local"
   DRIFT_CACHE_TTL_SECONDS: "259200"
+  CENTRAL_API_URL: "http://central-api.{{ app_namespace }}.svc.cluster.local:8000"
+  # Drift checker
+  DRIFT_CHECKER__SCHEDULE: "{{ drift_checker_schedule }}"
+  # Inactivity checker
+  INACTIVITY_CHECKER__REVIEW_GROUP: "{{ inactivity_review_group }}"
+  INACTIVITY_CHECKER__THRESHOLD_DAYS: "{{ inactivity_threshold_days }}"
+  # Workflow cleanup
+  WORKFLOW_CLEANUP__DAYS: "7"
