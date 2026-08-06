@@ -470,6 +470,7 @@ export function WorkflowDetailPage() {
                 {wd?.showroomType === 'zero_touch' && (
                   <DetailField label="AgnosticV Provided" value={wd?.zeroTouchReady ? 'Yes' : 'No'} />
                 )}
+                <DetailField label="Intake Type" value={summary.intakeType === 'migration' ? 'Migration' : 'New'} />
                 <DetailField label="State" value={summary.state} />
                 <DetailField label="Current Stage" value={stageLabel} />
               </Grid>

@@ -58,6 +58,8 @@ export function createGithubRepoFromTemplateAction(options: {
             access: z.string({ description: 'Permission level' }).default('push'),
           }),
         ).optional(),
+        sourceRepo: (z: any) => z.string({ description: 'Public repo URL whose content/ folder to import' }).optional(),
+        sourceContentPath: (z: any) => z.string({ description: 'Path within source repo to copy' }).default('content'),
       },
       output: {
         remoteUrl: (z: any) => z.string({ description: 'Remote URL' }),
@@ -76,6 +78,8 @@ export function createGithubRepoFromTemplateAction(options: {
       const gitAuthorName = (ctx.input.gitAuthorName as string) || 'Scaffolder';
       const gitAuthorEmail = (ctx.input.gitAuthorEmail as string) || 'scaffolder@backstage.io';
       const collaborators = (ctx.input.collaborators as Array<{ user: string; access: string }>) || [];
+      const sourceRepo = ctx.input.sourceRepo as string | undefined;
+      const sourceContentPath = (ctx.input.sourceContentPath as string) || 'content';
 
       const url = new URL(`https://${repoUrl}`);
       const owner = url.searchParams.get('owner');
@@ -159,6 +163,42 @@ export function createGithubRepoFromTemplateAction(options: {
 
         ctx.logger.info('Overlaying workspace files...');
         copyDirSync(workspacePath, cloneDir);
+
+        if (sourceRepo) {
+          const sourceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffolder-source-'));
+          try {
+            ctx.logger.info(`Cloning source repo: ${sourceRepo}`);
+            await git.clone({
+              fs,
+              http,
+              dir: sourceDir,
+              url: sourceRepo.replace(/\/$/, '') + '.git',
+              ref: 'main',
+              singleBranch: true,
+              depth: 1,
+              onAuth: () => ({ username: 'x-access-token', password: token }),
+            });
+
+            const srcContent = path.join(sourceDir, sourceContentPath);
+            if (fs.existsSync(srcContent)) {
+              const destContent = path.join(cloneDir, sourceContentPath);
+              fs.rmdirSync(destContent, { recursive: true });
+              fs.mkdirSync(destContent, { recursive: true });
+              copyDirSync(srcContent, destContent);
+              ctx.logger.info(`Copied ${sourceContentPath}/ from source repo`);
+            }
+
+            for (const file of ['site.yml', 'ui-config.yml']) {
+              const srcFile = path.join(sourceDir, file);
+              if (fs.existsSync(srcFile)) {
+                fs.copyFileSync(srcFile, path.join(cloneDir, file));
+                ctx.logger.info(`Copied ${file} from source repo`);
+              }
+            }
+          } finally {
+            fs.rmdirSync(sourceDir, { recursive: true });
+          }
+        }
 
         await git.add({ fs, dir: cloneDir, filepath: '.' });
 

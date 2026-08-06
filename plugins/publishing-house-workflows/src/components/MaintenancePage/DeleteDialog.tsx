@@ -111,6 +111,10 @@ export function DeleteDialog({ open, entity, onClose, onDeleted }: DeleteDialogP
               </ListItem>
               <ListItem>
                 <ListItemIcon><WarningIcon fontSize="small" /></ListItemIcon>
+                <ListItemText primary="Purge workflow data from database" />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon><WarningIcon fontSize="small" /></ListItemIcon>
                 <ListItemText primary="Delete LiteLLM virtual keys for this project" />
               </ListItem>
               <ListItem>
@@ -142,6 +146,7 @@ export function DeleteDialog({ open, entity, onClose, onDeleted }: DeleteDialogP
             </Typography>
             <List dense>
               <ResultItem label="Workflow aborted" success={result.workflow_aborted} />
+              <ResultItem label="Database purged" success={result.db_cleaned} />
               <ResultItem label="Catalog location removed" success={result.catalog_cleaned} />
               <ResultItem label={`LiteLLM keys deleted: ${result.litellm_keys_deleted}`} success={result.litellm_keys_deleted > 0} />
               <ResultItem label="Jira epic archived" success={result.jira_archived} />

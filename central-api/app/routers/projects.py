@@ -68,6 +68,7 @@ class TestingResponse(BaseModel):
 class DeleteProjectResponse(BaseModel):
     slug: str
     workflow_aborted: bool = False
+    db_cleaned: bool = False
     catalog_cleaned: bool = False
     litellm_keys_deleted: int = 0
     jira_archived: bool = False
@@ -697,6 +698,8 @@ class StartRequest(BaseModel):
     sso_email: str = ""
     showroom_type: str = ""
     zero_touch_ready: bool = False
+    intake_type: str = "new"
+    source_repo: str = ""
 
 
 def _send_cloud_event(event_type: str, project_slug: str, data: dict):
@@ -962,6 +965,9 @@ async def start_workflow(
     if body.showroom_type:
         wd["showroomType"] = body.showroom_type
     wd["zeroTouchReady"] = body.zero_touch_ready
+    wd["intakeType"] = body.intake_type
+    if body.source_repo:
+        wd["sourceRepo"] = body.source_repo
     start_payload = wd
 
     url = f"{settings.sonataflow_url.rstrip('/')}/publishinghouseworkflow?businessKey={urllib.parse.quote(business_key)}"
@@ -1007,6 +1013,7 @@ async def delete_project(
 
     # 1. Get workflow data — find ALL instances, prefer ACTIVE for epic_key
     epic_key = ""
+    all_ids = []
     active_ids = []
     try:
         graphql_query = {
@@ -1027,6 +1034,7 @@ async def delete_project(
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
             gql_result = json.loads(r.read().decode())
         for inst in gql_result.get("data", {}).get("ProcessInstances", []):
+            all_ids.append(inst["id"])
             if inst.get("state") == "ACTIVE":
                 active_ids.append(inst["id"])
             wd = (inst.get("variables") or {}).get("workflowdata") or {}
@@ -1050,6 +1058,65 @@ async def delete_project(
         except Exception as e:
             result.errors.append(f"Workflow abort failed ({wf_id}): {e}")
             logger.warning("delete: workflow abort failed for %s/%s: %s", project_slug, wf_id, e)
+
+    # 2a. Purge workflow and data-index DB rows
+    if all_ids and settings.sonataflow_db_password:
+        try:
+            import psycopg2
+            conn = psycopg2.connect(
+                host=settings.sonataflow_db_host,
+                port=settings.sonataflow_db_port,
+                dbname=settings.sonataflow_db_name,
+                user=settings.sonataflow_db_user,
+                password=settings.sonataflow_db_password,
+            )
+            try:
+                with conn.cursor() as cur:
+                    ids_tuple = tuple(all_ids)
+
+                    cur.execute(
+                        'SET search_path TO "publishing-house-workflow"'
+                    )
+                    cur.execute(
+                        "DELETE FROM correlation_instances "
+                        "WHERE correlated_id IN %s", (ids_tuple,)
+                    )
+                    cur.execute(
+                        "DELETE FROM business_key_mapping "
+                        "WHERE business_key = %s", (project_slug,)
+                    )
+                    cur.execute(
+                        "DELETE FROM process_instances WHERE id IN %s",
+                        (ids_tuple,),
+                    )
+
+                    cur.execute(
+                        'SET search_path TO "sonataflow-platform-data-index-service"'
+                    )
+                    cur.execute(
+                        "DELETE FROM nodes "
+                        "WHERE process_instance_id IN %s", (ids_tuple,)
+                    )
+                    cur.execute(
+                        "DELETE FROM processes_addons "
+                        "WHERE process_id IN %s", (ids_tuple,)
+                    )
+                    cur.execute(
+                        "DELETE FROM processes_roles "
+                        "WHERE process_id IN %s", (ids_tuple,)
+                    )
+                    cur.execute(
+                        "DELETE FROM processes WHERE id IN %s",
+                        (ids_tuple,),
+                    )
+                conn.commit()
+            finally:
+                conn.close()
+            result.db_cleaned = True
+            logger.info("delete: purged %d instance(s) from DB for %s", len(all_ids), project_slug)
+        except Exception as e:
+            result.errors.append(f"DB cleanup failed: {e}")
+            logger.warning("delete: DB cleanup failed for %s: %s", project_slug, e)
 
     # 2b. Delete catalog location and entity from RHDH
     if settings.rhdh_service_token:

@@ -41,6 +41,7 @@ function toSummary(inst: ProcessInstance): WorkflowSummary {
     lastUpdate: inst.lastUpdate,
     hasDrift: wd.hasDrift ?? false,
     baselineSha: wd.baselineSha || '',
+    intakeType: wd.intakeType || 'new',
   };
 }
 

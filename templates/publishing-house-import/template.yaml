@@ -1,13 +1,13 @@
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
-  name: publishing-house-project
-  title: Publishing House Content Project
-  description: Create a new PH content project with orchestrated workflow
+  name: publishing-house-import
+  title: Publishing House Import
+  description: Import an existing Showroom repo into the Publishing House workflow
   tags:
     - publishing-house
-    - lab
-    - devspaces
+    - import
+    - migration
 
 spec:
   owner: rhdp-team
@@ -18,13 +18,14 @@ spec:
       required:
         - project_name
         - project_description
+        - source_repo
         - content_type
         - deployment_mode
       properties:
         project_name:
           title: Project Name
           type: string
-          description: Name for your lab/demo (letters and hyphens only)
+          description: Name for the imported project (letters and hyphens only)
           ui:autofocus: true
           ui:placeholder: "openshift-ai-workshop"
           pattern: '^[a-z0-9-]+$'
@@ -33,11 +34,18 @@ spec:
         project_description:
           title: Project Description
           type: string
-          description: Brief overview of what this project will deliver
+          description: Brief overview of what this project delivers
           ui:widget: textarea
           ui:options:
             rows: 3
-          ui:placeholder: "A hands-on lab teaching developers how to deploy and manage AI workloads on OpenShift using RHOAI"
+
+        source_repo:
+          title: Source Repository
+          type: string
+          description: Public GitHub URL of the existing Showroom repo to import
+          ui:placeholder: "https://github.com/rhpds/my-existing-lab"
+          pattern: '^https://github\.com/.+/.+$'
+          ui:help: The content/, site.yml, and ui-config.yml will be copied from this repo
 
         content_type:
           title: Content Type
@@ -55,7 +63,6 @@ spec:
             - RHDP Published (full gates, reviewer required)
             - Self-Published (self-approval allowed)
           default: rhdp_published
-          ui:help: Choose review rigor level
 
         tags:
           title: Tags
@@ -68,7 +75,6 @@ spec:
             type: string
             title: Tag
             ui:placeholder: "e.g. LB1234, openshift, ansible"
-          ui:help: "e.g. LB1234, openshift, ansible"
 
     - title: GitHub Collaborators
       description: Enter your GitHub username first. You can also add collaborators who will have write access to the project repo.
@@ -116,7 +122,6 @@ spec:
             - Summit 2027
             - None
           default: rh1_2027
-          ui:help: Which initiative is this content for?
 
         showroom_type:
           title: Showroom Type
@@ -128,25 +133,8 @@ spec:
             - Classic (standard Showroom)
             - Zero Touch (embedded automation)
           default: classic
-          ui:help: Classic = standard Showroom lab. Zero Touch = embedded runtime/setup automation.
-
-      dependencies:
-        showroom_type:
-          oneOf:
-            - properties:
-                showroom_type:
-                  const: zero_touch
-                zero_touch_ready:
-                  title: I already have my AgnosticV catalog item configured
-                  type: boolean
-                  default: false
-                  ui:help: Check this to skip the Env Setup stage and go straight to Development.
-            - properties:
-                showroom_type:
-                  const: classic
 
   steps:
-    # Step 1: Check if project name is already taken
     - id: check-catalog
       name: Check Project Name Availability
       action: catalog:fetch
@@ -154,13 +142,12 @@ spec:
         entityRef: component:default/${{ parameters.project_name }}
         optional: true
 
-    # Step 2: Render skeleton artifacts into workspace
     - id: generate-skeleton
       name: Generate Skeleton Artifacts
       if: ${{ steps['check-catalog'].output.entity == null }}
       action: fetch:template
       input:
-        url: ./skeleton
+        url: ../publishing-house-project/skeleton
         values:
           project_name: ${{ parameters.project_name }}
           project_description: ${{ parameters.project_description }}
@@ -171,20 +158,18 @@ spec:
           repo_url: https://github.com/rhpds/${{ parameters.project_name }}
           initiative_key: ${{ parameters.initiative_key }}
           showroom_type: ${{ parameters.showroom_type }}
-          intake_type: new
+          intake_type: migration
           devspaces_url: https://devspaces.${{ environment.parameters.baseDomain }}
           central_api_url: https://central-api-publishing-house.${{ environment.parameters.baseDomain }}
           ph_git_ref: ${{ environment.parameters.phGitRef }}
 
-    # Step 3: Set created-at timestamp on catalog-info.yaml
     - id: timestamp
       name: Set Creation Timestamp
       if: ${{ steps['check-catalog'].output.entity == null }}
       action: publishing-house:timestamp
 
-    # Step 4: Create repo from GitHub template, overlay skeleton, commit and push
     - id: create-and-push
-      name: Create Repository & Push Skeleton
+      name: Create Repository & Import Content
       if: ${{ steps['check-catalog'].output.entity == null }}
       action: publishing-house:create-github-repo
       input:
@@ -193,10 +178,10 @@ spec:
         description: ${{ parameters.project_description }}
         defaultBranch: main
         repoVisibility: public
-        gitCommitMessage: "Add templated skeleton artifacts"
+        gitCommitMessage: "Import content from ${{ parameters.source_repo }}"
         collaborators: ${{ parameters.github_users }}
+        sourceRepo: ${{ parameters.source_repo }}
 
-    # Step 5: Start workflow via central API
     - id: trigger-workflow
       name: Start Publishing House Workflow
       if: ${{ steps['check-catalog'].output.entity == null }}
@@ -218,10 +203,9 @@ spec:
           sso_user: ${{ user.entity.metadata.name }}
           sso_email: ${{ user.entity.spec.profile.email }}
           showroom_type: ${{ parameters.showroom_type }}
-          zero_touch_ready: ${{ parameters.showroom_type == 'zero_touch' and parameters.zero_touch_ready }}
-          intake_type: new
+          intake_type: migration
+          source_repo: ${{ parameters.source_repo }}
 
-    # Step 6: Register in catalog
     - id: register
       name: Register in Backstage Catalog
       if: ${{ steps['check-catalog'].output.entity == null }}
@@ -260,16 +244,16 @@ spec:
 
           A project named **"${{ parameters.project_name }}"** already exists in the catalog. All steps were skipped — no repository was created and no workflow was started. Re-run the template with a different project name.
           {% else %}
-          **Your Publishing House project is live!** You're ready to start building.
+          **Your Publishing House import is live!** Content has been copied from the source repo.
 
           **Here's what we set up for you:**
-          1. Repository created
+          1. Repository created with content from `${{ parameters.source_repo }}`
           2. catalog-info.yaml added to repository
           3. Registered in Backstage catalog
-          4. Orchestrator workflow started — your AI-guided content pipeline is running!
+          4. Orchestrator workflow started
 
           **What happens next:**
-          Claude will walk you through the entire content lifecycle — from intake and spec creation, through Jira tracking and reviews, all the way to a published lab on RHDP. Just follow the prompts!
+          Open DevSpaces and run `/rhdp-publishing-house`. The migrate skill will read your existing content and generate the intake files (spec.yaml, design.md, module outlines), then submit for review.
 
           **Getting Started:**
 

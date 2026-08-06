@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # API Configuration
     api_title: str = "Publishing House Central API"
-    api_version: str = "1.16.0"
+    api_version: str = "1.17.0"
     api_prefix: str = "/api/v1"
 
     # Authentication
@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     # RHDH catalog API (for location cleanup on project delete)
     rhdh_service_token: str = ""
     rhdh_internal_url: str = "http://backstage-developer-hub.publishing-house.svc.cluster.local"
+
+    # SonataFlow PostgreSQL (for full cleanup on project delete)
+    sonataflow_db_host: str = "sonataflow-postgresql.publishing-house.svc.cluster.local"
+    sonataflow_db_port: int = 5432
+    sonataflow_db_name: str = "sonataflow"
+    sonataflow_db_user: str = "postgres"
+    sonataflow_db_password: str = ""
 
     class Config:
         env_file = ".env"
