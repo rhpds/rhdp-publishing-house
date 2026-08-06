@@ -180,7 +180,9 @@ export function createImportGithubRepoAction(options: {
             const srcDir = path.join(sourceDir, dir);
             if (fs.existsSync(srcDir) && fs.statSync(srcDir).isDirectory()) {
               const destDir = path.join(cloneDir, dir);
-              fs.rmdirSync(destDir, { recursive: true });
+              if (fs.existsSync(destDir)) {
+                fs.rmdirSync(destDir, { recursive: true });
+              }
               fs.mkdirSync(destDir, { recursive: true });
               copyDirSync(srcDir, destDir);
               ctx.logger.info(`Copied ${dir}/ from source repo`);
