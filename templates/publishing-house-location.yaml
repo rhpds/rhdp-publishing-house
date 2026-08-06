@@ -4,7 +4,7 @@ metadata:
   name: publishing-house-templates
   description: Publishing House software templates
 spec:
-  type: url
+  type: file
   targets:
-    - https://raw.githubusercontent.com/rhpds/rhdp-publishing-house/main/templates/publishing-house-project/template.yaml
-    - https://raw.githubusercontent.com/rhpds/rhdp-publishing-house/main/templates/publishing-house-migration/template.yaml
+    - ./publishing-house-project/template.yaml
+    - ./publishing-house-migration/template.yaml
