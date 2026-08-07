@@ -414,7 +414,7 @@ export function WorkflowDetailPage() {
   const canMessage = isContentReviewer || isInfraReviewer;
   const testingStages: WorkflowStage[] = ['testing', 'published'];
   const hasTestingTab = testingStages.includes(summary.stage);
-  const canPostTestingComment = isOperations || isAdmin;
+  const canPostTestingComment = isOperations && summary.stage === 'testing';
   const canCompleteTesting = isOperations || isAdmin;
   const stagingTabIndex = hasReviewTab ? 2 : 1;
   const testingTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0);
