@@ -19,6 +19,7 @@ GROUP_BITS = {
     "rhdp-developers": 4,
     "rhdp-administrators": 8,
     "rhdp-content-developers": 16,
+    "rhdp-operations": 32,
 }
 
 ALL_GROUPS_MASK = 0xFF

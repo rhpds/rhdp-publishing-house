@@ -1,5 +1,5 @@
 import { DiscoveryApi, FetchApi, IdentityApi } from '@backstage/core-plugin-api';
-import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult, ReviewMessage, TokenListResponse, RevokeResponse, RevokeAllResponse } from './types';
+import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult, ReviewMessage, TokenListResponse, RevokeResponse, RevokeAllResponse, TestingComment } from './types';
 import { deriveStage } from '../utils/stageMapping';
 
 const TOKEN_STORAGE_KEY = 'ph-central-token';
@@ -7,7 +7,7 @@ const EXPIRY_STORAGE_KEY = 'ph-central-token-expiry';
 
 const GRAPHQL_QUERY = `
   query GetPublishingHouseWorkflows {
-    ProcessInstances(where: { processId: { equal: "publishinghouseworkflow" }, state: { in: [ACTIVE, ERROR, SUSPENDED] } }) {
+    ProcessInstances(where: { processId: { equal: "publishinghouseworkflow" }, state: { in: [ACTIVE, ERROR, SUSPENDED, COMPLETED] } }) {
       id
       businessKey
       processId
@@ -41,6 +41,7 @@ function toSummary(inst: ProcessInstance): WorkflowSummary {
     lastUpdate: inst.lastUpdate,
     hasDrift: wd.hasDrift ?? false,
     baselineSha: wd.baselineSha || '',
+    intakeType: wd.intakeType || 'new',
   };
 }
 
@@ -292,8 +293,16 @@ export function createPhWorkflowsClient(options: {
     repoUrl: string,
     branch: string = 'main',
     baselineSha?: string,
+    workflowStage?: string,
   ): Promise<ValidationReport> {
-    const params = new URLSearchParams({ stage: 'review' });
+    const stageMap: Record<string, string> = {
+      content_review: 'review',
+      infra_review: 'review',
+      development: 'development',
+      testing: 'testing',
+    };
+    const stage = stageMap[workflowStage ?? ''] ?? 'review';
+    const params = new URLSearchParams({ stage });
     if (baselineSha) {
       params.set('baseline_sha', baselineSha);
     }
@@ -471,6 +480,73 @@ export function createPhWorkflowsClient(options: {
     return await response.json();
   }
 
+  async function postTestingComment(
+    epicKey: string,
+    text: string,
+  ): Promise<{ posted: boolean; ticket_key: string }> {
+    const response = await centralFetch(
+      `/jira/${epicKey}/comment`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      },
+    );
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || `Post comment failed: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  async function getTestingComments(
+    epicKey: string,
+  ): Promise<{ comments: TestingComment[]; ticket_key: string }> {
+    const response = await centralFetch(`/jira/${epicKey}/comments`);
+
+    if (!response.ok) return { comments: [], ticket_key: '' };
+
+    return await response.json();
+  }
+
+  async function completeModule(
+    epicKey: string,
+    moduleId: string,
+  ): Promise<{ closed: boolean; ticket_key: string }> {
+    const response = await centralFetch(
+      `/jira/${epicKey}/module/${moduleId}/complete`,
+      { method: 'POST' },
+    );
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || `Module complete failed: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  async function submitTesting(
+    slug: string,
+    repoUrl: string,
+    branch: string = 'main',
+  ): Promise<{ status: number; error?: string; validation?: any }> {
+    const response = await centralFetch(
+      `/projects/testing/${slug}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ repo_url: repoUrl, branch }),
+      },
+    );
+
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body.error || body.detail || `Testing submit failed: ${response.status}`);
+    }
+    return body;
+  }
+
   return {
     getWorkflows,
     getWorkflow,
@@ -483,6 +559,7 @@ export function createPhWorkflowsClient(options: {
     fetchHeadCommitSha,
     deleteProject,
     submitEnvSetup,
+    submitTesting,
     sendMessage,
     getMessages,
     markMessagesRead,
@@ -490,5 +567,8 @@ export function createPhWorkflowsClient(options: {
     searchTokens,
     revokeToken,
     revokeAllTokens,
+    postTestingComment,
+    getTestingComments,
+    completeModule,
   };
 }

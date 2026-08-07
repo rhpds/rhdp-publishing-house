@@ -89,6 +89,11 @@ const columns: TableColumn<WorkflowSummary>[] = [
     field: 'contentType',
   },
   {
+    title: 'Intake',
+    field: 'intakeType',
+    render: (row: WorkflowSummary) => row.intakeType === 'migration' ? 'Migration' : 'New',
+  },
+  {
     title: 'Stage',
     field: 'stage',
     render: (row: WorkflowSummary) => <StageChip stage={row.stage} />,

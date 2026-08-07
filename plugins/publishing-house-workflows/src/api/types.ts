@@ -170,6 +170,7 @@ export interface AuditEntry {
 export interface DeleteProjectResult {
   slug: string;
   workflow_aborted: boolean;
+  db_cleaned: boolean;
   catalog_cleaned: boolean;
   litellm_keys_deleted: number;
   jira_archived: boolean;
@@ -224,6 +225,12 @@ export interface RevokeAllResponse {
   revoked_count: number;
 }
 
+export interface TestingComment {
+  author: string;
+  text: string;
+  created: string;
+}
+
 export interface WorkflowSummary {
   id: string;
   projectId: string;
@@ -243,4 +250,5 @@ export interface WorkflowSummary {
   lastUpdate: string;
   hasDrift?: boolean;
   baselineSha?: string;
+  intakeType: string;
 }

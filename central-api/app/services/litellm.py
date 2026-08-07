@@ -54,7 +54,7 @@ class LiteLLMService:
                 index += 1
         return keys
 
-    async def generate_key(self, project_id: str, user_email: str, max_budget: float = 10.0) -> Optional[str]:
+    async def generate_key(self, project_id: str, user_email: str, max_budget: float = 100.0) -> Optional[str]:
         index = await self._next_index(project_id)
         alias = f"ph-{project_id}-{index}"
 

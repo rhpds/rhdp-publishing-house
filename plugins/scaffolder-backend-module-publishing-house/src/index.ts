@@ -5,6 +5,7 @@ import {
 import { scaffolderActionsExtensionPoint } from '@backstage/plugin-scaffolder-node';
 import { ScmIntegrations } from '@backstage/integration';
 import { createGithubRepoFromTemplateAction } from './actions/createFromTemplate';
+import { createImportGithubRepoAction } from './actions/importGithubRepo';
 import { createAnnotateAction } from './actions/annotate';
 import { createTimestampAction } from './actions/timestamp';
 
@@ -21,6 +22,7 @@ export default createBackendModule({
         const integrations = ScmIntegrations.fromConfig(config);
         scaffolder.addActions(
           createGithubRepoFromTemplateAction({ integrations }),
+          createImportGithubRepoAction({ integrations }),
           createAnnotateAction(),
           createTimestampAction(),
         );

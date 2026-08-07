@@ -1,0 +1,39 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.project_name }}
+  title: ${{ values.project_name }}
+  description: "${{ values.project_description }}"
+  annotations:
+    # Publishing House lifecycle annotations (workflow will update these)
+    ph.rhdp.io/content-type: ${{ values.content_type }}
+    ph.rhdp.io/deployment-mode: ${{ values.deployment_mode }}
+    ph.rhdp.io/github-user: ${{ values.github_user }}
+    ph.rhdp.io/owner: ${{ values.user_email }}
+    ph.rhdp.io/migrated-repo: ${{ values.migrated_repo }}
+
+    # TechDocs
+    backstage.io/techdocs-ref: dir:.
+
+    # Repository annotations
+    github.com/project-slug: ${{ values.repo_url | replace('https://github.com/', '') }}
+  tags:
+    - publishing-house
+    - ${{ values.content_type }}
+    - ${{ values.deployment_mode | replace('_', '-') }}
+    - migration
+  links:
+    - url: ${{ values.repo_url }}
+      title: Repository
+      icon: github
+    - url: ${{ values.devspaces_url }}#${{ values.repo_url }}
+      title: Open in DevSpaces
+      icon: catalog
+    - url: ${{ values.central_api_url }}
+      title: Central
+      icon: dashboard
+spec:
+  type: content
+  lifecycle: experimental
+  owner: rhdp-team
+  system: publishing-house

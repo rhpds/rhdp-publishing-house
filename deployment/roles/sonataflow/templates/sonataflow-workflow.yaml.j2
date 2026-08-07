@@ -107,7 +107,7 @@ spec:
               tags: (.tags // []),
               projectDescription: (.projectDescription // ""),
               showroomType: (.showroomType // "classic"),
-              zeroTouchReady: (.zeroTouchReady // false),
+              intakeType: (.intakeType // "new"),
               reviews: {
                 content: false,
                 infra: false
@@ -134,6 +134,7 @@ spec:
                 project_name: .projectId
                 content_type: .contentType
                 project_description: .projectDescription
+                showroom_type: (.showroomType // "classic")
             actionDataFilter:
               toStateData: .epicResponse
         stateDataFilter:
@@ -283,7 +284,7 @@ spec:
           - condition: "${ .rejection.isRejected == true }"
             transition:
               nextState: ContentReview
-          - condition: "${ .showroomType == \"zero_touch\" and .zeroTouchReady == true }"
+          - condition: "${ .showroomType == \"zero_touch\" }"
             transition:
               nextState: JiraSync
         defaultCondition:
@@ -329,8 +330,6 @@ spec:
               arguments:
                 repo_url: .repoUrl
                 epic_key: .epic_key
-                agnosticv_url: (.agnosticvUrl // "")
-                ci_url: (.ciUrl // "")
             actionDataFilter:
               toStateData: .jiraSyncResponse
         stateDataFilter:

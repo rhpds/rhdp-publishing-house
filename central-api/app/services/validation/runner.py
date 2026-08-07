@@ -1,5 +1,6 @@
 """Validation runner — maps stages to check groups, orchestrates execution."""
 import logging
+import time
 
 import yaml
 
@@ -16,6 +17,7 @@ from . import (
     automation_manifest,
     vocabulary,
     auto_compute,
+    development_checks,
 )
 
 logger = logging.getLogger(__name__)
@@ -23,8 +25,8 @@ logger = logging.getLogger(__name__)
 STAGE_GROUPS = {
     "intake": ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
     "review": ["A", "B", "C", "D", "E", "F"],
-    "development": [],
-    "testing": [],
+    "development": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+    "testing": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
 }
 
 
@@ -42,12 +44,15 @@ def _read_project_files(repo: ClonedRepo) -> dict:
             if content is not None:
                 outline_files[fname] = content
 
+    page_files = repo.list_dir("content/modules/ROOT/pages")
+
     spec_data = yaml.safe_load(spec_raw) if spec_raw else None
     return {
         "spec_data": spec_data,
         "design_text": design_text,
         "manifest_text": manifest_text,
         "outline_files": outline_files,
+        "page_files": page_files,
     }
 
 
@@ -60,7 +65,13 @@ async def run_validation(
     groups = STAGE_GROUPS.get(stage, STAGE_GROUPS["intake"])
     policy = load_policy()
 
-    repo = await github.clone_repo(repo_url, branch)
+    sparse_paths = ["publishing-house/"]
+    if stage in ("development", "testing"):
+        sparse_paths.append("content/modules/ROOT/pages/*.adoc")
+
+    t0 = time.monotonic()
+    repo = await github.clone_repo(repo_url, branch, sparse_paths=sparse_paths)
+    logger.info("sparse clone took %.1fs", time.monotonic() - t0)
     try:
         files = _read_project_files(repo)
         spec_data = files["spec_data"]
@@ -109,6 +120,9 @@ async def run_validation(
         if "I" in groups:
             compute_results, auto = auto_compute.run_checks(spec_data, policy)
             all_results.extend(compute_results)
+
+        if "J" in groups:
+            all_results.extend(development_checks.run_checks(spec_data, outline_files, files["page_files"]))
 
         passed = not any(r.status == CheckStatus.FAIL for r in all_results)
 

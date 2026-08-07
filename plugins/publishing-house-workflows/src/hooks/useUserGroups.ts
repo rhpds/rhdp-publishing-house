@@ -13,6 +13,7 @@ export function useUserGroups() {
       isDeveloper: refs.some(r => r === 'group:default/rhdp-developers'),
       isContentDeveloper: refs.some(r => r === 'group:default/rhdp-content-developers'),
       isAdmin: refs.some(r => r === 'group:default/rhdp-administrators'),
+      isOperations: refs.some(r => r === 'group:default/rhdp-operations'),
     };
   }, []);
 
@@ -22,6 +23,7 @@ export function useUserGroups() {
     isDeveloper: value?.isDeveloper ?? false,
     isContentDeveloper: value?.isContentDeveloper ?? false,
     isAdmin: value?.isAdmin ?? false,
+    isOperations: value?.isOperations ?? false,
     loading,
   };
 }

@@ -13,9 +13,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
+from ..auth.groups import GROUP_BITS
 from ..config import get_settings, Settings
 from ..services.github import GitHubService
-from .projects import _require_auth
+from .projects import _require_auth, _require_group
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/jira", tags=["Jira"])
@@ -30,6 +31,7 @@ class CreateEpicRequest(BaseModel):
     content_type: str = ""
     deployment_mode: str = ""
     project_description: str = ""
+    showroom_type: str = ""
 
 
 class CreateEpicResponse(BaseModel):
@@ -124,6 +126,66 @@ def create_epic(
     except Exception as e:
         logger.warning("jira: Intake task creation failed for epic %s: %s", epic_key, e)
 
+    testing_fields = {
+        "project": {"key": settings.jira_project_key},
+        "summary": "[PH] Testing",
+        "issuetype": {"name": "Task"},
+        "parent": {"key": epic_key},
+        "labels": ["publishing-house", "ph:testing"],
+        "assignee": None,
+        "description": {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text",
+                 "text": "Testing phase tracker. Testers post comments here during testing. "
+                         "This task will be closed automatically when testing is marked complete."}]},
+            ],
+        },
+    }
+    try:
+        req = urllib.request.Request(
+            f"{settings.jira_url}/rest/api/3/issue",
+            data=json.dumps({"fields": testing_fields}).encode(),
+            headers=_jira_headers(settings),
+            method="POST",
+        )
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+            logger.info("jira: created Testing task under epic %s", epic_key)
+    except Exception as e:
+        logger.warning("jira: Testing task creation failed for epic %s: %s", epic_key, e)
+
+    if body.showroom_type == "classic":
+        dev_ci_fields = {
+            "project": {"key": settings.jira_project_key},
+            "summary": "[PH] Development CI",
+            "issuetype": {"name": "Task"},
+            "parent": {"key": epic_key},
+            "labels": ["publishing-house", "ph:dev-ci"],
+            "assignee": None,
+            "description": {
+                "type": "doc",
+                "version": 1,
+                "content": [
+                    {"type": "paragraph", "content": [{"type": "text",
+                     "text": "Development CI tracker for catalog item setup. "
+                             "Updated with AgnosticV and CI URLs during env setup, "
+                             "then closed automatically."}]},
+                ],
+            },
+        }
+        try:
+            req = urllib.request.Request(
+                f"{settings.jira_url}/rest/api/3/issue",
+                data=json.dumps({"fields": dev_ci_fields}).encode(),
+                headers=_jira_headers(settings),
+                method="POST",
+            )
+            with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+                logger.info("jira: created Dev CI task under epic %s", epic_key)
+        except Exception as e:
+            logger.warning("jira: Dev CI task creation failed for epic %s: %s", epic_key, e)
+
     jira_url = f"{settings.jira_url}/browse/{epic_key}"
     logger.info("jira: created epic %s for project %s", epic_key, body.project_name)
     return CreateEpicResponse(epic_key=epic_key, jira_url=jira_url)
@@ -133,8 +195,6 @@ def create_epic(
 class SyncRequest(BaseModel):
     repo_url: str
     epic_key: str
-    agnosticv_url: str = ""
-    ci_url: str = ""
 
 
 class SyncResponse(BaseModel):
@@ -266,6 +326,138 @@ def _update_task_fields(task_key: str, summary: str, description: str, settings:
         return False
 
 
+def _find_task_by_label(epic_key: str, ph_label: str, settings: Settings) -> dict | None:
+    """Find a single task under an epic by its ph:* label. Returns {key, assignee} or None."""
+    headers = _jira_headers(settings)
+    jql = (
+        f"project = {settings.jira_project_key} AND issuetype = Task "
+        f"AND parent = {epic_key} AND labels = \"{ph_label}\""
+    )
+    req = urllib.request.Request(
+        f"{settings.jira_url}/rest/api/3/search/jql",
+        data=json.dumps({
+            "jql": jql,
+            "fields": ["key", "assignee", "status"],
+            "maxResults": 1,
+        }).encode(),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=15) as r:
+            issues = json.loads(r.read().decode()).get("issues", [])
+    except Exception as e:
+        logger.warning("jira: failed to find task %s under %s: %s", ph_label, epic_key, e)
+        return None
+
+    if not issues:
+        return None
+    issue = issues[0]
+    fields = issue.get("fields", {})
+    assignee = fields.get("assignee")
+    return {
+        "key": issue["key"],
+        "assignee": assignee.get("emailAddress", "") if assignee else "",
+        "status": fields.get("status", {}).get("name", ""),
+    }
+
+
+def _assign_ticket(ticket_key: str, email: str, settings: Settings) -> bool:
+    """Assign a Jira ticket to a user by email lookup."""
+    headers = _jira_headers(settings)
+    search_url = f"{settings.jira_url}/rest/api/3/user/search?query={urllib.parse.quote(email)}"
+    req = urllib.request.Request(search_url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
+            users = json.loads(r.read().decode())
+    except Exception as e:
+        logger.warning("jira: user search failed for %s: %s", email, e)
+        return False
+
+    if not users:
+        logger.warning("jira: no Jira user found for email %s", email)
+        return False
+
+    account_id = users[0].get("accountId", "")
+    if not account_id:
+        return False
+
+    req = urllib.request.Request(
+        f"{settings.jira_url}/rest/api/3/issue/{ticket_key}",
+        data=json.dumps({"fields": {"assignee": {"accountId": account_id}}}).encode(),
+        headers=headers,
+        method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+            logger.info("jira: assigned %s to %s", ticket_key, email)
+            return True
+    except Exception as e:
+        logger.warning("jira: failed to assign %s to %s: %s", ticket_key, email, e)
+        return False
+
+
+def _add_comment(ticket_key: str, text: str, author_name: str, settings: Settings) -> bool:
+    """Post a comment to a Jira issue."""
+    headers = _jira_headers(settings)
+    body_text = f"[{author_name}] {text}" if author_name else text
+    comment_body = {
+        "body": {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {"type": "paragraph", "content": [
+                    {"type": "text", "text": body_text[:30000]},
+                ]},
+            ],
+        },
+    }
+    req = urllib.request.Request(
+        f"{settings.jira_url}/rest/api/3/issue/{ticket_key}/comment",
+        data=json.dumps(comment_body).encode(),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+            logger.info("jira: added comment to %s", ticket_key)
+            return True
+    except Exception as e:
+        logger.warning("jira: failed to add comment to %s: %s", ticket_key, e)
+        return False
+
+
+def _get_comments(ticket_key: str, settings: Settings) -> list[dict]:
+    """Fetch comments from a Jira issue."""
+    headers = _jira_headers(settings)
+    req = urllib.request.Request(
+        f"{settings.jira_url}/rest/api/3/issue/{ticket_key}/comment?orderBy=created",
+        headers=headers,
+    )
+    try:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=15) as r:
+            data = json.loads(r.read().decode())
+    except Exception as e:
+        logger.warning("jira: failed to get comments for %s: %s", ticket_key, e)
+        return []
+
+    result = []
+    for c in data.get("comments", []):
+        author_data = c.get("author", {})
+        body_content = c.get("body", {}).get("content", [])
+        text_parts = []
+        for block in body_content:
+            for inline in block.get("content", []):
+                if inline.get("type") == "text":
+                    text_parts.append(inline.get("text", ""))
+        result.append({
+            "author": author_data.get("displayName", author_data.get("emailAddress", "")),
+            "text": " ".join(text_parts),
+            "created": c.get("created", ""),
+        })
+    return result
+
+
 def _create_task(
     epic_key: str, summary: str, description: str, ph_label: str, settings: Settings,
 ) -> bool:
@@ -317,14 +509,12 @@ async def sync_jira_tasks(
 
     asyncio.get_event_loop().run_in_executor(
         None, _sync_jira_tasks_bg, body.repo_url, body.epic_key, settings,
-        body.agnosticv_url, body.ci_url,
     )
     logger.info("jira sync: accepted for epic %s — running in background", body.epic_key)
     return SyncResponse(epic_key=body.epic_key)
 
 
-def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings,
-                        agnosticv_url: str = "", ci_url: str = ""):
+def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, close_completed: bool = False):
     """Background thread: sync Jira tasks from spec.yaml, design.md, and module outlines."""
     try:
         gh = GitHubService(token=settings.github_token)
@@ -382,21 +572,6 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings,
                 ],
             }
             update_fields: dict = {"description": desc_adf}
-            if agnosticv_url or ci_url:
-                env_lines = []
-                if agnosticv_url:
-                    env_lines.append(f"AgnosticV Catalog Item: {agnosticv_url}")
-                if ci_url:
-                    env_lines.append(f"CI Catalog Item: {ci_url}")
-                update_fields["environment"] = {
-                    "type": "doc",
-                    "version": 1,
-                    "content": [
-                        {"type": "paragraph", "content": [
-                            {"type": "text", "text": "\n".join(env_lines)}
-                        ]},
-                    ],
-                }
             req = urllib.request.Request(
                 f"{settings.jira_url}/rest/api/3/issue/{epic_key}",
                 data=json.dumps({"fields": update_fields}).encode(),
@@ -460,6 +635,15 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings,
                 if _transition_to_done(task["key"], settings):
                     tasks_closed += 1
 
+        if close_completed:
+            for mod in modules:
+                mod_id = mod.get("id", "")
+                if mod.get("status") == "complete" and mod_id:
+                    task = label_to_task.get(f"ph:{mod_id}")
+                    if task and task["status"].lower() != "done":
+                        if _transition_to_done(task["key"], settings):
+                            tasks_closed += 1
+
         logger.info(
             "jira sync bg: epic %s — created=%d updated=%d closed=%d",
             epic_key, tasks_created, tasks_updated, tasks_closed,
@@ -467,4 +651,87 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings,
     except Exception as e:
         logger.error("jira sync bg: failed for epic %s: %s", epic_key, e, exc_info=True)
 
+
+# ── Testing Comments ─────────────────────────────────────────────────────────
+
+
+class CommentRequest(BaseModel):
+    text: str
+
+
+@router.post("/{epic_key}/comment")
+def post_testing_comment(
+    epic_key: str,
+    body: CommentRequest,
+    auth: tuple[str, int] = Depends(_require_auth),
+    settings: Settings = Depends(get_settings),
+):
+    owner, groups = auth
+    allowed = GROUP_BITS["rhdp-operations"] | GROUP_BITS["rhdp-administrators"]
+    _require_group(groups, allowed, "rhdp-operations or rhdp-administrators")
+
+    if not settings.jira_url:
+        raise HTTPException(status_code=503, detail="Jira not configured")
+
+    task = _find_task_by_label(epic_key, "ph:testing", settings)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Testing ticket not found under {epic_key}")
+
+    if not task["assignee"]:
+        _assign_ticket(task["key"], owner, settings)
+
+    if not _add_comment(task["key"], body.text, owner, settings):
+        raise HTTPException(status_code=502, detail="Failed to post comment to Jira")
+
+    return {"posted": True, "ticket_key": task["key"]}
+
+
+@router.get("/{epic_key}/comments")
+def get_testing_comments(
+    epic_key: str,
+    auth: tuple[str, int] = Depends(_require_auth),
+    settings: Settings = Depends(get_settings),
+):
+    owner, groups = auth
+    has_ops = groups & GROUP_BITS["rhdp-operations"]
+    has_dev = groups & GROUP_BITS["rhdp-developers"]
+    if not (has_ops or has_dev):
+        raise HTTPException(status_code=403, detail="Requires rhdp-operations or rhdp-developers")
+
+    if not settings.jira_url:
+        raise HTTPException(status_code=503, detail="Jira not configured")
+
+    task = _find_task_by_label(epic_key, "ph:testing", settings)
+    if not task:
+        return {"comments": [], "ticket_key": ""}
+
+    comments = _get_comments(task["key"], settings)
+    return {"comments": comments, "ticket_key": task["key"]}
+
+
+# ── Module Complete ──────────────────────────────────────────────────────────
+
+
+@router.post("/{epic_key}/module/{module_id}/complete")
+def complete_module(
+    epic_key: str,
+    module_id: str,
+    auth: tuple[str, int] = Depends(_require_auth),
+    settings: Settings = Depends(get_settings),
+):
+    owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
+
+    if not settings.jira_url:
+        return {"closed": False, "ticket_key": "", "detail": "Jira not configured"}
+
+    task = _find_task_by_label(epic_key, f"ph:{module_id}", settings)
+    if not task:
+        return {"closed": False, "ticket_key": "", "detail": f"No ticket found for {module_id}"}
+
+    if task["status"].lower() == "done":
+        return {"closed": True, "ticket_key": task["key"], "detail": "Already closed"}
+
+    closed = _transition_to_done(task["key"], settings)
+    return {"closed": closed, "ticket_key": task["key"]}
 

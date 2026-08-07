@@ -7,3 +7,4 @@ spec:
   type: url
   targets:
     - ./publishing-house-project/template.yaml
+    - ./publishing-house-migration/template.yaml

@@ -68,6 +68,7 @@ class TestingResponse(BaseModel):
 class DeleteProjectResponse(BaseModel):
     slug: str
     workflow_aborted: bool = False
+    db_cleaned: bool = False
     catalog_cleaned: bool = False
     litellm_keys_deleted: int = 0
     jira_archived: bool = False
@@ -508,12 +509,6 @@ async def submit_development(
 
         _check_github_write_access(body.repo_url, x_github_user)
 
-        # If hasDrift is already set, return immediately without re-checking
-        if wd.get("hasDrift"):
-            return JSONResponse(status_code=422, content=DevelopmentResponse(
-                status=422, stage=stage, error=drift_msg,
-            ).model_dump())
-
         settings = get_settings()
         if not settings.github_token:
             return JSONResponse(status_code=500, content=DevelopmentResponse(
@@ -543,6 +538,17 @@ async def submit_development(
                 return JSONResponse(status_code=422, content=DevelopmentResponse(
                     status=422, stage=stage, error=drift_msg,
                 ).model_dump())
+            elif wd.get("hasDrift"):
+                _patch_workflow_data(wf_uuid, {"hasDrift": False}, settings=settings)
+                logger.info("development: drift cleared for %s", project_slug)
+
+        epic_key = wd.get("epic_key", "")
+        if epic_key and body.repo_url:
+            from .jira import _sync_jira_tasks_bg
+            asyncio.get_event_loop().run_in_executor(
+                None, _sync_jira_tasks_bg, body.repo_url, epic_key, settings, True,
+            )
+            logger.info("development: jira sync dispatched for %s", project_slug)
 
         _advance_workflow(
             project_slug, wf_uuid, owner, stage="development",
@@ -570,7 +576,6 @@ async def submit_testing(
     project_slug: str,
     body: TestingRequest,
     auth: tuple[str, int] = Depends(_require_auth),
-    x_github_user: str | None = Header(None, alias="X-GitHub-User"),
 ):
     """Validate testing artifacts, run semantic drift check, then advance workflow.
 
@@ -587,7 +592,8 @@ async def submit_testing(
     from ..services.drift import check_drift_semantic, drift_cache_evict
 
     owner, groups = auth
-    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
+    allowed = GROUP_BITS["rhdp-operations"] | GROUP_BITS["rhdp-administrators"]
+    _require_group(groups, allowed, "rhdp-operations or rhdp-administrators")
     stage = None
     drift_msg = "Design drift detected. Your submission has been referred for additional review."
 
@@ -613,13 +619,6 @@ async def submit_testing(
             return JSONResponse(status_code=409, content=TestingResponse(
                 status=409, stage=current,
                 error=f"Workflow is in '{current}' stage. Testing requires 'testing'.",
-            ).model_dump())
-
-        _check_github_write_access(body.repo_url, x_github_user)
-
-        if wd.get("hasDrift"):
-            return JSONResponse(status_code=422, content=TestingResponse(
-                status=422, stage=stage, error=drift_msg,
             ).model_dump())
 
         settings = get_settings()
@@ -650,12 +649,21 @@ async def submit_testing(
                 return JSONResponse(status_code=422, content=TestingResponse(
                     status=422, stage=stage, error=drift_msg,
                 ).model_dump())
+            elif wd.get("hasDrift"):
+                _patch_workflow_data(wf_uuid, {"hasDrift": False}, settings=settings)
+                logger.info("testing: drift cleared for %s", project_slug)
 
         _advance_workflow(
             project_slug, wf_uuid, owner, stage="testing",
             commit_sha=result.commit_sha, settings=settings,
         )
         logger.info("testing: submitted for %s", project_slug)
+
+        epic_key = wd.get("epic_key", "")
+        if epic_key:
+            asyncio.get_event_loop().run_in_executor(
+                None, _close_testing_ticket, epic_key, settings,
+            )
 
         return JSONResponse(status_code=201, content=TestingResponse(
             status=201,
@@ -696,7 +704,7 @@ class StartRequest(BaseModel):
     sso_user: str = ""
     sso_email: str = ""
     showroom_type: str = ""
-    zero_touch_ready: bool = False
+    intake_type: str = "new"
 
 
 def _send_cloud_event(event_type: str, project_slug: str, data: dict):
@@ -837,6 +845,66 @@ async def reject_infra_review(
     return {"slug": slug, "action": "rejected", "stage": "infra_review"}
 
 
+# ── Jira CI Ticket Helpers ─────────────────────────────────────────────────
+
+
+def _close_dev_ci_ticket(epic_key: str, agnosticv_url: str, ci_url: str, submitter_email: str, settings):
+    """Background: update Dev CI description, assign to submitter, close."""
+    from .jira import _find_task_by_label, _assign_ticket, _transition_to_done, _jira_headers, _SSL_CTX
+    try:
+        task = _find_task_by_label(epic_key, "ph:dev-ci", settings)
+        if not task:
+            logger.info("dev-ci: no Dev CI ticket under %s — skipping", epic_key)
+            return
+
+        desc_lines = []
+        if agnosticv_url:
+            desc_lines.append(f"AgnosticV Catalog Item: {agnosticv_url}")
+        if ci_url:
+            desc_lines.append(f"CI Catalog Item: {ci_url}")
+        if desc_lines:
+            headers = _jira_headers(settings)
+            desc_adf = {
+                "type": "doc",
+                "version": 1,
+                "content": [
+                    {"type": "paragraph", "content": [
+                        {"type": "text", "text": "\n".join(desc_lines)},
+                    ]},
+                ],
+            }
+            req = urllib.request.Request(
+                f"{settings.jira_url}/rest/api/3/issue/{task['key']}",
+                data=json.dumps({"fields": {"description": desc_adf}}).encode(),
+                headers=headers,
+                method="PUT",
+            )
+            with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+                logger.info("dev-ci: updated description for %s", task["key"])
+
+        _assign_ticket(task["key"], submitter_email, settings)
+        _transition_to_done(task["key"], settings)
+        logger.info("dev-ci: closed %s for epic %s", task["key"], epic_key)
+    except Exception as e:
+        logger.warning("dev-ci: failed for epic %s: %s", epic_key, e)
+
+
+def _close_testing_ticket(epic_key: str, settings):
+    """Background: close the Testing ticket."""
+    from .jira import _find_task_by_label, _transition_to_done
+    try:
+        task = _find_task_by_label(epic_key, "ph:testing", settings)
+        if not task:
+            logger.info("testing: no Testing ticket under %s — skipping", epic_key)
+            return
+        if task["status"].lower() == "done":
+            return
+        _transition_to_done(task["key"], settings)
+        logger.info("testing: closed %s for epic %s", task["key"], epic_key)
+    except Exception as e:
+        logger.warning("testing: failed for epic %s: %s", epic_key, e)
+
+
 # ── Env Setup ──────────────────────────────────────────────────────────────
 
 class EnvSetupSubmitRequest(BaseModel):
@@ -867,6 +935,14 @@ async def submit_env_setup(
         "agnosticvUrl": body.agnosticv_url,
         "ciUrl": body.ci_url,
     })
+
+    epic_key = wd.get("epic_key", "")
+    if epic_key:
+        settings = get_settings()
+        asyncio.get_event_loop().run_in_executor(
+            None, _close_dev_ci_ticket, epic_key, body.agnosticv_url, body.ci_url, owner, settings,
+        )
+
     return {"slug": slug, "action": "submitted", "stage": "env_setup"}
 
 
@@ -961,7 +1037,7 @@ async def start_workflow(
         wd["auditTrailSha"] = body.audit_trail_sha
     if body.showroom_type:
         wd["showroomType"] = body.showroom_type
-    wd["zeroTouchReady"] = body.zero_touch_ready
+    wd["intakeType"] = body.intake_type
     start_payload = wd
 
     url = f"{settings.sonataflow_url.rstrip('/')}/publishinghouseworkflow?businessKey={urllib.parse.quote(business_key)}"
@@ -1007,6 +1083,7 @@ async def delete_project(
 
     # 1. Get workflow data — find ALL instances, prefer ACTIVE for epic_key
     epic_key = ""
+    all_ids = []
     active_ids = []
     try:
         graphql_query = {
@@ -1027,6 +1104,7 @@ async def delete_project(
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
             gql_result = json.loads(r.read().decode())
         for inst in gql_result.get("data", {}).get("ProcessInstances", []):
+            all_ids.append(inst["id"])
             if inst.get("state") == "ACTIVE":
                 active_ids.append(inst["id"])
             wd = (inst.get("variables") or {}).get("workflowdata") or {}
@@ -1050,6 +1128,65 @@ async def delete_project(
         except Exception as e:
             result.errors.append(f"Workflow abort failed ({wf_id}): {e}")
             logger.warning("delete: workflow abort failed for %s/%s: %s", project_slug, wf_id, e)
+
+    # 2a. Purge workflow and data-index DB rows
+    if all_ids and settings.sonataflow_db_password:
+        try:
+            import psycopg2
+            conn = psycopg2.connect(
+                host=settings.sonataflow_db_host,
+                port=settings.sonataflow_db_port,
+                dbname=settings.sonataflow_db_name,
+                user=settings.sonataflow_db_user,
+                password=settings.sonataflow_db_password,
+            )
+            try:
+                with conn.cursor() as cur:
+                    ids_tuple = tuple(all_ids)
+
+                    cur.execute(
+                        'SET search_path TO "publishing-house-workflow"'
+                    )
+                    cur.execute(
+                        "DELETE FROM correlation_instances "
+                        "WHERE correlated_id IN %s", (ids_tuple,)
+                    )
+                    cur.execute(
+                        "DELETE FROM business_key_mapping "
+                        "WHERE business_key = %s", (project_slug,)
+                    )
+                    cur.execute(
+                        "DELETE FROM process_instances WHERE id IN %s",
+                        (ids_tuple,),
+                    )
+
+                    cur.execute(
+                        'SET search_path TO "sonataflow-platform-data-index-service"'
+                    )
+                    cur.execute(
+                        "DELETE FROM nodes "
+                        "WHERE process_instance_id IN %s", (ids_tuple,)
+                    )
+                    cur.execute(
+                        "DELETE FROM processes_addons "
+                        "WHERE process_id IN %s", (ids_tuple,)
+                    )
+                    cur.execute(
+                        "DELETE FROM processes_roles "
+                        "WHERE process_id IN %s", (ids_tuple,)
+                    )
+                    cur.execute(
+                        "DELETE FROM processes WHERE id IN %s",
+                        (ids_tuple,),
+                    )
+                conn.commit()
+            finally:
+                conn.close()
+            result.db_cleaned = True
+            logger.info("delete: purged %d instance(s) from DB for %s", len(all_ids), project_slug)
+        except Exception as e:
+            result.errors.append(f"DB cleanup failed: {e}")
+            logger.warning("delete: DB cleanup failed for %s: %s", project_slug, e)
 
     # 2b. Delete catalog location and entity from RHDH
     if settings.rhdh_service_token:
