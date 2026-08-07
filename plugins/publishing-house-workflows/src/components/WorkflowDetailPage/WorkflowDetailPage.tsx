@@ -193,6 +193,7 @@ export function WorkflowDetailPage() {
   const [testingCommentText, setTestingCommentText] = useState('');
   const [submittingTestingComment, setSubmittingTestingComment] = useState(false);
   const [loadingTestingComments, setLoadingTestingComments] = useState(false);
+  const [completingTesting, setCompletingTesting] = useState(false);
 
   const handleApprove = async (stage: WorkflowStage) => {
     if (!result) return;
@@ -348,8 +349,22 @@ export function WorkflowDetailPage() {
     }
   };
 
+  const handleCompleteTesting = async () => {
+    if (!result?.summary.repoUrl) return;
+    setCompletingTesting(true);
+    try {
+      await client.submitTesting(result.summary.projectId, result.summary.repoUrl);
+      setSnackbar({ open: true, severity: 'success', message: 'Testing complete. Workflow advanced.' });
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err: any) {
+      setSnackbar({ open: true, severity: 'error', message: `Testing submit failed: ${err.message}` });
+    } finally {
+      setCompletingTesting(false);
+    }
+  };
+
   React.useEffect(() => {
-    if (result && result.summary.stage === 'testing' && result.summary.epicKey) {
+    if (result && ['testing', 'published'].includes(result.summary.stage) && result.summary.epicKey) {
       loadTestingComments();
     }
   }, [result, loadTestingComments]);
@@ -397,8 +412,10 @@ export function WorkflowDetailPage() {
     || (summary.stage === 'infra_review' && isInfraReviewer);
   const canStaging = summary.stage === 'env_setup' && (isContentDeveloper || isAdmin);
   const canMessage = isContentReviewer || isInfraReviewer;
-  const hasTestingTab = summary.stage === 'testing' && (isOperations || isAdmin || isDeveloper);
+  const testingStages: WorkflowStage[] = ['testing', 'published'];
+  const hasTestingTab = testingStages.includes(summary.stage);
   const canPostTestingComment = isOperations || isAdmin;
+  const canCompleteTesting = isOperations || isAdmin;
   const stagingTabIndex = hasReviewTab ? 2 : 1;
   const testingTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0);
   const timelineTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0) + (hasTestingTab ? 1 : 0);
@@ -962,17 +979,22 @@ export function WorkflowDetailPage() {
                   disabled={submittingTestingComment}
                   style={{ marginBottom: 8 }}
                 />
-                <Button
-                  variant="contained"
-                  color="primary"
-                  size="small"
-                  style={{ fontWeight: 600 }}
-                  onClick={handlePostTestingComment}
-                  disabled={submittingTestingComment || !testingCommentText.trim()}
-                  startIcon={submittingTestingComment ? <CircularProgress size={16} color="inherit" /> : undefined}
-                >
-                  {submittingTestingComment ? 'Posting...' : 'Post Comment'}
-                </Button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="small"
+                    style={{ fontWeight: 600 }}
+                    onClick={handlePostTestingComment}
+                    disabled={submittingTestingComment || !testingCommentText.trim()}
+                    startIcon={submittingTestingComment ? <CircularProgress size={16} color="inherit" /> : undefined}
+                  >
+                    {submittingTestingComment ? 'Posting...' : 'Post Comment'}
+                  </Button>
+                  <IconButton size="small" onClick={loadTestingComments} disabled={loadingTestingComments}>
+                    <RefreshIcon fontSize="small" />
+                  </IconButton>
+                </div>
               </div>
             )}
             {loadingTestingComments ? (
@@ -1000,17 +1022,20 @@ export function WorkflowDetailPage() {
             ) : (
               <Typography variant="body2" style={{ color: '#757575' }}>No comments yet.</Typography>
             )}
-            <div style={{ marginTop: 12 }}>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<RefreshIcon />}
-                onClick={loadTestingComments}
-                disabled={loadingTestingComments}
-              >
-                Refresh
-              </Button>
-            </div>
+            {canCompleteTesting && summary.stage === 'testing' && (
+              <div style={{ marginTop: 16 }}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  style={{ fontWeight: 600, backgroundColor: '#4caf50' }}
+                  onClick={handleCompleteTesting}
+                  disabled={completingTesting}
+                  startIcon={completingTesting ? <CircularProgress size={16} color="inherit" /> : undefined}
+                >
+                  {completingTesting ? 'Completing...' : 'Complete Testing'}
+                </Button>
+              </div>
+            )}
           </InfoCard>
         )}
 

@@ -576,7 +576,6 @@ async def submit_testing(
     project_slug: str,
     body: TestingRequest,
     auth: tuple[str, int] = Depends(_require_auth),
-    x_github_user: str | None = Header(None, alias="X-GitHub-User"),
 ):
     """Validate testing artifacts, run semantic drift check, then advance workflow.
 
@@ -593,7 +592,8 @@ async def submit_testing(
     from ..services.drift import check_drift_semantic, drift_cache_evict
 
     owner, groups = auth
-    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
+    allowed = GROUP_BITS["rhdp-operations"] | GROUP_BITS["rhdp-administrators"]
+    _require_group(groups, allowed, "rhdp-operations or rhdp-administrators")
     stage = None
     drift_msg = "Design drift detected. Your submission has been referred for additional review."
 
@@ -620,8 +620,6 @@ async def submit_testing(
                 status=409, stage=current,
                 error=f"Workflow is in '{current}' stage. Testing requires 'testing'.",
             ).model_dump())
-
-        _check_github_write_access(body.repo_url, x_github_user)
 
         settings = get_settings()
         if not settings.github_token:

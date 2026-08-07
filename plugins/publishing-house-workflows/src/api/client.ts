@@ -7,7 +7,7 @@ const EXPIRY_STORAGE_KEY = 'ph-central-token-expiry';
 
 const GRAPHQL_QUERY = `
   query GetPublishingHouseWorkflows {
-    ProcessInstances(where: { processId: { equal: "publishinghouseworkflow" }, state: { in: [ACTIVE, ERROR, SUSPENDED] } }) {
+    ProcessInstances(where: { processId: { equal: "publishinghouseworkflow" }, state: { in: [ACTIVE, ERROR, SUSPENDED, COMPLETED] } }) {
       id
       businessKey
       processId
@@ -527,6 +527,26 @@ export function createPhWorkflowsClient(options: {
     return await response.json();
   }
 
+  async function submitTesting(
+    slug: string,
+    repoUrl: string,
+    branch: string = 'main',
+  ): Promise<{ status: number; error?: string; validation?: any }> {
+    const response = await centralFetch(
+      `/projects/testing/${slug}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ repo_url: repoUrl, branch }),
+      },
+    );
+
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body.error || body.detail || `Testing submit failed: ${response.status}`);
+    }
+    return body;
+  }
+
   return {
     getWorkflows,
     getWorkflow,
@@ -539,6 +559,7 @@ export function createPhWorkflowsClient(options: {
     fetchHeadCommitSha,
     deleteProject,
     submitEnvSetup,
+    submitTesting,
     sendMessage,
     getMessages,
     markMessagesRead,

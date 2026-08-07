@@ -667,7 +667,8 @@ def post_testing_comment(
     settings: Settings = Depends(get_settings),
 ):
     owner, groups = auth
-    _require_group(groups, GROUP_BITS["rhdp-operations"], "rhdp-operations")
+    allowed = GROUP_BITS["rhdp-operations"] | GROUP_BITS["rhdp-administrators"]
+    _require_group(groups, allowed, "rhdp-operations or rhdp-administrators")
 
     if not settings.jira_url:
         raise HTTPException(status_code=503, detail="Jira not configured")
