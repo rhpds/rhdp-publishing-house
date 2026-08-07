@@ -51,6 +51,7 @@ interface ComponentRow {
   jiraLabel: string;
   contentType: string;
   createdAt: string;
+  workflowState: string;
 }
 
 function toRow(entity: Entity, wfMap: Record<string, WorkflowSummary>): ComponentRow {
@@ -83,6 +84,7 @@ function toRow(entity: Entity, wfMap: Record<string, WorkflowSummary>): Componen
     jiraLabel,
     contentType: annotations['ph.rhdp.io/content-type'] ?? '',
     createdAt,
+    workflowState: wf?.state ?? '',
   };
 }
 
@@ -192,20 +194,23 @@ export function MaintenancePage() {
       title: 'Actions',
       field: 'name',
       sorting: false,
-      render: (row: ComponentRow) => (
-        <Tooltip title="Delete component and resources">
-          <IconButton
-            size="small"
-            className={classes.deleteButton}
-            onClick={e => {
-              e.stopPropagation();
-              setDeleteTarget(row.entity);
-            }}
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      ),
+      render: (row: ComponentRow) =>
+        row.workflowState === 'COMPLETED' ? (
+          <Typography variant="caption" color="textSecondary">Completed</Typography>
+        ) : (
+          <Tooltip title="Delete component and resources">
+            <IconButton
+              size="small"
+              className={classes.deleteButton}
+              onClick={e => {
+                e.stopPropagation();
+                setDeleteTarget(row.entity);
+              }}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        ),
     },
   ];
 
