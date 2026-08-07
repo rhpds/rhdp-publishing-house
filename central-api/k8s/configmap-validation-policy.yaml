@@ -125,6 +125,10 @@ data:
         aliases:
           - RHOAI
           - OpenShift AI
+      - name: Red Hat Advanced Cluster Management
+        aliases:
+          - RHACM
+          - ACM
       - name: Red Hat Advanced Cluster Security
         aliases:
           - RHACS
@@ -184,6 +188,9 @@ data:
         aliases:
           - Lightwell
           - Lightwell Network
+      - name: Red Hat OpenShift Lightspeed
+        aliases:
+          - OpenShift Lightspeed
 
     provisioning_time_estimates:
       shared-cluster: 5
