@@ -542,6 +542,14 @@ async def submit_development(
                 _patch_workflow_data(wf_uuid, {"hasDrift": False}, settings=settings)
                 logger.info("development: drift cleared for %s", project_slug)
 
+        epic_key = wd.get("epic_key", "")
+        if epic_key and body.repo_url:
+            from .jira import _sync_jira_tasks_bg
+            asyncio.get_event_loop().run_in_executor(
+                None, _sync_jira_tasks_bg, body.repo_url, epic_key, settings, True,
+            )
+            logger.info("development: jira sync dispatched for %s", project_slug)
+
         _advance_workflow(
             project_slug, wf_uuid, owner, stage="development",
             commit_sha=result.commit_sha, settings=settings,
@@ -652,6 +660,12 @@ async def submit_testing(
             commit_sha=result.commit_sha, settings=settings,
         )
         logger.info("testing: submitted for %s", project_slug)
+
+        epic_key = wd.get("epic_key", "")
+        if epic_key:
+            asyncio.get_event_loop().run_in_executor(
+                None, _close_testing_ticket, epic_key, settings,
+            )
 
         return JSONResponse(status_code=201, content=TestingResponse(
             status=201,
@@ -833,6 +847,66 @@ async def reject_infra_review(
     return {"slug": slug, "action": "rejected", "stage": "infra_review"}
 
 
+# ── Jira CI Ticket Helpers ─────────────────────────────────────────────────
+
+
+def _close_dev_ci_ticket(epic_key: str, agnosticv_url: str, ci_url: str, submitter_email: str, settings):
+    """Background: update Dev CI description, assign to submitter, close."""
+    from .jira import _find_task_by_label, _assign_ticket, _transition_to_done, _jira_headers, _SSL_CTX
+    try:
+        task = _find_task_by_label(epic_key, "ph:dev-ci", settings)
+        if not task:
+            logger.info("dev-ci: no Dev CI ticket under %s — skipping", epic_key)
+            return
+
+        desc_lines = []
+        if agnosticv_url:
+            desc_lines.append(f"AgnosticV Catalog Item: {agnosticv_url}")
+        if ci_url:
+            desc_lines.append(f"CI Catalog Item: {ci_url}")
+        if desc_lines:
+            headers = _jira_headers(settings)
+            desc_adf = {
+                "type": "doc",
+                "version": 1,
+                "content": [
+                    {"type": "paragraph", "content": [
+                        {"type": "text", "text": "\n".join(desc_lines)},
+                    ]},
+                ],
+            }
+            req = urllib.request.Request(
+                f"{settings.jira_url}/rest/api/3/issue/{task['key']}",
+                data=json.dumps({"fields": {"description": desc_adf}}).encode(),
+                headers=headers,
+                method="PUT",
+            )
+            with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+                logger.info("dev-ci: updated description for %s", task["key"])
+
+        _assign_ticket(task["key"], submitter_email, settings)
+        _transition_to_done(task["key"], settings)
+        logger.info("dev-ci: closed %s for epic %s", task["key"], epic_key)
+    except Exception as e:
+        logger.warning("dev-ci: failed for epic %s: %s", epic_key, e)
+
+
+def _close_testing_ticket(epic_key: str, settings):
+    """Background: close the Testing ticket."""
+    from .jira import _find_task_by_label, _transition_to_done
+    try:
+        task = _find_task_by_label(epic_key, "ph:testing", settings)
+        if not task:
+            logger.info("testing: no Testing ticket under %s — skipping", epic_key)
+            return
+        if task["status"].lower() == "done":
+            return
+        _transition_to_done(task["key"], settings)
+        logger.info("testing: closed %s for epic %s", task["key"], epic_key)
+    except Exception as e:
+        logger.warning("testing: failed for epic %s: %s", epic_key, e)
+
+
 # ── Env Setup ──────────────────────────────────────────────────────────────
 
 class EnvSetupSubmitRequest(BaseModel):
@@ -863,6 +937,14 @@ async def submit_env_setup(
         "agnosticvUrl": body.agnosticv_url,
         "ciUrl": body.ci_url,
     })
+
+    epic_key = wd.get("epic_key", "")
+    if epic_key:
+        settings = get_settings()
+        asyncio.get_event_loop().run_in_executor(
+            None, _close_dev_ci_ticket, epic_key, body.agnosticv_url, body.ci_url, owner, settings,
+        )
+
     return {"slug": slug, "action": "submitted", "stage": "env_setup"}
 
 

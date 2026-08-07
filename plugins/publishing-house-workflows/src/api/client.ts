@@ -1,5 +1,5 @@
 import { DiscoveryApi, FetchApi, IdentityApi } from '@backstage/core-plugin-api';
-import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult, ReviewMessage, TokenListResponse, RevokeResponse, RevokeAllResponse } from './types';
+import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult, ReviewMessage, TokenListResponse, RevokeResponse, RevokeAllResponse, TestingComment } from './types';
 import { deriveStage } from '../utils/stageMapping';
 
 const TOKEN_STORAGE_KEY = 'ph-central-token';
@@ -480,6 +480,53 @@ export function createPhWorkflowsClient(options: {
     return await response.json();
   }
 
+  async function postTestingComment(
+    epicKey: string,
+    text: string,
+  ): Promise<{ posted: boolean; ticket_key: string }> {
+    const response = await centralFetch(
+      `/jira/${epicKey}/comment`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      },
+    );
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || `Post comment failed: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  async function getTestingComments(
+    epicKey: string,
+  ): Promise<{ comments: TestingComment[]; ticket_key: string }> {
+    const response = await centralFetch(`/jira/${epicKey}/comments`);
+
+    if (!response.ok) return { comments: [], ticket_key: '' };
+
+    return await response.json();
+  }
+
+  async function completeModule(
+    epicKey: string,
+    moduleId: string,
+  ): Promise<{ closed: boolean; ticket_key: string }> {
+    const response = await centralFetch(
+      `/jira/${epicKey}/module/${moduleId}/complete`,
+      { method: 'POST' },
+    );
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || `Module complete failed: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
   return {
     getWorkflows,
     getWorkflow,
@@ -499,5 +546,8 @@ export function createPhWorkflowsClient(options: {
     searchTokens,
     revokeToken,
     revokeAllTokens,
+    postTestingComment,
+    getTestingComments,
+    completeModule,
   };
 }

@@ -134,6 +134,7 @@ spec:
                 project_name: .projectId
                 content_type: .contentType
                 project_description: .projectDescription
+                showroom_type: (.showroomType // "classic")
             actionDataFilter:
               toStateData: .epicResponse
         stateDataFilter:
@@ -329,8 +330,6 @@ spec:
               arguments:
                 repo_url: .repoUrl
                 epic_key: .epic_key
-                agnosticv_url: (.agnosticvUrl // "")
-                ci_url: (.ciUrl // "")
             actionDataFilter:
               toStateData: .jiraSyncResponse
         stateDataFilter:

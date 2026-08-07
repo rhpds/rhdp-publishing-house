@@ -38,7 +38,7 @@ import ReplayIcon from '@material-ui/icons/Replay';
 import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 import MenuBookIcon from '@material-ui/icons/MenuBook';
 import { createPhWorkflowsClient } from '../../api/client';
-import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport } from '../../api/types';
+import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport, TestingComment } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
 import { useUserGroups } from '../../hooks/useUserGroups';
 
@@ -121,7 +121,7 @@ export function WorkflowDetailPage() {
   const centralApiUrl = configApi.getString('phWorkflows.centralApiUrl');
 
   const client = useMemo(() => createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi }), [centralApiUrl, discoveryApi, fetchApi, identityApi]);
-  const { isContentReviewer, isInfraReviewer, isContentDeveloper, isAdmin } = useUserGroups();
+  const { isContentReviewer, isInfraReviewer, isContentDeveloper, isAdmin, isOperations, isDeveloper } = useUserGroups();
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState(0);
@@ -189,6 +189,10 @@ export function WorkflowDetailPage() {
   const [stagingAgnosticvUrl, setStagingAgnosticvUrl] = useState('');
   const [stagingCiUrl, setStagingCiUrl] = useState('');
   const [submittingStaging, setSubmittingStaging] = useState(false);
+  const [testingComments, setTestingComments] = useState<TestingComment[]>([]);
+  const [testingCommentText, setTestingCommentText] = useState('');
+  const [submittingTestingComment, setSubmittingTestingComment] = useState(false);
+  const [loadingTestingComments, setLoadingTestingComments] = useState(false);
 
   const handleApprove = async (stage: WorkflowStage) => {
     if (!result) return;
@@ -316,6 +320,40 @@ export function WorkflowDetailPage() {
     }
   };
 
+  const loadTestingComments = useCallback(async () => {
+    if (!result?.summary.epicKey) return;
+    setLoadingTestingComments(true);
+    try {
+      const data = await client.getTestingComments(result.summary.epicKey);
+      setTestingComments(data.comments);
+    } catch {
+      setTestingComments([]);
+    } finally {
+      setLoadingTestingComments(false);
+    }
+  }, [result, client]);
+
+  const handlePostTestingComment = async () => {
+    if (!result?.summary.epicKey || !testingCommentText.trim()) return;
+    setSubmittingTestingComment(true);
+    try {
+      await client.postTestingComment(result.summary.epicKey, testingCommentText.trim());
+      setTestingCommentText('');
+      setSnackbar({ open: true, severity: 'success', message: 'Comment posted to Jira.' });
+      await loadTestingComments();
+    } catch (err: any) {
+      setSnackbar({ open: true, severity: 'error', message: `Comment failed: ${err.message}` });
+    } finally {
+      setSubmittingTestingComment(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (result && result.summary.stage === 'testing' && result.summary.epicKey) {
+      loadTestingComments();
+    }
+  }, [result, loadTestingComments]);
+
   if (loading) {
     return (
       <Page themeId="tool">
@@ -359,8 +397,11 @@ export function WorkflowDetailPage() {
     || (summary.stage === 'infra_review' && isInfraReviewer);
   const canStaging = summary.stage === 'env_setup' && (isContentDeveloper || isAdmin);
   const canMessage = isContentReviewer || isInfraReviewer;
+  const hasTestingTab = summary.stage === 'testing' && (isOperations || isAdmin || isDeveloper);
+  const canPostTestingComment = isOperations || isAdmin;
   const stagingTabIndex = hasReviewTab ? 2 : 1;
-  const timelineTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0);
+  const testingTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0);
+  const timelineTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0) + (hasTestingTab ? 1 : 0);
 
   return (
     <Page themeId="tool">
@@ -452,6 +493,7 @@ export function WorkflowDetailPage() {
           <Tab label="Overview" />
           {hasReviewTab && <Tab label="Review" />}
           {hasStagingTab && <Tab label="Env Setup" />}
+          {hasTestingTab && <Tab label="Testing" />}
           <Tab label="Timeline" />
         </Tabs>
 
@@ -898,6 +940,77 @@ export function WorkflowDetailPage() {
                 )}
               </>
             )}
+          </InfoCard>
+        )}
+
+        {hasTestingTab && activeTab === testingTabIndex && (
+          <InfoCard title="Testing Comments">
+            <Typography variant="body2" style={{ marginBottom: 16, color: '#757575' }}>
+              Comments posted here are forwarded to the Testing Jira ticket.
+            </Typography>
+            {canPostTestingComment && (
+              <div style={{ marginBottom: 24 }}>
+                <TextField
+                  label="Add a comment"
+                  placeholder="Enter your testing feedback..."
+                  fullWidth
+                  multiline
+                  minRows={3}
+                  variant="outlined"
+                  value={testingCommentText}
+                  onChange={e => setTestingCommentText(e.target.value)}
+                  disabled={submittingTestingComment}
+                  style={{ marginBottom: 8 }}
+                />
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="small"
+                  style={{ fontWeight: 600 }}
+                  onClick={handlePostTestingComment}
+                  disabled={submittingTestingComment || !testingCommentText.trim()}
+                  startIcon={submittingTestingComment ? <CircularProgress size={16} color="inherit" /> : undefined}
+                >
+                  {submittingTestingComment ? 'Posting...' : 'Post Comment'}
+                </Button>
+              </div>
+            )}
+            {loadingTestingComments ? (
+              <Progress />
+            ) : testingComments.length > 0 ? (
+              <div>
+                {testingComments.map((c, i) => (
+                  <div key={i} style={{
+                    padding: '12px 16px',
+                    marginBottom: 8,
+                    borderRadius: 4,
+                    backgroundColor: 'rgba(255,255,255,0.06)',
+                    borderLeft: '3px solid #1976d2',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Typography variant="subtitle2" style={{ fontWeight: 600 }}>{c.author}</Typography>
+                      <Typography variant="caption" style={{ color: '#757575' }}>
+                        {new Date(c.created).toLocaleString()}
+                      </Typography>
+                    </div>
+                    <Typography variant="body2" style={{ whiteSpace: 'pre-wrap' }}>{c.text}</Typography>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Typography variant="body2" style={{ color: '#757575' }}>No comments yet.</Typography>
+            )}
+            <div style={{ marginTop: 12 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<RefreshIcon />}
+                onClick={loadTestingComments}
+                disabled={loadingTestingComments}
+              >
+                Refresh
+              </Button>
+            </div>
           </InfoCard>
         )}
 

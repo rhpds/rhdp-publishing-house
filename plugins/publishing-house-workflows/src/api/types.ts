@@ -225,6 +225,12 @@ export interface RevokeAllResponse {
   revoked_count: number;
 }
 
+export interface TestingComment {
+  author: string;
+  text: string;
+  created: string;
+}
+
 export interface WorkflowSummary {
   id: string;
   projectId: string;
