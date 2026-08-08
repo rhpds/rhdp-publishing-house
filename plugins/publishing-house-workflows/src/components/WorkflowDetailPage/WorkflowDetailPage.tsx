@@ -44,7 +44,7 @@ import { useUserGroups } from '../../hooks/useUserGroups';
 
 const REVIEW_STAGES: WorkflowStage[] = ['content_review', 'infra_review'];
 const STAGES_WITH_REVIEW_TAB: WorkflowStage[] = [
-  'content_review', 'infra_review', 'env_setup', 'development', 'testing',
+  'content_review', 'infra_review', 'env_setup', 'development', 'testing', 'published',
 ];
 
 const CHECK_GROUP_LABELS: Record<string, string> = {
@@ -158,7 +158,8 @@ export function WorkflowDetailPage() {
         .finally(() => setValidationLoading(false));
 
     const driftMode = isReview ? 'structural' : 'semantic';
-    const driftPromise = baselineSha
+    const skipDrift = stage === 'published';
+    const driftPromise = baselineSha && !skipDrift
       ? client.fetchDriftReport(slug, driftMode)
           .then(report => setDriftReport(report))
           .catch((err: any) => setSnackbar({ open: true, severity: 'error', message: `Drift check failed: ${err.message}` }))

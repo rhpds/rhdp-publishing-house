@@ -103,6 +103,7 @@ def create_epic(
         "parent": {"key": epic_key},
         "labels": ["publishing-house", "ph:intake"],
         "assignee": None,
+        STORY_POINTS_FIELD: float(POINTS["intake"]),
         "description": {
             "type": "doc",
             "version": 1,
@@ -133,6 +134,7 @@ def create_epic(
         "parent": {"key": epic_key},
         "labels": ["publishing-house", "ph:testing"],
         "assignee": None,
+        STORY_POINTS_FIELD: float(POINTS["testing"]),
         "description": {
             "type": "doc",
             "version": 1,
@@ -155,7 +157,7 @@ def create_epic(
     except Exception as e:
         logger.warning("jira: Testing task creation failed for epic %s: %s", epic_key, e)
 
-    if body.showroom_type == "classic":
+    if body.showroom_type != "zero_touch":
         dev_ci_fields = {
             "project": {"key": settings.jira_project_key},
             "summary": "[PH] Development CI",
@@ -163,6 +165,7 @@ def create_epic(
             "parent": {"key": epic_key},
             "labels": ["publishing-house", "ph:dev-ci"],
             "assignee": None,
+            STORY_POINTS_FIELD: float(POINTS["dev-ci"]),
             "description": {
                 "type": "doc",
                 "version": 1,
@@ -186,6 +189,12 @@ def create_epic(
         except Exception as e:
             logger.warning("jira: Dev CI task creation failed for epic %s: %s", epic_key, e)
 
+    for ft in FIXED_TASKS:
+        _create_task(
+            epic_key, ft["summary"], "", f"ph:{ft['id']}", settings,
+            points=POINTS.get(ft["id"]),
+        )
+
     jira_url = f"{settings.jira_url}/browse/{epic_key}"
     logger.info("jira: created epic %s for project %s", epic_key, body.project_name)
     return CreateEpicResponse(epic_key=epic_key, jira_url=jira_url)
@@ -195,6 +204,8 @@ def create_epic(
 class SyncRequest(BaseModel):
     repo_url: str
     epic_key: str
+    slug: str = ""
+    status: str = ""
 
 
 class SyncResponse(BaseModel):
@@ -204,6 +215,17 @@ class SyncResponse(BaseModel):
     tasks_closed: int = 0
     intake_closed: bool = False
 
+
+STORY_POINTS_FIELD = "customfield_10028"
+POINTS = {
+    "intake": 8,
+    "module": 13,
+    "dev-ci": 13,
+    "write-automation": 5,
+    "write-health-check": 3,
+    "write-e2e-tests": 5,
+    "testing": 3,
+}
 
 FIXED_TASKS = [
     {"id": "write-automation", "summary": "[PH] Write Automation"},
@@ -460,6 +482,7 @@ def _get_comments(ticket_key: str, settings: Settings) -> list[dict]:
 
 def _create_task(
     epic_key: str, summary: str, description: str, ph_label: str, settings: Settings,
+    points: float | None = None,
 ) -> bool:
     """Create a Jira task under an epic with a ph:{id} label."""
     headers = _jira_headers(settings)
@@ -471,6 +494,8 @@ def _create_task(
         "labels": ["publishing-house", ph_label],
         "assignee": None,
     }
+    if points is not None:
+        fields[STORY_POINTS_FIELD] = float(points)
     if description:
         fields["description"] = {
             "type": "doc",
@@ -508,13 +533,13 @@ async def sync_jira_tasks(
         raise HTTPException(status_code=503, detail="GitHub token not configured")
 
     asyncio.get_event_loop().run_in_executor(
-        None, _sync_jira_tasks_bg, body.repo_url, body.epic_key, settings,
+        None, _sync_jira_tasks_bg, body.repo_url, body.epic_key, settings, body.status, body.slug,
     )
-    logger.info("jira sync: accepted for epic %s — running in background", body.epic_key)
+    logger.info("jira sync: accepted for epic %s (status=%s) — running in background", body.epic_key, body.status)
     return SyncResponse(epic_key=body.epic_key)
 
 
-def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, close_completed: bool = False):
+def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, status: str = "", slug: str = ""):
     """Background thread: sync Jira tasks from spec.yaml, design.md, and module outlines."""
     try:
         gh = GitHubService(token=settings.github_token)
@@ -546,7 +571,7 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, close_
         headers = _jira_headers(settings)
         title = spec_section.get("title", "") or project.get("slug", "")
         content_type = project.get("content_type", "lab")
-        slug = project.get("slug", "")
+        slug = slug or project.get("slug", "")
         epic_summary = f"[PH] {title} — {content_type} ({slug})"
 
         req = urllib.request.Request(
@@ -592,50 +617,68 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, close_
                     label_to_task[label] = task
                     break
 
-        intake_task = label_to_task.get("ph:intake")
-        if intake_task and intake_task["status"].lower() != "done":
-            _transition_to_done(intake_task["key"], settings)
+        if status == "IntakeComplete":
+            intake_task = label_to_task.get("ph:intake")
+            if intake_task and intake_task["status"].lower() != "done":
+                _transition_to_done(intake_task["key"], settings)
+                logger.info("jira sync bg: closed Intake task %s", intake_task["key"])
 
-        modules = spec_section.get("modules", [])
-        desired: dict[str, dict] = {}
-        for i, mod in enumerate(modules, 1):
-            mod_id = mod.get("id", f"module-{i:02d}")
-            mod_title = mod.get("title", f"Module {i}")
-            brief = module_briefs.get(i, "")
-            desired[f"ph:{mod_id}"] = {
-                "summary": f"[PH] Write Module {i}: {mod_title}",
-                "description": brief,
-            }
-
-        for ft in FIXED_TASKS:
-            desired[f"ph:{ft['id']}"] = {
-                "summary": ft["summary"],
-                "description": "",
-            }
+        if status == "EnvSetupComplete":
+            dev_ci_task = label_to_task.get("ph:dev-ci")
+            if dev_ci_task and dev_ci_task["status"].lower() != "done":
+                if slug:
+                    try:
+                        from .projects import _get_workflow_data
+                        wd = _get_workflow_data(slug)
+                        agnosticv_url = wd.get("agnosticvUrl", "")
+                        ci_url = wd.get("ciUrl", "")
+                        if agnosticv_url or ci_url:
+                            desc_lines = []
+                            if agnosticv_url:
+                                desc_lines.append(f"AgnosticV Catalog Item: {agnosticv_url}")
+                            if ci_url:
+                                desc_lines.append(f"CI Catalog Item: {ci_url}")
+                            _update_task_fields(dev_ci_task["key"], dev_ci_task["summary"], "\n".join(desc_lines), settings)
+                    except Exception as e:
+                        logger.warning("jira sync bg: failed to update Dev CI description: %s", e)
+                _transition_to_done(dev_ci_task["key"], settings)
+                logger.info("jira sync bg: closed Dev CI task %s", dev_ci_task["key"])
 
         tasks_created = 0
         tasks_updated = 0
         tasks_closed = 0
 
-        for ph_label, want in desired.items():
-            existing = label_to_task.get(ph_label)
-            if not existing:
-                if _create_task(epic_key, want["summary"], want["description"], ph_label, settings):
-                    tasks_created += 1
-            elif ph_label.startswith("ph:module-") and existing["summary"] != want["summary"]:
-                if _update_task_fields(existing["key"], want["summary"], want["description"], settings):
-                    tasks_updated += 1
+        if status in ("DevelopmentComplete", "TestingComplete"):
+            modules = spec_section.get("modules", [])
+            desired: dict[str, dict] = {}
+            for i, mod in enumerate(modules, 1):
+                mod_id = mod.get("id", f"module-{i:02d}")
+                mod_title = mod.get("title", f"Module {i}")
+                brief = module_briefs.get(i, "")
+                desired[f"ph:{mod_id}"] = {
+                    "summary": f"[PH] Write Module {i}: {mod_title}",
+                    "description": brief,
+                    "points": POINTS["module"],
+                }
 
-        for ph_label, task in label_to_task.items():
-            if (
-                ph_label.startswith("ph:module-")
-                and ph_label not in desired
-                and task["status"].lower() != "done"
-            ):
-                if _transition_to_done(task["key"], settings):
-                    tasks_closed += 1
+            for ph_label, want in desired.items():
+                existing = label_to_task.get(ph_label)
+                if not existing:
+                    if _create_task(epic_key, want["summary"], want["description"], ph_label, settings, points=want.get("points")):
+                        tasks_created += 1
+                elif ph_label.startswith("ph:module-") and existing["summary"] != want["summary"]:
+                    if _update_task_fields(existing["key"], want["summary"], want["description"], settings):
+                        tasks_updated += 1
 
-        if close_completed:
+            for ph_label, task in label_to_task.items():
+                if (
+                    ph_label.startswith("ph:module-")
+                    and ph_label not in desired
+                    and task["status"].lower() != "done"
+                ):
+                    if _transition_to_done(task["key"], settings):
+                        tasks_closed += 1
+
             for mod in modules:
                 mod_id = mod.get("id", "")
                 if mod.get("status") == "complete" and mod_id:

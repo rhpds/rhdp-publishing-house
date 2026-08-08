@@ -27,6 +27,7 @@ STAGE_GROUPS = {
     "review": ["A", "B", "C", "D", "E", "F"],
     "development": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
     "testing": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+    "published": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
 }
 
 
@@ -66,7 +67,7 @@ async def run_validation(
     policy = load_policy()
 
     sparse_paths = ["publishing-house/"]
-    if stage in ("development", "testing"):
+    if stage in ("development", "testing", "published"):
         sparse_paths.append("content/modules/ROOT/pages/*.adoc")
 
     t0 = time.monotonic()

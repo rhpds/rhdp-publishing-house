@@ -286,7 +286,34 @@ spec:
               nextState: ContentReview
           - condition: "${ .showroomType == \"zero_touch\" }"
             transition:
-              nextState: JiraSync
+              nextState: JiraSyncIntake
+        defaultCondition:
+          transition:
+            nextState: JiraSyncIntake
+      - name: JiraSyncIntake
+        type: operation
+        actions:
+          - name: SyncJiraIntake
+            condition: "${ .deploymentMode == \"rhdp_published\" }"
+            functionRef:
+              refName: syncjiratasks
+              arguments:
+                repo_url: .repoUrl
+                epic_key: .epic_key
+                slug: .projectId
+                status: "IntakeComplete"
+            actionDataFilter:
+              toStateData: .jiraSyncResponse
+        stateDataFilter:
+          output: ". | del(.jiraSyncResponse)"
+        transition:
+          nextState: EnvSetupOrDev
+      - name: EnvSetupOrDev
+        type: switch
+        dataConditions:
+          - condition: "${ .showroomType == \"zero_touch\" }"
+            transition:
+              nextState: Development
         defaultCondition:
           transition:
             nextState: EnvSetup
@@ -319,17 +346,19 @@ spec:
         timeouts:
           stateExecTimeout: PT168H
         transition:
-          nextState: JiraSync
-      - name: JiraSync
+          nextState: JiraSyncEnvSetup
+      - name: JiraSyncEnvSetup
         type: operation
         actions:
-          - name: SyncJiraTasks
+          - name: SyncJiraEnvSetup
             condition: "${ .deploymentMode == \"rhdp_published\" }"
             functionRef:
               refName: syncjiratasks
               arguments:
                 repo_url: .repoUrl
                 epic_key: .epic_key
+                slug: .projectId
+                status: "EnvSetupComplete"
             actionDataFilter:
               toStateData: .jiraSyncResponse
         stateDataFilter:
@@ -366,6 +395,24 @@ spec:
         timeouts:
           stateExecTimeout: PT168H
         transition:
+          nextState: JiraSyncDev
+      - name: JiraSyncDev
+        type: operation
+        actions:
+          - name: SyncJiraDev
+            condition: "${ .deploymentMode == \"rhdp_published\" }"
+            functionRef:
+              refName: syncjiratasks
+              arguments:
+                repo_url: .repoUrl
+                epic_key: .epic_key
+                slug: .projectId
+                status: "DevelopmentComplete"
+            actionDataFilter:
+              toStateData: .jiraSyncResponse
+        stateDataFilter:
+          output: ". | del(.jiraSyncResponse)"
+        transition:
           nextState: Testing
       - name: Testing
         type: event
@@ -394,6 +441,24 @@ spec:
             }
         timeouts:
           stateExecTimeout: PT168H
+        transition:
+          nextState: JiraSyncFinal
+      - name: JiraSyncFinal
+        type: operation
+        actions:
+          - name: SyncJiraFinal
+            condition: "${ .deploymentMode == \"rhdp_published\" }"
+            functionRef:
+              refName: syncjiratasks
+              arguments:
+                repo_url: .repoUrl
+                epic_key: .epic_key
+                slug: .projectId
+                status: "TestingComplete"
+            actionDataFilter:
+              toStateData: .jiraSyncResponse
+        stateDataFilter:
+          output: ". | del(.jiraSyncResponse)"
         transition:
           nextState: Published
       - name: Published
