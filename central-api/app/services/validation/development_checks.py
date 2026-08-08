@@ -117,7 +117,7 @@ def run_checks(
         ))
 
     # J-06: showroom_content_status must be "complete"
-    content_status = spec_data.get("showroom_content_status", "")
+    content_status = spec_data.get("showroom_content_status", "not_started")
     if content_status == "complete":
         results.append(CheckResult(
             check_id="J-06", group="J", status=CheckStatus.PASS,
@@ -127,7 +127,7 @@ def run_checks(
     else:
         results.append(CheckResult(
             check_id="J-06", group="J", status=CheckStatus.FAIL,
-            message=f"showroom_content_status is '{content_status or 'not set'}' — must be 'complete'",
+            message="showroom_content_status is not complete",
             field="showroom_content_status",
         ))
 
