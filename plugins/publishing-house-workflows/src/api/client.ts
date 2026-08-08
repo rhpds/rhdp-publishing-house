@@ -300,6 +300,7 @@ export function createPhWorkflowsClient(options: {
       infra_review: 'review',
       development: 'development',
       testing: 'testing',
+      published: 'published',
     };
     const stage = stageMap[workflowStage ?? ''] ?? 'review';
     const params = new URLSearchParams({ stage });

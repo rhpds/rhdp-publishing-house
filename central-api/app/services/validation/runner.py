@@ -27,6 +27,7 @@ STAGE_GROUPS = {
     "review": ["A", "B", "C", "D", "E", "F"],
     "development": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
     "testing": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+    "published": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
 }
 
 
@@ -45,6 +46,14 @@ def _read_project_files(repo: ClonedRepo) -> dict:
                 outline_files[fname] = content
 
     page_files = repo.list_dir("content/modules/ROOT/pages")
+    has_nav = repo.read_file("content/modules/ROOT/nav.adoc") is not None
+
+    page_contents: dict[str, str] = {}
+    for fname in page_files:
+        if fname.endswith(".adoc"):
+            content = repo.read_file(f"content/modules/ROOT/pages/{fname}")
+            if content is not None:
+                page_contents[fname] = content
 
     spec_data = yaml.safe_load(spec_raw) if spec_raw else None
     return {
@@ -53,6 +62,8 @@ def _read_project_files(repo: ClonedRepo) -> dict:
         "manifest_text": manifest_text,
         "outline_files": outline_files,
         "page_files": page_files,
+        "page_contents": page_contents,
+        "has_nav": has_nav,
     }
 
 
@@ -66,8 +77,9 @@ async def run_validation(
     policy = load_policy()
 
     sparse_paths = ["publishing-house/"]
-    if stage in ("development", "testing"):
+    if stage in ("development", "testing", "published"):
         sparse_paths.append("content/modules/ROOT/pages/*.adoc")
+        sparse_paths.append("content/modules/ROOT/nav.adoc")
 
     t0 = time.monotonic()
     repo = await github.clone_repo(repo_url, branch, sparse_paths=sparse_paths)
@@ -122,7 +134,10 @@ async def run_validation(
             all_results.extend(compute_results)
 
         if "J" in groups:
-            all_results.extend(development_checks.run_checks(spec_data, outline_files, files["page_files"]))
+            all_results.extend(development_checks.run_checks(
+                spec_data, outline_files, files["page_files"],
+                files.get("has_nav", False), files.get("page_contents", {}),
+            ))
 
         passed = not any(r.status == CheckStatus.FAIL for r in all_results)
 
