@@ -319,10 +319,12 @@ def _transition_to_done(task_key: str, settings: Settings) -> bool:
         return False
 
 
-def _update_task_fields(task_key: str, summary: str, description: str, settings: Settings) -> bool:
+def _update_task_fields(task_key: str, summary: str, description: str, settings: Settings, points: float | None = None) -> bool:
     """Update a Jira task's summary and description."""
     headers = _jira_headers(settings)
     fields: dict = {"summary": summary}
+    if points is not None:
+        fields[STORY_POINTS_FIELD] = float(points)
     if description:
         fields["description"] = {
             "type": "doc",
@@ -617,11 +619,31 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, status
                     label_to_task[label] = task
                     break
 
+        tasks_created = 0
+        tasks_updated = 0
+        tasks_closed = 0
+
+        modules = spec_section.get("modules", [])
+        desired: dict[str, dict] = {}
+        for i, mod in enumerate(modules, 1):
+            mod_id = mod.get("id", f"module-{i:02d}")
+            mod_title = mod.get("title", f"Module {i}")
+            brief = module_briefs.get(i, "")
+            desired[f"ph:{mod_id}"] = {
+                "summary": f"[PH] Write Module {i}: {mod_title}",
+                "description": brief,
+                "points": POINTS["module"],
+            }
+
         if status == "IntakeComplete":
             intake_task = label_to_task.get("ph:intake")
             if intake_task and intake_task["status"].lower() != "done":
                 _transition_to_done(intake_task["key"], settings)
                 logger.info("jira sync bg: closed Intake task %s", intake_task["key"])
+            for ph_label, want in desired.items():
+                if not label_to_task.get(ph_label):
+                    if _create_task(epic_key, want["summary"], want["description"], ph_label, settings, points=want.get("points")):
+                        tasks_created += 1
 
         if status == "EnvSetupComplete":
             dev_ci_task = label_to_task.get("ph:dev-ci")
@@ -644,31 +666,26 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, status
                 _transition_to_done(dev_ci_task["key"], settings)
                 logger.info("jira sync bg: closed Dev CI task %s", dev_ci_task["key"])
 
-        tasks_created = 0
-        tasks_updated = 0
-        tasks_closed = 0
-
         if status in ("DevelopmentComplete", "TestingComplete"):
-            modules = spec_section.get("modules", [])
-            desired: dict[str, dict] = {}
-            for i, mod in enumerate(modules, 1):
-                mod_id = mod.get("id", f"module-{i:02d}")
-                mod_title = mod.get("title", f"Module {i}")
-                brief = module_briefs.get(i, "")
-                desired[f"ph:{mod_id}"] = {
-                    "summary": f"[PH] Write Module {i}: {mod_title}",
-                    "description": brief,
-                    "points": POINTS["module"],
-                }
-
+            newly_created_labels = []
             for ph_label, want in desired.items():
                 existing = label_to_task.get(ph_label)
                 if not existing:
                     if _create_task(epic_key, want["summary"], want["description"], ph_label, settings, points=want.get("points")):
                         tasks_created += 1
-                elif ph_label.startswith("ph:module-") and existing["summary"] != want["summary"]:
+                        newly_created_labels.append(ph_label)
+                elif existing["summary"] != want["summary"]:
                     if _update_task_fields(existing["key"], want["summary"], want["description"], settings):
                         tasks_updated += 1
+
+            if newly_created_labels:
+                existing_tasks = _get_epic_tasks(epic_key, settings)
+                label_to_task = {}
+                for task in existing_tasks:
+                    for label in task["labels"]:
+                        if label.startswith("ph:"):
+                            label_to_task[label] = task
+                            break
 
             for ph_label, task in label_to_task.items():
                 if (
@@ -676,6 +693,7 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, status
                     and ph_label not in desired
                     and task["status"].lower() != "done"
                 ):
+                    _update_task_fields(task["key"], f"{task['summary']} [Removed]", "", settings, points=0)
                     if _transition_to_done(task["key"], settings):
                         tasks_closed += 1
 

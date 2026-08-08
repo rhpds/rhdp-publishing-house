@@ -921,15 +921,6 @@ async def approve_drift(
     drift_cache_evict(slug)
     logger.info("drift approved for %s by %s — baselineSha=%s", slug, owner, head_sha[:8])
 
-    epic_key = wd.get("epic_key", "")
-    if epic_key and repo_url:
-        from .jira import _sync_jira_tasks_bg
-        import asyncio
-        asyncio.get_event_loop().run_in_executor(
-            None, _sync_jira_tasks_bg, repo_url, epic_key, settings, "DevelopmentComplete", slug,
-        )
-        logger.info("drift approve: jira sync dispatched for %s", slug)
-
     return {"slug": slug, "baselineSha": head_sha, "cleared": True}
 
 
