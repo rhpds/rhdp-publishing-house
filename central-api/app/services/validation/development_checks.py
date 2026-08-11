@@ -116,22 +116,7 @@ def run_checks(
             field="content/modules/ROOT/nav.adoc",
         ))
 
-    # J-06: showroom_content_status must be "complete"
-    content_status = spec_data.get("showroom_content_status", "not_started")
-    if content_status == "complete":
-        results.append(CheckResult(
-            check_id="J-06", group="J", status=CheckStatus.PASS,
-            message="showroom_content_status is complete",
-            field="showroom_content_status",
-        ))
-    else:
-        results.append(CheckResult(
-            check_id="J-06", group="J", status=CheckStatus.FAIL,
-            message="showroom_content_status is not complete",
-            field="showroom_content_status",
-        ))
-
-    # J-07: No placeholder text in .adoc pages
+    # J-06: No placeholder text in .adoc pages
     if page_contents:
         files_with_placeholders = []
         for fname, content in sorted(page_contents.items()):
@@ -140,13 +125,13 @@ def run_checks(
                 files_with_placeholders.append(f"{fname} ({', '.join(set(matches))})")
         if files_with_placeholders:
             results.append(CheckResult(
-                check_id="J-07", group="J", status=CheckStatus.FAIL,
+                check_id="J-06", group="J", status=CheckStatus.FAIL,
                 message=f"Placeholder text found in: {', '.join(files_with_placeholders[:5])}",
                 field="content/modules/ROOT/pages/",
             ))
         else:
             results.append(CheckResult(
-                check_id="J-07", group="J", status=CheckStatus.PASS,
+                check_id="J-06", group="J", status=CheckStatus.PASS,
                 message="No placeholder text found in .adoc pages",
                 field="content/modules/ROOT/pages/",
             ))
