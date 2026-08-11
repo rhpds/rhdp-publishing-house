@@ -85,5 +85,3 @@ approval_checklist:
     agnosticv_base_ci: ""
     approved_by: ""
     rejections: []
-
-showroom_content_status: not_started
