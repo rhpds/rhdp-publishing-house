@@ -175,7 +175,7 @@ spec:
       input:
         repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
         templateRepo: https://github.com/rhpds/rhdp-publishing-house-template
-        description: ${{ parameters.project_description | truncate(350, true, '...') }}
+        description: https://rhpds.github.io/${{ parameters.project_name }}
         defaultBranch: main
         repoVisibility: public
         gitCommitMessage: "Add templated skeleton artifacts"
