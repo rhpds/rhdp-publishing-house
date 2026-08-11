@@ -33,8 +33,7 @@ spec:
         project_description:
           title: Project Description
           type: string
-          maxLength: 1500
-          description: Brief overview of what this project will deliver (max 1500 characters)
+          description: Brief overview of what this project will deliver
           ui:widget: textarea
           ui:options:
             rows: 3
@@ -176,7 +175,7 @@ spec:
       input:
         repoUrl: github.com?owner=rhpds&repo=${{ parameters.project_name }}
         templateRepo: https://github.com/rhpds/rhdp-publishing-house-template
-        description: ${{ parameters.project_description }}
+        description: ${{ parameters.project_description | truncate(350, true, '...') }}
         defaultBranch: main
         repoVisibility: public
         gitCommitMessage: "Add templated skeleton artifacts"
