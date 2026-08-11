@@ -33,7 +33,8 @@ spec:
         project_description:
           title: Project Description
           type: string
-          description: Brief overview of what this project will deliver
+          maxLength: 1500
+          description: Brief overview of what this project will deliver (max 1500 characters)
           ui:widget: textarea
           ui:options:
             rows: 3
