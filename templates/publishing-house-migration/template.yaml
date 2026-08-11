@@ -213,7 +213,7 @@ spec:
           intake_type: migration
 
     - id: register
-      name: Register in Backstage Catalog
+      name: Register in Developer Hub Catalog
       if: ${{ steps['check-catalog'].output.entity == null }}
       action: catalog:register
       input:
@@ -255,7 +255,7 @@ spec:
           **Here's what we set up for you:**
           1. Repository created with content from `${{ parameters.source_repo }}`
           2. catalog-info.yaml added to repository
-          3. Registered in Backstage catalog
+          3. Registered in Developer Hub catalog
           4. Orchestrator workflow started
 
           **What happens next:**
