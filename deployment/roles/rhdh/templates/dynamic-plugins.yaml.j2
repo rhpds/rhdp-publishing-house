@@ -117,6 +117,22 @@ plugins:
   - disabled: false
     package: 'oci://quay.io/rhpds/backstage-plugin-scaffolder-backend-module-publishing-house:1.1.5!backstage-plugin-scaffolder-backend-module-publishing-house'
   - disabled: false
+    package: 'oci://quay.io/rhpds/backstage-plugin-readme-backend:0.1.0!backstage-plugin-readme-backend'
+  - disabled: false
+    package: 'oci://quay.io/rhpds/backstage-plugin-readme:0.1.0!backstage-plugin-readme'
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          backstage-plugin-readme:
+            mountPoints:
+              - mountPoint: entity.page.overview/cards
+                importName: ReadmeCard
+                config:
+                  props:
+                    variant: gridItem
+                  layout:
+                    gridColumnEnd: span 12
+  - disabled: false
     package: ./dynamic-plugins/dist/backstage-community-plugin-rbac
   - disabled: false
     package: ./dynamic-plugins/dist/backstage-plugin-notifications
