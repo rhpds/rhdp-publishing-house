@@ -13,7 +13,7 @@ project:
   initiative_key: "${{ values.initiative_key }}"
   showroom_type: "${{ values.showroom_type }}"
   intake_type: "${{ values.intake_type }}"
-  description: "${{ values.project_description }}"
+  description: "${{ values.project_description | replace('\r', '') | replace('\n', ' ') | replace('\t', ' ') | replace('\\', '\\\\') | replace('"', '\\"') }}"
   # content_reviewer_email and infra_reviewer_email are assigned by the RHDP team — not set by the author
   jira_ticket: ""
   workflow_id: ""
