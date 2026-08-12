@@ -409,8 +409,8 @@ export function WorkflowDetailPage() {
   const isReviewStage = REVIEW_STAGES.includes(summary.stage);
   const hasReviewTab = STAGES_WITH_REVIEW_TAB.includes(summary.stage);
   const hasStagingTab = summary.stage === 'env_setup' || Boolean(wd?.agnosticvUrl) || Boolean(wd?.ciUrl);
-  const canReview = (summary.stage === 'content_review' && isContentReviewer)
-    || (summary.stage === 'infra_review' && isInfraReviewer);
+  const canReview = (summary.stage === 'content_review' && (isContentReviewer || isAdmin))
+    || (summary.stage === 'infra_review' && (isInfraReviewer || isAdmin));
   const canStaging = summary.stage === 'env_setup' && (isContentDeveloper || isAdmin);
   const canMessage = isContentReviewer || isInfraReviewer;
   const testingStages: WorkflowStage[] = ['testing', 'published'];

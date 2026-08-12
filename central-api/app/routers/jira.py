@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
-from ..auth.groups import GROUP_BITS
+from ..auth.groups import GROUP_BITS, lookup_group_members
 from ..config import get_settings, Settings
 from ..services.github import GitHubService
 from .projects import _require_auth, _require_group
@@ -32,6 +32,7 @@ class CreateEpicRequest(BaseModel):
     deployment_mode: str = ""
     project_description: str = ""
     showroom_type: str = ""
+    sso_email: str = ""
 
 
 class CreateEpicResponse(BaseModel):
@@ -65,12 +66,18 @@ def create_epic(
     if body.content_type:
         labels.append(body.content_type)
 
+    assignee = None
+    if body.sso_email:
+        jira_user = _lookup_jira_account_id(body.sso_email, settings)
+        if jira_user and jira_user["accountId"]:
+            assignee = {"accountId": jira_user["accountId"]}
+
     fields: dict = {
         "project": {"key": settings.jira_project_key},
         "summary": f"[PH] {body.project_name}",
         "issuetype": {"name": "Epic"},
         "labels": labels,
-        "assignee": None,
+        "assignee": assignee,
     }
     if body.project_description:
         fields["description"] = {
@@ -199,6 +206,81 @@ def create_epic(
     logger.info("jira: created epic %s for project %s", epic_key, body.project_name)
     return CreateEpicResponse(epic_key=epic_key, jira_url=jira_url)
 
+
+
+def _lookup_jira_account_id(email: str, settings: Settings) -> dict | None:
+    """Look up a Jira user by email. Returns {accountId, displayName} or None."""
+    headers = _jira_headers(settings)
+    search_url = f"{settings.jira_url}/rest/api/3/user/search?query={urllib.parse.quote(email)}"
+    req = urllib.request.Request(search_url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
+            users = json.loads(r.read().decode())
+    except Exception as e:
+        logger.warning("jira: user search failed for %s: %s", email, e)
+        return None
+
+    if not users:
+        return None
+    return {
+        "accountId": users[0].get("accountId", ""),
+        "displayName": users[0].get("displayName", email),
+    }
+
+
+_GROUP_LABELS = {
+    "rhdp-content-review": "Content Review",
+    "rhdp-infra-review": "Infra Review",
+}
+
+
+def notify_reviewers_bg(epic_key: str, group_name: str, settings: Settings) -> None:
+    """Background: look up group members, resolve Jira IDs, post a comment with @mentions."""
+    review_label = _GROUP_LABELS.get(group_name, group_name)
+    try:
+        emails = lookup_group_members(group_name)
+        if not emails:
+            logger.warning("notify_reviewers: no members found in group %s", group_name)
+            return
+
+        mention_nodes = []
+        for email in emails:
+            jira_user = _lookup_jira_account_id(email, settings)
+            if not jira_user or not jira_user["accountId"]:
+                continue
+            if mention_nodes:
+                mention_nodes.append({"type": "text", "text": " "})
+            mention_nodes.append({
+                "type": "mention",
+                "attrs": {
+                    "id": jira_user["accountId"],
+                    "text": f"@{jira_user['displayName']}",
+                    "accessLevel": "",
+                },
+            })
+
+        if not mention_nodes:
+            logger.warning("notify_reviewers: no Jira users resolved for group %s", group_name)
+            return
+
+        content = [
+            {"type": "paragraph", "content": mention_nodes + [
+                {"type": "text", "text": f" this project is ready for {review_label}."},
+            ]},
+        ]
+
+        headers = _jira_headers(settings)
+        comment_body = {"body": {"type": "doc", "version": 1, "content": content}}
+        req = urllib.request.Request(
+            f"{settings.jira_url}/rest/api/3/issue/{epic_key}/comment",
+            data=json.dumps(comment_body).encode(),
+            headers=headers,
+            method="POST",
+        )
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+            logger.info("notify_reviewers: posted %s comment on %s", review_label, epic_key)
+    except Exception as e:
+        logger.error("notify_reviewers: failed for %s: %s", epic_key, e, exc_info=True)
 
 
 class SyncRequest(BaseModel):
