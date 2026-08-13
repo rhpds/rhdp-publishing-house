@@ -186,7 +186,7 @@ export function DriftDashboardPage() {
   const fetchApi = useApi(fetchApiRef);
   const identityApi = useApi(identityApiRef);
   const centralApiUrl = configApi.getString('phWorkflows.centralApiUrl');
-  const { isContentReviewer } = useUserGroups();
+  const { isContentReviewer, isAdmin } = useUserGroups();
   const [refreshKey, setRefreshKey] = useState(0);
   const [rowStates, setRowStates] = useState<Record<string, DriftRowState>>({});
 
@@ -341,7 +341,7 @@ export function DriftDashboardPage() {
                   state={rowStates[rowData.projectId]}
                   onFetch={fetchDrift}
                   onApprove={handleApprove}
-                  canApprove={isContentReviewer}
+                  canApprove={isContentReviewer || isAdmin}
                   classes={classes}
                 />
               ),

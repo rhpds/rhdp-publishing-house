@@ -77,6 +77,46 @@ def lookup_user_groups(email: str) -> int:
         return 0
 
 
+def lookup_group_members(group_name: str) -> list[str]:
+    """Query Backstage catalog for all members of a group. Returns list of emails."""
+    settings = get_settings()
+    if not settings.rhdh_service_token or not settings.rhdh_internal_url:
+        logger.warning("RHDH_SERVICE_TOKEN or RHDH_INTERNAL_URL not configured")
+        return []
+
+    url = f"{settings.rhdh_internal_url.rstrip('/')}/api/catalog/entities/by-name/group/default/{group_name}"
+    headers = {
+        "Authorization": f"Bearer {settings.rhdh_service_token}",
+        "Accept": "application/json",
+    }
+
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
+            entity = json.loads(r.read().decode())
+
+        relations = entity.get("relations", [])
+        emails = []
+        for rel in relations:
+            if rel.get("type") == "hasMember":
+                target = rel.get("targetRef", "")
+                if target.startswith("user:default/"):
+                    username = target.removeprefix("user:default/")
+                    emails.append(f"{username}@redhat.com")
+
+        logger.info("group %s members: %s", group_name, emails)
+        return emails
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            logger.warning("group %s not found in Backstage catalog", group_name)
+            return []
+        logger.error("catalog lookup failed for group %s: %s", group_name, e)
+        return []
+    except Exception as e:
+        logger.error("catalog lookup failed for group %s: %s", group_name, e)
+        return []
+
+
 # ── Signed bitmask token helpers ─────────────────────────────────────────────
 
 

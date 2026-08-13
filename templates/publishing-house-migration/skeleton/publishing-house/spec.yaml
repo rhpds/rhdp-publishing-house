@@ -13,6 +13,7 @@ project:
   initiative_key: "${{ values.initiative_key }}"
   showroom_type: "${{ values.showroom_type }}"
   intake_type: "${{ values.intake_type }}"
+  automation_type: "${{ values.automation_type }}"
   description: "${{ values.project_description | replace('\r', '') | replace('\n', ' ') | replace('\t', ' ') | replace('\\', '\\\\') | replace('"', '\\"') }}"
   # content_reviewer_email and infra_reviewer_email are assigned by the RHDP team — not set by the author
   jira_ticket: ""
@@ -56,6 +57,14 @@ spec:
     gpu_type: ""                       # e.g. NVIDIA A100 40GB (required if gpu_nodes > 0)
   duration_hours: null
   audience: ""               # beginner | intermediate | advanced
+
+development:
+  automation:
+    status: not_started
+  e2e:
+    status: not_started
+  healthCheck:
+    status: not_started
 
 compliance:
   last_hard_check: null

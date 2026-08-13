@@ -448,6 +448,14 @@ async def submit_intake(
         )
         logger.info("intake: submitted for %s", project_slug)
 
+        epic_key = wd.get("epic_key", "")
+        if epic_key and settings.jira_url:
+            from .jira import notify_reviewers_bg
+            asyncio.get_event_loop().run_in_executor(
+                None, notify_reviewers_bg,
+                epic_key, "rhdp-content-review", settings,
+            )
+
         return JSONResponse(status_code=201, content=IntakeResponse(
             status=201,
         ).model_dump())
@@ -738,7 +746,7 @@ async def approve_content_review(
     auth: tuple[str, int] = Depends(_require_auth),
 ):
     owner, groups = auth
-    _require_group(groups, GROUP_BITS["rhdp-content-review"], "rhdp-content-review")
+    _require_group(groups, GROUP_BITS["rhdp-content-review"] | GROUP_BITS["rhdp-administrators"], "rhdp-content-review or rhdp-administrators")
 
     wd = _get_workflow_data(slug)
     wf_uuid = wd.get("workflow_id", "")
@@ -753,6 +761,16 @@ async def approve_content_review(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "commitSha": body.commit_sha,
     })
+
+    epic_key = wd.get("epic_key", "")
+    settings = get_settings()
+    if epic_key and settings.jira_url:
+        from .jira import notify_reviewers_bg
+        asyncio.get_event_loop().run_in_executor(
+            None, notify_reviewers_bg,
+            epic_key, "rhdp-infra-review", settings,
+        )
+
     return {"slug": slug, "action": "approved", "stage": "content_review"}
 
 
@@ -763,7 +781,7 @@ async def reject_content_review(
     auth: tuple[str, int] = Depends(_require_auth),
 ):
     owner, groups = auth
-    _require_group(groups, GROUP_BITS["rhdp-content-review"], "rhdp-content-review")
+    _require_group(groups, GROUP_BITS["rhdp-content-review"] | GROUP_BITS["rhdp-administrators"], "rhdp-content-review or rhdp-administrators")
 
     wd = _get_workflow_data(slug)
     wf_uuid = wd.get("workflow_id", "")
@@ -792,7 +810,7 @@ async def approve_infra_review(
     auth: tuple[str, int] = Depends(_require_auth),
 ):
     owner, groups = auth
-    _require_group(groups, GROUP_BITS["rhdp-infra-review"], "rhdp-infra-review")
+    _require_group(groups, GROUP_BITS["rhdp-infra-review"] | GROUP_BITS["rhdp-administrators"], "rhdp-infra-review or rhdp-administrators")
 
     wd = _get_workflow_data(slug)
     wf_uuid = wd.get("workflow_id", "")
@@ -817,7 +835,7 @@ async def reject_infra_review(
     auth: tuple[str, int] = Depends(_require_auth),
 ):
     owner, groups = auth
-    _require_group(groups, GROUP_BITS["rhdp-infra-review"], "rhdp-infra-review")
+    _require_group(groups, GROUP_BITS["rhdp-infra-review"] | GROUP_BITS["rhdp-administrators"], "rhdp-infra-review or rhdp-administrators")
 
     wd = _get_workflow_data(slug)
     wf_uuid = wd.get("workflow_id", "")
@@ -882,7 +900,7 @@ async def approve_drift(
     auth: tuple[str, int] = Depends(_require_auth),
 ):
     owner, groups = auth
-    _require_group(groups, GROUP_BITS["rhdp-content-review"], "rhdp-content-review")
+    _require_group(groups, GROUP_BITS["rhdp-content-review"] | GROUP_BITS["rhdp-administrators"], "rhdp-content-review or rhdp-administrators")
 
     settings = get_settings()
     if not settings.github_token:
