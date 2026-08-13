@@ -852,13 +852,13 @@ def get_testing_comments(
     return {"comments": comments, "ticket_key": task["key"]}
 
 
-# ── Module Complete ──────────────────────────────────────────────────────────
+# ── Task Complete ────────────────────────────────────────────────────────────
 
 
-@router.post("/{epic_key}/module/{module_id}/complete")
-def complete_module(
+@router.post("/{epic_key}/task/{task_id}/complete")
+def complete_task(
     epic_key: str,
-    module_id: str,
+    task_id: str,
     auth: tuple[str, int] = Depends(_require_auth),
     settings: Settings = Depends(get_settings),
 ):
@@ -868,9 +868,9 @@ def complete_module(
     if not settings.jira_url:
         return {"closed": False, "ticket_key": "", "detail": "Jira not configured"}
 
-    task = _find_task_by_label(epic_key, f"ph:{module_id}", settings)
+    task = _find_task_by_label(epic_key, f"ph:{task_id}", settings)
     if not task:
-        return {"closed": False, "ticket_key": "", "detail": f"No ticket found for {module_id}"}
+        return {"closed": False, "ticket_key": "", "detail": f"No ticket found for {task_id}"}
 
     if task["status"].lower() == "done":
         return {"closed": True, "ticket_key": task["key"], "detail": "Already closed"}

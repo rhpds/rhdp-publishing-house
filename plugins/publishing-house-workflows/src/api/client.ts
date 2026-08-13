@@ -511,18 +511,18 @@ export function createPhWorkflowsClient(options: {
     return await response.json();
   }
 
-  async function completeModule(
+  async function completeTask(
     epicKey: string,
-    moduleId: string,
+    taskId: string,
   ): Promise<{ closed: boolean; ticket_key: string }> {
     const response = await centralFetch(
-      `/jira/${epicKey}/module/${moduleId}/complete`,
+      `/jira/${epicKey}/task/${taskId}/complete`,
       { method: 'POST' },
     );
 
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      throw new Error(body.detail || `Module complete failed: ${response.status}`);
+      throw new Error(body.detail || `Task complete failed: ${response.status}`);
     }
 
     return await response.json();
@@ -570,6 +570,6 @@ export function createPhWorkflowsClient(options: {
     revokeAllTokens,
     postTestingComment,
     getTestingComments,
-    completeModule,
+    completeTask,
   };
 }
