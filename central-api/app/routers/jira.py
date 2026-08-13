@@ -300,12 +300,12 @@ class SyncResponse(BaseModel):
 
 STORY_POINTS_FIELD = "customfield_10028"
 POINTS = {
-    "intake": 8,
-    "module": 13,
-    "dev-ci": 13,
-    "write-automation": 5,
+    "intake": 3,
+    "module": 10,
+    "dev-ci": 5,
+    "write-automation": 8,
     "write-health-check": 3,
-    "write-e2e-tests": 5,
+    "write-e2e-tests": 8,
     "testing": 3,
 }
 
