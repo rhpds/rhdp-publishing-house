@@ -160,6 +160,21 @@ export function createGithubRepoFromTemplateAction(options: {
         ctx.logger.info('Overlaying workspace files...');
         copyDirSync(workspacePath, cloneDir);
 
+        for (const strip of ['site.yml', 'ui-config.yml']) {
+          const p = path.join(cloneDir, strip);
+          if (fs.existsSync(p)) {
+            fs.unlinkSync(p);
+            ctx.logger.info(`Stripped template file: ${strip}`);
+          }
+        }
+        const contentDir = path.join(cloneDir, 'content');
+        if (fs.existsSync(contentDir) && fs.statSync(contentDir).isDirectory()) {
+          fs.rmSync(contentDir, { recursive: true });
+          fs.mkdirSync(contentDir, { recursive: true });
+          fs.writeFileSync(path.join(contentDir, '.gitkeep'), '');
+          ctx.logger.info('Stripped content/ directory (replaced with .gitkeep)');
+        }
+
         await git.add({ fs, dir: cloneDir, filepath: '.' });
 
         const commitHash = await git.commit({

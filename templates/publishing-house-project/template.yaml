@@ -103,6 +103,7 @@ spec:
       required:
         - initiative_key
         - showroom_type
+        - automation_type
       properties:
         initiative_key:
           title: Initiative
@@ -130,6 +131,20 @@ spec:
           default: classic
           ui:help: Classic = standard Showroom lab. Zero Touch = embedded runtime/setup automation.
 
+        automation_type:
+          title: Automation Type
+          type: string
+          enum:
+            - ansible
+            - gitops
+            - both
+          enumNames:
+            - Ansible
+            - GitOps
+            - Both (Ansible + GitOps)
+          default: ansible
+          ui:help: What type of automation will this project use?
+
   steps:
     # Step 1: Check if project name is already taken
     - id: check-catalog
@@ -156,6 +171,7 @@ spec:
           repo_url: https://github.com/rhpds/${{ parameters.project_name }}
           initiative_key: ${{ parameters.initiative_key }}
           showroom_type: ${{ parameters.showroom_type }}
+          automation_type: ${{ parameters.automation_type }}
           intake_type: new
           devspaces_url: https://devspaces.${{ environment.parameters.baseDomain }}
           central_api_url: https://central-api-publishing-house.${{ environment.parameters.baseDomain }}

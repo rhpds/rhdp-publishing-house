@@ -136,4 +136,50 @@ def run_checks(
                 field="content/modules/ROOT/pages/",
             ))
 
+    # J-07: development.automation.status must be "complete"
+    dev = spec_data.get("development", {})
+    auto_status = dev.get("automation", {}).get("status", "")
+    if auto_status == "complete":
+        results.append(CheckResult(
+            check_id="J-07", group="J", status=CheckStatus.PASS,
+            message="Automation status is complete",
+            field="development.automation.status",
+        ))
+    else:
+        results.append(CheckResult(
+            check_id="J-07", group="J", status=CheckStatus.FAIL,
+            message=f"Automation status is '{auto_status or 'not set'}', expected 'complete'",
+            field="development.automation.status",
+        ))
+
+    # J-08: development.e2e.status must be "complete"
+    e2e_status = dev.get("e2e", {}).get("status", "")
+    if e2e_status == "complete":
+        results.append(CheckResult(
+            check_id="J-08", group="J", status=CheckStatus.PASS,
+            message="E2E testing status is complete",
+            field="development.e2e.status",
+        ))
+    else:
+        results.append(CheckResult(
+            check_id="J-08", group="J", status=CheckStatus.FAIL,
+            message=f"E2E testing status is '{e2e_status or 'not set'}', expected 'complete'",
+            field="development.e2e.status",
+        ))
+
+    # J-09: development.healthCheck.status must be "complete"
+    hc_status = dev.get("healthCheck", {}).get("status", "")
+    if hc_status == "complete":
+        results.append(CheckResult(
+            check_id="J-09", group="J", status=CheckStatus.PASS,
+            message="Health check status is complete",
+            field="development.healthCheck.status",
+        ))
+    else:
+        results.append(CheckResult(
+            check_id="J-09", group="J", status=CheckStatus.FAIL,
+            message=f"Health check status is '{hc_status or 'not set'}', expected 'complete'",
+            field="development.healthCheck.status",
+        ))
+
     return results
