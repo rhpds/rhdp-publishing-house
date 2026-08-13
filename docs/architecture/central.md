@@ -98,7 +98,7 @@ Every skill-to-backend interaction uses one of these tools. The table below is t
 
 ## Gate Service
 
-The gate service is Central's decision authority for lifecycle phase transitions. See [System Design](../system-design.md) for the overall gate concept and [Lifecycle & Phases](lifecycle-phases.md) for the full prerequisite chain.
+The gate service is Central's decision authority for lifecycle phase transitions. See [System Design](system-design.md) for the overall gate concept and [Lifecycle & Phases](lifecycle-phases.md) for the full prerequisite chain.
 
 What's unique to Central is the phase-specific behavior of two gates:
 
