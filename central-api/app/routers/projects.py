@@ -211,8 +211,8 @@ def _get_workflow_data(project_id: str):
             "baselineSha": wd.get("baselineSha", ""),
             "hasDrift": wd.get("hasDrift", False),
             "repoUrl": wd.get("repoUrl", ""),
-            "agnosticvUrls": wd.get("agnosticvUrls", wd.get("agnosticvUrl", "")),
-            "ciUrls": wd.get("ciUrls", wd.get("ciUrl", "")),
+            "agnosticvUrls": wd.get("agnosticvUrls", []),
+            "ciUrls": wd.get("ciUrls", []),
         }
         if rejection and rejection.get("isRejected"):
             result["rejection"] = rejection

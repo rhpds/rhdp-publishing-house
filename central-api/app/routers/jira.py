@@ -735,11 +735,6 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, status
                         wd = _get_workflow_data(slug)
                         agnosticv_urls = wd.get("agnosticvUrls", [])
                         ci_urls = wd.get("ciUrls", [])
-                        # backwards compat: old single-value keys
-                        if not agnosticv_urls and wd.get("agnosticvUrl"):
-                            agnosticv_urls = [wd["agnosticvUrl"]]
-                        if not ci_urls and wd.get("ciUrl"):
-                            ci_urls = [wd["ciUrl"]]
                         if agnosticv_urls or ci_urls:
                             desc_lines = []
                             for url in agnosticv_urls:
