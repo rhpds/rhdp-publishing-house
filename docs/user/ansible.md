@@ -166,6 +166,32 @@ ansible-galaxy role init my_new_role
 
 ---
 
+## AgnosticV integration
+
+Once your collection and roles are ready, include the collection in your AgnosticV catalog item's `common.yaml` using `requirements_content`. Since the collection lives in a subdirectory of your project repo, use the `#/path` fragment syntax to point to it:
+
+```yaml
+requirements_content:
+  collections:
+  - name: https://github.com/rhpds/<your-repo>.git#/automation/ansible
+    type: git
+    version: main
+```
+
+The `#/automation/ansible` fragment tells `ansible-galaxy` to install from that subdirectory rather than the repo root. The `version` field is the git ref (branch, tag, or commit SHA).
+
+You can then reference roles from the collection in your workload playbooks:
+
+```yaml
+- hosts: all
+  roles:
+    - role: <namespace>.ansible.<role_name>
+```
+
+Where `<namespace>` is the namespace from your `galaxy.yml` (your project slug with hyphens converted to underscores).
+
+---
+
 ## Tips
 
 - **One role per concern.** Each role should do one thing well — deploy an operator, configure a service, set up user environments. This makes roles reusable across projects.
