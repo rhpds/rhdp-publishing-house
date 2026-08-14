@@ -180,12 +180,12 @@ requirements_content:
 
 The `#/automation/ansible` fragment tells `ansible-galaxy` to install from that subdirectory rather than the repo root. The `version` field is the git ref (branch, tag, or commit SHA).
 
-You can then reference roles from the collection in your workload playbooks:
+You can then reference your roles as workloads in your AgnosticV catalog item alongside core workloads:
 
 ```yaml
-- hosts: all
-  roles:
-    - role: <namespace>.ansible.<role_name>
+workloads:
+  - agnosticd.core_workloads.ocp4_workload_authorino
+  - <namespace>.ansible.<role_name>
 ```
 
 Where `<namespace>` is the namespace from your `galaxy.yml` (your project slug with hyphens converted to underscores).
