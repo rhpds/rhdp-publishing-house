@@ -141,6 +141,27 @@ This prevents ArgoCD from failing the dry-run when the CRD doesn't exist yet (th
 
 ---
 
+## Manual setup
+
+If you prefer to build GitOps automation without the skill:
+
+1. Select **GitOps Automation** from the development dashboard, choose **Do it myself**
+2. Work in `automation/gitops/bootstrap-infra/templates/` (and `bootstrap-tenant/templates/` if applicable)
+3. Follow the sync-wave ordering and namespace isolation conventions above
+4. Use the [rhdp-gitops-patterns](https://github.com/rhpds/rhdp-gitops-patterns) repo as a reference for examples
+5. Come back to the dashboard and mark GitOps automation complete when done
+
+---
+
+## Tips
+
+- **Start with infra, then add tenant.** Get operators and shared services deploying first, then layer on per-user resources.
+- **Use `helm template` to validate locally.** The gitops-helper runs this automatically, but you can do it manually: `helm template test automation/gitops/bootstrap-infra/`
+- **Reference the patterns repo.** The `rhdp-gitops-patterns/examples/` directory has working examples for common components (GitLab, Gitea, DevHub, KubeVirt VMs, per-user ArgoCD, Istio Gateway).
+- **Watch for operator quirks.** Some operators (e.g., Gitea) aren't in standard OLM catalogs and require a custom CatalogSource. The patterns repo documents these.
+
+---
+
 ## AgnosticV integration
 
 To deploy your GitOps automation, include the `ocp4_workload_gitops_bootstrap` workload in your AgnosticV catalog item's `common.yaml` and configure it to point at your chart:
@@ -162,24 +183,3 @@ ocp4_workload_gitops_bootstrap_helm_values:
 The `ocp4_workload_openshift_gitops` workload installs the OpenShift GitOps operator (ArgoCD). The `ocp4_workload_gitops_bootstrap` workload creates an ArgoCD `Application` that points to your Helm chart and syncs it.
 
 Only include values that should be deployer-managed (operator channels, git revisions, image tags, secrets, user count). Leave everything else to the chart's `values.yaml` defaults.
-
----
-
-## Manual setup
-
-If you prefer to build GitOps automation without the skill:
-
-1. Select **GitOps Automation** from the development dashboard, choose **Do it myself**
-2. Work in `automation/gitops/bootstrap-infra/templates/` (and `bootstrap-tenant/templates/` if applicable)
-3. Follow the sync-wave ordering and namespace isolation conventions above
-4. Use the [rhdp-gitops-patterns](https://github.com/rhpds/rhdp-gitops-patterns) repo as a reference for examples
-5. Come back to the dashboard and mark GitOps automation complete when done
-
----
-
-## Tips
-
-- **Start with infra, then add tenant.** Get operators and shared services deploying first, then layer on per-user resources.
-- **Use `helm template` to validate locally.** The gitops-helper runs this automatically, but you can do it manually: `helm template test automation/gitops/bootstrap-infra/`
-- **Reference the patterns repo.** The `rhdp-gitops-patterns/examples/` directory has working examples for common components (GitLab, Gitea, DevHub, KubeVirt VMs, per-user ArgoCD, Istio Gateway).
-- **Watch for operator quirks.** Some operators (e.g., Gitea) aren't in standard OLM catalogs and require a custom CatalogSource. The patterns repo documents these.
