@@ -12,13 +12,24 @@ After logging in, you'll see the project pipeline board showing any existing pro
 
 ---
 
-## 2. Create a project from the template
+## 2. Choose your intake type
 
-Click **Self Service** in the left navigation bar, then select the **Publishing House Content Project** template.
+Click **Self Service** in the left navigation bar. There are two intake options:
 
-The template walks you through three pages:
+| Intake type | Template | When to use |
+|-------------|----------|-------------|
+| **New** | Publishing House Content Project | Starting a brand-new lab or demo from an idea, a doc, or rough notes |
+| **Migration** | Publishing House Migration | You have a working Showroom repo with `content/`, `site.yml`, and `nav.adoc` already in place |
 
-### Page 1 — Project Details
+Both options create a GitHub repo, register it in the catalog, and start the Publishing House workflow. The difference is where the content comes from and how the spec is built: **New** starts empty and walks you through a conversational discovery; **Migration** imports your existing Showroom content and reverse-engineers the spec from it.
+
+---
+
+### New — Content Project template
+
+Select the **Publishing House Content Project** template. It walks you through three pages:
+
+#### Page 1 — Project Details
 
 | Field | Description |
 |-------|-------------|
@@ -30,7 +41,7 @@ The template walks you through three pages:
 
 Click **Next**.
 
-### Page 2 — GitHub Collaborators
+#### Page 2 — GitHub Collaborators
 
 | Field | Description |
 |-------|-------------|
@@ -38,7 +49,7 @@ Click **Next**.
 
 Click **Next**.
 
-### Page 3 — Initiative & Content Format
+#### Page 3 — Initiative & Content Format
 
 | Field | Description |
 |-------|-------------|
@@ -48,7 +59,7 @@ Click **Next**.
 
 Click **Review**, verify your selections, then click **Create**.
 
-### What the template does
+#### What the template does
 
 The template runs five steps automatically:
 
@@ -58,7 +69,7 @@ The template runs five steps automatically:
 4. Starts the Publishing House workflow in Central (sets the stage to `intake`)
 5. Registers the project in the Developer Hub catalog
 
-### Template output
+#### Template output
 
 When the template completes, you'll see three links:
 
@@ -70,9 +81,54 @@ The page also shows getting-started instructions for both DevSpaces and local se
 
 ---
 
+### Migration — Migration template
+
+Select the **Publishing House Migration** template. It has the same three pages as the **New** template, with one key addition on page 1.
+
+#### Page 1 — Project Details
+
+| Field | Description |
+|-------|-------------|
+| **Project Name** | Lowercase letters, numbers, and hyphens only. This becomes your new GitHub repo name — it must be unique. |
+| **Project Description** | Brief overview (max 1500 characters). |
+| **Source Repository** | Public GitHub URL of the existing Showroom repo to import (e.g., `https://github.com/rhpds/my-existing-lab`). The `content/`, `site.yml`, and `ui-config.yml` will be copied from this repo. |
+| **Content Type** | `Lab` or `Demo`. |
+| **Deployment Mode** | `RHDP Published` or `Self-Published`. |
+| **Tags** | Optional identifiers. |
+
+#### Page 2 — GitHub Collaborators
+
+Same as the **New** template — enter your GitHub username first, then add any collaborators.
+
+#### Page 3 — Initiative & Content Format
+
+| Field | Description |
+|-------|-------------|
+| **Initiative** | `RH1 2027`, `Summit 2027`, or `None`. |
+| **Showroom Type** | `Classic` or `Zero Touch`. |
+| **Automation Type** | `Ansible`, `GitOps`, or `Both`. |
+
+Click **Review**, verify your selections, then click **Create**.
+
+#### What the template does
+
+The template runs five steps:
+
+1. Checks that your project name isn't already taken
+2. Generates skeleton files (same as **New**)
+3. Creates a GitHub repo under `rhpds/` and **imports content from your source repo** — the `content/` folder, `site.yml`, and `ui-config.yml` are copied in
+4. Starts the Publishing House workflow with `intake_type: migration`
+5. Registers the project in the Developer Hub catalog
+
+#### Template output
+
+Same three links as **New**: **Open Repository**, **View in Catalog**, **Open in DevSpaces**.
+
+---
+
 ## 3. Open your workspace
 
-You have two options for working on your project:
+This step is the same for both paths.
 
 ### Option A — Dev Spaces (browser-based)
 
@@ -120,7 +176,7 @@ See the [Getting Started](getting-started.md) guide for additional prerequisites
 
 ---
 
-## 4. Start the intake skill
+## 4. Run the skill
 
 Whether you're in Dev Spaces or running Claude Code locally, the next step is the same. In the Claude Code prompt, type:
 
@@ -128,7 +184,7 @@ Whether you're in Dev Spaces or running Claude Code locally, the next step is th
 /rhdp-publishing-house
 ```
 
-The orchestrator discovers your project, reads the current stage (`intake`), and launches the intake skill.
+The orchestrator discovers your project, reads the intake type (**New** or **Migration**), and launches the appropriate skill.
 
 Before starting the conversation, Claude runs a pre-flight sequence automatically:
 
@@ -144,17 +200,15 @@ Before starting the conversation, Claude runs a pre-flight sequence automaticall
 !!! tip "Resuming a previous session"
     If you paused intake partway through, Claude detects which phases are already complete (design.md populated, RCARS results present, module outlines exist, infrastructure fields filled) and picks up at the next incomplete phase. You won't repeat work.
 
+After pre-flight, the skill follows a phased flow. The early phases differ between **New** and **Migration**; the later phases are the same for both.
+
 ---
 
-## 5. Walk through the intake conversation
+## 5. Early phases — where the paths differ
 
-The intake skill runs through six phases. You'll have a conversation with Claude — it asks questions, you provide answers, and together you build the project spec. Each phase commits its output to git, so your progress is saved even if the session ends.
+### New intake: Discovery and design
 
-> "Six phases: discovery, design, RCARS vetting, module outlines, infrastructure, and submission."
->
-> Migrating an existing Showroom repo? Skip to [Migrating an existing Showroom repo](#migrating-an-existing-showroom-repo) — the migrate skill replaces the first four phases with automated content analysis.
-
-### Phase 1 — Discovery
+#### Phase 1 — Discovery
 
 Claude reads the project description you entered in the template and presents three options:
 
@@ -177,7 +231,7 @@ At the end of this phase, Claude writes the captured fields to `spec.yaml` and c
 
 > "Discovery complete. Next: design doc. **(4 phases remaining)**"
 
-### Phase 2 — Design document
+#### Phase 2 — Design document
 
 Claude generates `publishing-house/spec/design.md` from your discovery answers. The design doc has 11 required sections: overview, target audience, prerequisites, learning objectives, content type, products and technologies, module map (with duration table), difficulty level, environment, and optionally assessment strategy.
 
@@ -185,7 +239,7 @@ Key details:
 
 - Claude proposes a **module map** with titles and estimated durations, explaining why it structured it that way. You can adjust.
 - **Learning objectives** are scaled to duration — roughly 3 per 45 minutes of content.
-- **Infrastructure Requirements** is intentionally left as TBD — that's covered in Phase 5.
+- **Infrastructure Requirements** is intentionally left as TBD — that's covered in the infrastructure phase.
 
 Claude presents the design for your review:
 
@@ -197,7 +251,7 @@ Claude commits `design.md` and `spec.yaml`, then proceeds.
 
 > "Design doc complete and validated. Next: RCARS vetting. **(3 phases remaining)**"
 
-### Phase 3 — RCARS vetting
+#### Phase 3 — RCARS vetting
 
 Claude queries the RCARS content advisor to check your design against the existing RHDP catalog. This takes 10–20 seconds.
 
@@ -213,11 +267,11 @@ Claude writes the results to `spec.yaml` and commits.
 
 > "RCARS vetting complete. Next: module outlines. **(2 phases remaining)**"
 
-### Phase 4 — Module outlines
+#### Phase 4 — Module outlines
 
 If module outlines already exist in `publishing-house/spec/modules/`, Claude asks whether to validate them or treat them as ready.
 
-For fresh intake, Claude generates one outline file per module from the design doc (not from conversation context). Each outline follows the project's `module-outline-template.md` and covers:
+For **New** intake, Claude generates one outline file per module from the design doc (not from conversation context). Each outline follows the project's `module-outline-template.md` and covers:
 
 - Brief overview
 - Audience and estimated time
@@ -235,135 +289,11 @@ Claude commits the outlines.
 
 > "Module outlines complete. Next: infrastructure confirmation. **(1 phase remaining)**"
 
-### Phase 5 — Infrastructure
-
-Claude determines your platform (OCP or RHEL VMs) from the products discussed earlier, derives sensible defaults, and presents a complete infrastructure profile for you to confirm or adjust. This is a single interaction, not a long questionnaire.
-
-**For OCP labs**, the profile includes: cloud provider, cluster type (SNO or multinode), worker sizing, OCP version, and topology.
-
-**For RHEL-based labs**, the profile includes: per-student VM roles with sizing (e.g., 1 AAP controller, 2 managed nodes, 1 Windows server).
-
-Claude only asks conditional follow-ups if triggered:
-
-- **AI/MaaS** — only if your products include AI keywords
-- **AAP version** — only if AAP is in your products
-- **Non-GA products** — only if any product is beta or tech preview
-- **External services** — always asked explicitly (container registries, package repos, license servers, Git hosts, external APIs needed during provisioning or student sessions)
-- **Concurrent users** — only for shared-cluster topology (per-student topologies don't need this)
-
-After you confirm, Claude writes the infrastructure fields to `spec.yaml` and updates the Infrastructure Requirements section of `design.md`, then commits.
-
-### Phase 6 — Finalize and submit
-
-Claude presents a final summary of everything captured, flagging any fields still empty or with placeholder values.
-
-> "Here's what we have before submitting for review..."
-
-**You must explicitly approve before Claude continues.** If anything needs changing, say so.
-
-Once approved, Claude executes the remaining steps without further prompts:
-
-1. **Generates a draft automation manifest** (`automation-manifest.yaml`) — derived from your spec, covering operators, infrastructure, RBAC, and external services
-2. **Generates `mkdocs.yml`** — for TechDocs rendering in Developer Hub
-3. **Asks for final confirmation** — one last checkpoint before submission
-4. **Commits and pushes** all spec artifacts to your repo
-5. **Submits to Central** via `ph-intake.py`
-
-After submission:
-
-- **201 (success)** — your project advances to the review stage
-- **422 (validation failed)** — Claude shows each failed check, proposes fixes, and asks you to confirm before applying. After fixes, it resubmits. This loops until validation passes.
-- **409/404/other** — Claude shows the error and stops
-
-For classic Showroom projects, Claude also cleans up any zero-touch directories (`runtime-automation/`, `setup-automation/`) that don't apply.
-
 ---
 
-## 6. What happens after intake
+### Migration intake: Content analysis and spec generation
 
-After a successful intake submission:
-
-- **Onboarded projects** enter review — content and infrastructure reviewers evaluate your spec. You'll be notified when reviews are complete.
-- **Self-published projects** move directly to the development stage.
-
-Either way, the next time you open your workspace and run `/rhdp-publishing-house`, the orchestrator picks up exactly where you left off.
-
-### Handling rejections
-
-If reviewers reject parts of your spec, run `/rhdp-publishing-house` again. Claude syncs the rejection reasons from Central, shows them to you grouped by review stage, and walks you through addressing each one. After resolving all rejections, Claude resubmits automatically.
-
----
-
-## Migrating an existing Showroom repo
-
-If you already have a Showroom lab or demo in a GitHub repo and want to bring it into the Publishing House workflow, use the **Publishing House Migration** template instead of creating a new project from scratch.
-
-### When to use migration vs. fresh intake
-
-| Scenario | Use |
-|----------|-----|
-| Starting a brand-new lab or demo from an idea | Fresh intake (section 2 above) |
-| You have a working Showroom repo with `content/`, `site.yml`, and `nav.adoc` already in place | Migration |
-| You have requirements in a doc but no repo yet | Fresh intake — choose "I have a doc or outline" during discovery |
-
-### Run the migration template
-
-Click **Self Service** in the left navigation bar and select the **Publishing House Migration** template.
-
-The template has three pages, similar to the fresh project template:
-
-#### Page 1 — Project Details
-
-| Field | Description |
-|-------|-------------|
-| **Project Name** | Lowercase letters, numbers, and hyphens only. This becomes your new GitHub repo name — it must be unique. |
-| **Project Description** | Brief overview (max 1500 characters). |
-| **Source Repository** | Public GitHub URL of the existing Showroom repo to import (e.g., `https://github.com/rhpds/my-existing-lab`). The `content/`, `site.yml`, and `ui-config.yml` will be copied from this repo. |
-| **Content Type** | `Lab` or `Demo`. |
-| **Deployment Mode** | `RHDP Published` or `Self-Published`. |
-| **Tags** | Optional identifiers. |
-
-#### Page 2 — GitHub Collaborators
-
-Same as the fresh project template — enter your GitHub username first, then add any collaborators.
-
-#### Page 3 — Initiative & Content Format
-
-| Field | Description |
-|-------|-------------|
-| **Initiative** | `RH1 2027`, `Summit 2027`, or `None`. |
-| **Showroom Type** | `Classic` or `Zero Touch`. |
-| **Automation Type** | `Ansible`, `GitOps`, or `Both`. |
-
-Click **Review**, verify your selections, then click **Create**.
-
-### What the migration template does
-
-The template runs five steps:
-
-1. Checks that your project name isn't already taken
-2. Generates skeleton files (same as fresh intake)
-3. Creates a GitHub repo under `rhpds/` and **imports content from your source repo** — the `content/` folder, `site.yml`, and `ui-config.yml` are copied in
-4. Starts the Publishing House workflow with `intake_type: migration`
-5. Registers the project in the Developer Hub catalog
-
-### Template output
-
-Same three links as a fresh project: **Open Repository**, **View in Catalog**, **Open in DevSpaces**.
-
-### Open your workspace and start the migrate skill
-
-Open your workspace (DevSpaces or local) the same way as described in [section 3](#3-open-your-workspace) above. Then run:
-
-```
-/rhdp-publishing-house
-```
-
-The orchestrator detects that this is a migration project and launches the **migrate skill** instead of the standard intake skill. The pre-flight sequence is the same (project verification, authentication, Central sync, policy fetch).
-
-### How the migrate skill works
-
-Instead of a conversational discovery phase, the migrate skill reads your existing content and reverse-engineers the intake artifacts from it.
+If you chose **Migration**, the orchestrator launches the **migrate skill** instead. It replaces the four phases above (discovery, design, RCARS, module outlines) with automated content analysis — then converges with **New** at the infrastructure phase.
 
 #### Step 1 — Content analysis
 
@@ -395,7 +325,7 @@ Claude presents a summary of what it found:
 
 Claude spawns a migration writer agent that generates the intake artifacts from the content analysis:
 
-- **`design.md`** — all 11 sections populated from the existing content (overview, audience, prerequisites, learning objectives, module map with durations, difficulty level, environment description). Infrastructure is left as TBD, same as fresh intake.
+- **`design.md`** — all 11 sections populated from the existing content (overview, audience, prerequisites, learning objectives, module map with durations, difficulty level, environment description). Infrastructure is left as TBD, same as **New** intake.
 - **`spec.yaml`** — fields populated where the content provides clear signals (title, audience, duration, products, modules). Fields left empty when the content doesn't provide enough information.
 - **Module outlines** — one per module in `publishing-house/spec/modules/`, derived from the actual content pages rather than from scratch.
 
@@ -403,15 +333,70 @@ Claude presents the design doc for your review. **You must explicitly approve be
 
 #### Step 4 — RCARS vetting
 
-Same as fresh intake [Phase 3](#phase-3--rcars-vetting), with one addition: the source repo you're migrating from is automatically filtered out of the results. If your existing lab appears in the RHDP catalog, it won't be flagged as a duplicate of itself.
+Same as the **New** intake RCARS phase, with one addition: the source repo you're migrating from is automatically filtered out of the results. If your existing lab appears in the RHDP catalog, it won't be flagged as a duplicate of itself.
 
-#### Step 5 — Infrastructure confirmation
+---
 
-Same as fresh intake [Phase 5](#phase-5--infrastructure). Claude presents an infrastructure profile based on what was detected in your content, and you confirm or adjust.
+## 6. Shared phases — where the paths converge
 
-#### Step 6 — Finalize and submit
+From here on, the flow is identical for both **New** and **Migration** projects.
 
-Same as fresh intake [Phase 6](#phase-6--finalize-and-submit). Claude presents a final summary, generates the automation manifest and `mkdocs.yml`, and submits to Central.
+### Infrastructure
+
+Claude determines your platform (OCP or RHEL VMs) from the products discussed or detected earlier, derives sensible defaults, and presents a complete infrastructure profile for you to confirm or adjust. This is a single interaction, not a long questionnaire.
+
+**For OCP labs**, the profile includes: cloud provider, cluster type (SNO or multinode), worker sizing, OCP version, and topology.
+
+**For RHEL-based labs**, the profile includes: per-student VM roles with sizing (e.g., 1 AAP controller, 2 managed nodes, 1 Windows server).
+
+Claude only asks conditional follow-ups if triggered:
+
+- **AI/MaaS** — only if your products include AI keywords
+- **AAP version** — only if AAP is in your products
+- **Non-GA products** — only if any product is beta or tech preview
+- **External services** — always asked explicitly (container registries, package repos, license servers, Git hosts, external APIs needed during provisioning or student sessions)
+- **Concurrent users** — only for shared-cluster topology (per-student topologies don't need this)
+
+After you confirm, Claude writes the infrastructure fields to `spec.yaml` and updates the Infrastructure Requirements section of `design.md`, then commits.
+
+### Finalize and submit
+
+Claude presents a final summary of everything captured, flagging any fields still empty or with placeholder values.
+
+> "Here's what we have before submitting for review..."
+
+**You must explicitly approve before Claude continues.** If anything needs changing, say so.
+
+Once approved, Claude executes the remaining steps without further prompts:
+
+1. **Generates a draft automation manifest** (`automation-manifest.yaml`) — derived from your spec, covering operators, infrastructure, RBAC, and external services
+2. **Generates `mkdocs.yml`** — for TechDocs rendering in Developer Hub
+3. **Asks for final confirmation** — one last checkpoint before submission
+4. **Commits and pushes** all spec artifacts to your repo
+5. **Submits to Central** via `ph-intake.py`
+
+After submission:
+
+- **201 (success)** — your project advances to the review stage
+- **422 (validation failed)** — Claude shows each failed check, proposes fixes, and asks you to confirm before applying. After fixes, it resubmits. This loops until validation passes.
+- **409/404/other** — Claude shows the error and stops
+
+For classic Showroom projects, Claude also cleans up any zero-touch directories (`runtime-automation/`, `setup-automation/`) that don't apply.
+
+---
+
+## 7. What happens after intake
+
+After a successful intake submission:
+
+- **Onboarded projects** enter review — content and infrastructure reviewers evaluate your spec. You'll be notified when reviews are complete.
+- **Self-published projects** move directly to the development stage.
+
+Either way, the next time you open your workspace and run `/rhdp-publishing-house`, the orchestrator picks up exactly where you left off.
+
+### Handling rejections
+
+If reviewers reject parts of your spec, run `/rhdp-publishing-house` again. Claude syncs the rejection reasons from Central, shows them to you grouped by review stage, and walks you through addressing each one. After resolving all rejections, Claude resubmits automatically.
 
 ---
 
