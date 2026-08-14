@@ -1,0 +1,89 @@
+site_name: RHDP Publishing House
+site_description: AI-powered content lifecycle management for Red Hat Demo Platform
+site_url: https://rhpds.github.io/rhdp-publishing-house/
+repo_url: https://github.com/rhpds/rhdp-publishing-house
+repo_name: rhpds/rhdp-publishing-house
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+
+# Internal planning docs (specs/plans) and orphan pages aren't part of the
+# published site. Keep them out of the build entirely.
+exclude_docs: |
+  superpowers/
+  feedback/
+  /deployment.md
+
+nav:
+  - Home: index.md
+  - Overview: overview.md
+  - Intake:
+      - New Project: user/intake-new.md
+      - Migration: user/intake-migration.md
+  - Deployment Modes: user/deployment-modes.md
+  - QA Automation: user/qa-automation.md
+  - Developer Docs:
+      - Architecture:
+          - System Design: architecture/system-design.md
+          - Central Backend: architecture/central.md
+          - Skills System: architecture/skills.md
+          - Lifecycle & Phases: architecture/lifecycle-phases.md
+          - RCARS Integration: architecture/rcars-integration.md
+          - Jira Integration: architecture/jira-integration.md
+      - Admin:
+          - Deployment Guide: admin/deployment.md
+          - MCP Authentication: admin/mcp-auth.md
+          - Operations: admin/operations.md
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.top
+    - navigation.tracking
+    - content.code.copy
+    - content.action.edit
+    - search.suggest
+    - search.highlight
+
+extra_css:
+  - stylesheets/publishing-house.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+plugins:
+  - search

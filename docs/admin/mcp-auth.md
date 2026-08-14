@@ -57,7 +57,7 @@ The `apply` tag updates manifests (Secrets, ConfigMaps, Deployments) without tri
 
 #### Step 5: Distribute the raw key
 
-Give the **raw key** (from Step 1) to the user. They will add it to their Claude Code MCP configuration. See the [Claude Code Setup Guide](../user/getting-started.md) for user-facing instructions.
+Give the **raw key** (from Step 1) to the user. They will add it to their Claude Code MCP configuration.
 
 **Never share the SHA-256 hash.** The hash is the stored credential; the raw key is the user credential.
 
@@ -124,7 +124,7 @@ The `mcp_api_keys` variable lives in env-specific vars files (`vars/dev.yml`, `v
 
 **Cause:** The request does not have an `Authorization` header or it does not start with `Bearer `.
 
-**Fix:** Verify the Claude Code MCP config includes the `headers` block with `Authorization: Bearer <key>`. See the [Claude Code Setup Guide](../user/getting-started.md).
+**Fix:** Verify the Claude Code MCP config includes the `headers` block with `Authorization: Bearer <key>`.
 
 #### "Authentication failed: invalid API key"
 
@@ -373,5 +373,4 @@ The PH `RCARSClient` retries transient failures 3 times with exponential backoff
 ## Related Documentation
 
 - [RCARS Integration Architecture](../architecture/rcars-integration.md)
-- [Claude Code Setup Guide](../user/getting-started.md)
 - [Central Deployment](deployment.md)

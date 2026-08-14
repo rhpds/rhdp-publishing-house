@@ -94,4 +94,4 @@ Pick up where you left off any day, any session. The manifest preserves project 
 
 **Content managers and PMs** view progress across projects in the Central dashboard and Jira — which projects are in which phase, gate decisions, velocity across the content portfolio. They don't need Claude Code.
 
-See [System Design](architecture/system-design.md) for the end-to-end technical architecture and [Getting Started](user/getting-started.md) for installation instructions.
+See [System Design](architecture/system-design.md) for the end-to-end technical architecture.

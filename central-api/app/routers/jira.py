@@ -32,7 +32,6 @@ class CreateEpicRequest(BaseModel):
     deployment_mode: str = ""
     project_description: str = ""
     showroom_type: str = ""
-    sso_email: str = ""
 
 
 class CreateEpicResponse(BaseModel):
@@ -67,8 +66,8 @@ def create_epic(
         labels.append(body.content_type)
 
     assignee = None
-    if body.sso_email:
-        jira_user = _lookup_jira_account_id(body.sso_email, settings)
+    if settings.jira_default_assignee:
+        jira_user = _lookup_jira_account_id(settings.jira_default_assignee, settings)
         if jira_user and jira_user["accountId"]:
             assignee = {"accountId": jira_user["accountId"]}
 

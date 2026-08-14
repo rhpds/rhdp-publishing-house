@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # API Configuration
     api_title: str = "Publishing House Central API"
-    api_version: str = "1.19.15"
+    api_version: str = "1.20.0"
     api_prefix: str = "/api/v1"
 
     # Authentication
@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     jira_email: str = ""
     jira_api_token: str = ""
     jira_project_key: str = "RHDPCD"
+    jira_default_assignee: str = ""
 
     # GitHub integration
     github_token: str = ""

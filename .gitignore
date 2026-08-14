@@ -60,6 +60,9 @@ coverage/
 .nyc_output/
 *.tsbuildinfo
 
+# MkDocs
+site/
+
 # Environment files
 .env
 .env.local
