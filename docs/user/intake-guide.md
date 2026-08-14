@@ -151,6 +151,8 @@ Before starting the conversation, Claude runs a pre-flight sequence automaticall
 The intake skill runs through six phases. You'll have a conversation with Claude — it asks questions, you provide answers, and together you build the project spec. Each phase commits its output to git, so your progress is saved even if the session ends.
 
 > "Six phases: discovery, design, RCARS vetting, module outlines, infrastructure, and submission."
+>
+> Migrating an existing Showroom repo? Skip to [Migrating an existing Showroom repo](#migrating-an-existing-showroom-repo) — the migrate skill replaces the first four phases with automated content analysis.
 
 ### Phase 1 — Discovery
 
@@ -292,9 +294,131 @@ If reviewers reject parts of your spec, run `/rhdp-publishing-house` again. Clau
 
 ---
 
+## Migrating an existing Showroom repo
+
+If you already have a Showroom lab or demo in a GitHub repo and want to bring it into the Publishing House workflow, use the **Publishing House Migration** template instead of creating a new project from scratch.
+
+### When to use migration vs. fresh intake
+
+| Scenario | Use |
+|----------|-----|
+| Starting a brand-new lab or demo from an idea | Fresh intake (section 2 above) |
+| You have a working Showroom repo with `content/`, `site.yml`, and `nav.adoc` already in place | Migration |
+| You have requirements in a doc but no repo yet | Fresh intake — choose "I have a doc or outline" during discovery |
+
+### Run the migration template
+
+Click **Self Service** in the left navigation bar and select the **Publishing House Migration** template.
+
+The template has three pages, similar to the fresh project template:
+
+#### Page 1 — Project Details
+
+| Field | Description |
+|-------|-------------|
+| **Project Name** | Lowercase letters, numbers, and hyphens only. This becomes your new GitHub repo name — it must be unique. |
+| **Project Description** | Brief overview (max 1500 characters). |
+| **Source Repository** | Public GitHub URL of the existing Showroom repo to import (e.g., `https://github.com/rhpds/my-existing-lab`). The `content/`, `site.yml`, and `ui-config.yml` will be copied from this repo. |
+| **Content Type** | `Lab` or `Demo`. |
+| **Deployment Mode** | `RHDP Published` or `Self-Published`. |
+| **Tags** | Optional identifiers. |
+
+#### Page 2 — GitHub Collaborators
+
+Same as the fresh project template — enter your GitHub username first, then add any collaborators.
+
+#### Page 3 — Initiative & Content Format
+
+| Field | Description |
+|-------|-------------|
+| **Initiative** | `RH1 2027`, `Summit 2027`, or `None`. |
+| **Showroom Type** | `Classic` or `Zero Touch`. |
+| **Automation Type** | `Ansible`, `GitOps`, or `Both`. |
+
+Click **Review**, verify your selections, then click **Create**.
+
+### What the migration template does
+
+The template runs five steps:
+
+1. Checks that your project name isn't already taken
+2. Generates skeleton files (same as fresh intake)
+3. Creates a GitHub repo under `rhpds/` and **imports content from your source repo** — the `content/` folder, `site.yml`, and `ui-config.yml` are copied in
+4. Starts the Publishing House workflow with `intake_type: migration`
+5. Registers the project in the Developer Hub catalog
+
+### Template output
+
+Same three links as a fresh project: **Open Repository**, **View in Catalog**, **Open in DevSpaces**.
+
+### Open your workspace and start the migrate skill
+
+Open your workspace (DevSpaces or local) the same way as described in [section 3](#3-open-your-workspace) above. Then run:
+
+```
+/rhdp-publishing-house
+```
+
+The orchestrator detects that this is a migration project and launches the **migrate skill** instead of the standard intake skill. The pre-flight sequence is the same (project verification, authentication, Central sync, policy fetch).
+
+### How the migrate skill works
+
+Instead of a conversational discovery phase, the migrate skill reads your existing content and reverse-engineers the intake artifacts from it.
+
+#### Step 1 — Content analysis
+
+Claude spawns a content reader agent that scans your imported repo:
+
+- `site.yml` — project title and metadata
+- `nav.adoc` — module ordering and titles
+- All `.adoc` pages in `content/modules/ROOT/pages/` — the actual lab content
+- `spec.yaml` — any fields pre-populated by the template
+
+For each module page, the reader extracts titles, section structure, code blocks, products mentioned, commands used, and estimated duration. It also identifies infrastructure signals (operators, VMs, AI/GPU references, external services) and audience indicators (prerequisite knowledge, task complexity).
+
+#### Step 2 — Review the analysis
+
+Claude presents a summary of what it found:
+
+> "I've analyzed the imported content. Here's what I found:
+>
+> **Title:** OpenShift AI Workshop
+> **Modules:** 5 modules: Introduction, Model Training, Model Serving, Pipeline Setup, Monitoring
+> **Products:** RHOAI, OpenShift, Pipelines
+> **Estimated duration:** 3 hours
+>
+> Does this look right? Anything I should adjust before I generate the spec?"
+
+**You must confirm before Claude proceeds.** Adjust anything that looks off.
+
+#### Step 3 — Design doc and spec generation
+
+Claude spawns a migration writer agent that generates the intake artifacts from the content analysis:
+
+- **`design.md`** — all 11 sections populated from the existing content (overview, audience, prerequisites, learning objectives, module map with durations, difficulty level, environment description). Infrastructure is left as TBD, same as fresh intake.
+- **`spec.yaml`** — fields populated where the content provides clear signals (title, audience, duration, products, modules). Fields left empty when the content doesn't provide enough information.
+- **Module outlines** — one per module in `publishing-house/spec/modules/`, derived from the actual content pages rather than from scratch.
+
+Claude presents the design doc for your review. **You must explicitly approve before it moves on.** After approval, it runs a structure check (all sections present, valid action verbs in objectives, no unfilled placeholders).
+
+#### Step 4 — RCARS vetting
+
+Same as fresh intake [Phase 3](#phase-3--rcars-vetting), with one addition: the source repo you're migrating from is automatically filtered out of the results. If your existing lab appears in the RHDP catalog, it won't be flagged as a duplicate of itself.
+
+#### Step 5 — Infrastructure confirmation
+
+Same as fresh intake [Phase 5](#phase-5--infrastructure). Claude presents an infrastructure profile based on what was detected in your content, and you confirm or adjust.
+
+#### Step 6 — Finalize and submit
+
+Same as fresh intake [Phase 6](#phase-6--finalize-and-submit). Claude presents a final summary, generates the automation manifest and `mkdocs.yml`, and submits to Central.
+
+---
+
 ## Tips
 
 - **Invest time in module outlines.** They're the foundation for everything that follows — content generation, automation, and review all reference them.
 - **You can pause and resume.** Say `"I'm done for today"` or just close the session. The orchestrator saves your progress and picks up next time.
 - **Human edits are welcome.** Edit `design.md`, module outlines, or any spec file directly between sessions. Claude reads fresh and respects what's on disk.
 - **Bring existing material.** If you have a Google Doc, Confluence page, or rough notes, share them during discovery. Claude extracts structured information rather than asking you to repeat it.
+- **Migrating?** If you have a working Showroom repo, use the migration template — it copies your content and reverse-engineers the spec, saving you from re-describing what you've already built.
