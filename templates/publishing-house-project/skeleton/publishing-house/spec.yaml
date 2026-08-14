@@ -60,7 +60,14 @@ spec:
 
 development:
   automation:
-    status: not_started
+{%- if values.automation_type == 'gitops' or values.automation_type == 'both' %}
+    gitops:
+      status: not_started
+{%- endif %}
+{%- if values.automation_type == 'ansible' or values.automation_type == 'both' %}
+    ansible:
+      status: not_started
+{%- endif %}
   e2e:
     status: not_started
   healthCheck:

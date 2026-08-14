@@ -136,21 +136,40 @@ def run_checks(
                 field="content/modules/ROOT/pages/",
             ))
 
-    # J-07: development.automation.status must be "complete"
+    # J-07: development.automation children must all be "complete"
     dev = spec_data.get("development", {})
-    auto_status = dev.get("automation", {}).get("status", "")
-    if auto_status == "complete":
+    automation = dev.get("automation", {})
+    automation_type = spec_data.get("project", {}).get("automation_type", "")
+    expected_children = []
+    if automation_type in ("gitops", "both"):
+        expected_children.append("gitops")
+    if automation_type in ("ansible", "both"):
+        expected_children.append("ansible")
+
+    if not expected_children:
         results.append(CheckResult(
-            check_id="J-07", group="J", status=CheckStatus.PASS,
-            message="Automation status is complete",
-            field="development.automation.status",
+            check_id="J-07", group="J", status=CheckStatus.SKIP,
+            message="No automation_type set in project",
+            field="development.automation",
         ))
     else:
-        results.append(CheckResult(
-            check_id="J-07", group="J", status=CheckStatus.FAIL,
-            message=f"Automation status is '{auto_status or 'not set'}', expected 'complete'",
-            field="development.automation.status",
-        ))
+        incomplete = []
+        for child in expected_children:
+            child_status = automation.get(child, {}).get("status", "")
+            if child_status != "complete":
+                incomplete.append(f"{child} ({child_status or 'not set'})")
+        if incomplete:
+            results.append(CheckResult(
+                check_id="J-07", group="J", status=CheckStatus.FAIL,
+                message=f"Automation not complete: {', '.join(incomplete)}",
+                field="development.automation",
+            ))
+        else:
+            results.append(CheckResult(
+                check_id="J-07", group="J", status=CheckStatus.PASS,
+                message=f"All automation children complete: {', '.join(expected_children)}",
+                field="development.automation",
+            ))
 
     # J-08: development.e2e.status must be "complete"
     e2e_status = dev.get("e2e", {}).get("status", "")
