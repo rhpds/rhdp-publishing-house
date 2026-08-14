@@ -18,7 +18,6 @@ exclude_docs: |
 nav:
   - Home: index.md
   - Overview: overview.md
-  - Getting Started: user/getting-started.md
   - Intake:
       - New Project: user/intake-new.md
       - Migration: user/intake-migration.md

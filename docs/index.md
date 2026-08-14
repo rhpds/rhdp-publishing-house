@@ -7,5 +7,4 @@ Publishing House is an AI-powered content lifecycle tool for Red Hat Demo Platfo
 | Document | Description |
 |---|---|
 | [Overview](overview.md) | What PH is, why it exists, and how it works |
-| [Getting Started](user/getting-started.md) | Install the plugin, create a project, run your first session |
 | [Deployment Modes](user/deployment-modes.md) | Onboarded, self-published, and express modes compared |

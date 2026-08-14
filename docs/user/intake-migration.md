@@ -118,8 +118,6 @@ If you prefer to work locally:
     claude
     ```
 
-See the [Getting Started](getting-started.md) guide for additional prerequisites (installing Claude Code, connecting the MCP server).
-
 ---
 
 ## 4. Run the skill
