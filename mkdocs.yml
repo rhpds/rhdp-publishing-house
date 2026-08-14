@@ -23,6 +23,7 @@ nav:
       - Migration: user/intake-migration.md
   - Deployment Modes: user/deployment-modes.md
   - QA Automation: user/qa-automation.md
+  - Custom Automation: user/custom-automation.md
   - Developer Docs:
       - Architecture:
           - System Design: architecture/system-design.md
