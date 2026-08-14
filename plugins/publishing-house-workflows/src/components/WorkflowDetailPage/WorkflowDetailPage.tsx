@@ -187,8 +187,8 @@ export function WorkflowDetailPage() {
   const [reasonsPopover, setReasonsPopover] = useState<{ anchorEl: HTMLElement | null; reasons: { id: number; text: string }[] }>({ anchorEl: null, reasons: [] });
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [stagingAgnosticvUrl, setStagingAgnosticvUrl] = useState('');
-  const [stagingCiUrl, setStagingCiUrl] = useState('');
+  const [stagingAgnosticvUrls, setStagingAgnosticvUrls] = useState<string[]>(['']);
+  const [stagingCiUrls, setStagingCiUrls] = useState<string[]>(['']);
   const [submittingStaging, setSubmittingStaging] = useState(false);
   const [testingComments, setTestingComments] = useState<TestingComment[]>([]);
   const [testingCommentText, setTestingCommentText] = useState('');
@@ -303,10 +303,12 @@ export function WorkflowDetailPage() {
   };
 
   const handleStagingSubmit = async () => {
-    if (!result || !stagingAgnosticvUrl.trim() || !stagingCiUrl.trim()) return;
+    const filteredAgv = stagingAgnosticvUrls.map(u => u.trim()).filter(Boolean);
+    const filteredCi = stagingCiUrls.map(u => u.trim()).filter(Boolean);
+    if (!result || !filteredAgv.length || !filteredCi.length) return;
     setSubmittingStaging(true);
     try {
-      await client.submitEnvSetup(result.summary.projectId, stagingAgnosticvUrl.trim(), stagingCiUrl.trim());
+      await client.submitEnvSetup(result.summary.projectId, filteredAgv, filteredCi);
       setSnackbar({ open: true, severity: 'success', message: 'Env setup info submitted — waiting for workflow to advance...' });
       const prevStage = result.summary.stage;
       for (let i = 0; i < 6; i++) {
@@ -408,7 +410,7 @@ export function WorkflowDetailPage() {
 
   const isReviewStage = REVIEW_STAGES.includes(summary.stage);
   const hasReviewTab = STAGES_WITH_REVIEW_TAB.includes(summary.stage);
-  const hasStagingTab = summary.stage === 'env_setup' || Boolean(wd?.agnosticvUrl) || Boolean(wd?.ciUrl);
+  const hasStagingTab = summary.stage === 'env_setup' || Boolean(wd?.agnosticvUrls?.length) || Boolean(wd?.ciUrls?.length);
   const canReview = (summary.stage === 'content_review' && (isContentReviewer || isAdmin))
     || (summary.stage === 'infra_review' && (isInfraReviewer || isAdmin));
   const canStaging = summary.stage === 'env_setup' && (isContentDeveloper || isAdmin);
@@ -905,55 +907,89 @@ export function WorkflowDetailPage() {
             <Typography variant="body2" style={{ marginBottom: 16, color: '#757575' }}>
               Provide the AgnosticV catalog item URL and demo.redhat.com CI link for this project.
             </Typography>
-            {wd?.agnosticvUrl && !canStaging ? (
+            {wd?.agnosticvUrls?.length && !canStaging ? (
               <Grid container spacing={2}>
                 <Grid item xs={12}>
-                  <Typography variant="body2" style={{ color: '#757575', marginBottom: 4 }}>AgnosticV Catalog Item URL</Typography>
-                  <a href={wd.agnosticvUrl} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all' }}>{wd.agnosticvUrl}</a>
+                  <Typography variant="body2" style={{ color: '#757575', marginBottom: 4 }}>AgnosticV Catalog Item URLs</Typography>
+                  {(wd.agnosticvUrls || []).map((url: string, i: number) => (
+                    <div key={i}><a href={url} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all' }}>{url}</a></div>
+                  ))}
                 </Grid>
                 <Grid item xs={12}>
-                  <Typography variant="body2" style={{ color: '#757575', marginBottom: 4 }}>demo.redhat.com CI Link</Typography>
-                  {wd.ciUrl ? (
-                    <a href={wd.ciUrl} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all' }}>{wd.ciUrl}</a>
-                  ) : (
+                  <Typography variant="body2" style={{ color: '#757575', marginBottom: 4 }}>demo.redhat.com CI Links</Typography>
+                  {(wd.ciUrls || []).length ? (wd.ciUrls || []).map((url: string, i: number) => (
+                    <div key={i}><a href={url} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all' }}>{url}</a></div>
+                  )) : (
                     <Typography variant="body1">—</Typography>
                   )}
                 </Grid>
               </Grid>
             ) : (
               <>
-                <TextField
-                  label="AgnosticV Catalog Item URL"
-                  placeholder="https://github.com/rhpds/agnosticv/tree/master/agd_v2/..."
-                  fullWidth
-                  variant="outlined"
-                  value={stagingAgnosticvUrl || wd?.agnosticvUrl || ''}
-                  onChange={e => setStagingAgnosticvUrl(e.target.value)}
-                  disabled={!canStaging || submittingStaging}
-                  style={{ marginBottom: 16 }}
-                />
-                <TextField
-                  label="demo.redhat.com CI Link"
-                  placeholder="https://catalog.demo.redhat.com/catalog/..."
-                  fullWidth
-                  variant="outlined"
-                  value={stagingCiUrl || wd?.ciUrl || ''}
-                  onChange={e => setStagingCiUrl(e.target.value)}
-                  disabled={!canStaging || submittingStaging}
-                  style={{ marginBottom: 16 }}
-                />
+                <Typography variant="body2" style={{ color: '#757575', marginBottom: 8 }}>AgnosticV Catalog Item URLs</Typography>
+                {stagingAgnosticvUrls.map((url, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                    <TextField
+                      placeholder="https://github.com/rhpds/agnosticv/tree/master/agd_v2/..."
+                      fullWidth
+                      variant="outlined"
+                      size="small"
+                      value={url}
+                      onChange={e => {
+                        const next = [...stagingAgnosticvUrls];
+                        next[i] = e.target.value;
+                        setStagingAgnosticvUrls(next);
+                      }}
+                      disabled={!canStaging || submittingStaging}
+                    />
+                    {stagingAgnosticvUrls.length > 1 && (
+                      <Button size="small" onClick={() => setStagingAgnosticvUrls(stagingAgnosticvUrls.filter((_, j) => j !== i))} disabled={!canStaging || submittingStaging}>Remove</Button>
+                    )}
+                  </div>
+                ))}
                 {canStaging && (
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    size="large"
-                    style={{ fontWeight: 600 }}
-                    onClick={handleStagingSubmit}
-                    disabled={submittingStaging || !stagingAgnosticvUrl.trim() || !stagingCiUrl.trim()}
-                    startIcon={submittingStaging ? <CircularProgress size={16} color="inherit" /> : undefined}
-                  >
-                    {submittingStaging ? 'Submitting...' : 'Submit'}
-                  </Button>
+                  <Button size="small" onClick={() => setStagingAgnosticvUrls([...stagingAgnosticvUrls, ''])} disabled={submittingStaging} style={{ marginBottom: 16 }}>+ Add URL</Button>
+                )}
+
+                <Typography variant="body2" style={{ color: '#757575', marginBottom: 8, marginTop: 8 }}>demo.redhat.com CI Links</Typography>
+                {stagingCiUrls.map((url, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                    <TextField
+                      placeholder="https://catalog.demo.redhat.com/catalog/..."
+                      fullWidth
+                      variant="outlined"
+                      size="small"
+                      value={url}
+                      onChange={e => {
+                        const next = [...stagingCiUrls];
+                        next[i] = e.target.value;
+                        setStagingCiUrls(next);
+                      }}
+                      disabled={!canStaging || submittingStaging}
+                    />
+                    {stagingCiUrls.length > 1 && (
+                      <Button size="small" onClick={() => setStagingCiUrls(stagingCiUrls.filter((_, j) => j !== i))} disabled={!canStaging || submittingStaging}>Remove</Button>
+                    )}
+                  </div>
+                ))}
+                {canStaging && (
+                  <Button size="small" onClick={() => setStagingCiUrls([...stagingCiUrls, ''])} disabled={submittingStaging} style={{ marginBottom: 16 }}>+ Add URL</Button>
+                )}
+
+                {canStaging && (
+                  <div style={{ marginTop: 16 }}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      size="large"
+                      style={{ fontWeight: 600 }}
+                      onClick={handleStagingSubmit}
+                      disabled={submittingStaging || !stagingAgnosticvUrls.some(u => u.trim()) || !stagingCiUrls.some(u => u.trim())}
+                      startIcon={submittingStaging ? <CircularProgress size={16} color="inherit" /> : undefined}
+                    >
+                      {submittingStaging ? 'Submitting...' : 'Submit'}
+                    </Button>
+                  </div>
                 )}
               </>
             )}

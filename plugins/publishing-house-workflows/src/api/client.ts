@@ -440,14 +440,14 @@ export function createPhWorkflowsClient(options: {
 
   async function submitEnvSetup(
     slug: string,
-    agnosticvUrl: string,
-    ciUrl: string,
+    agnosticvUrls: string[],
+    ciUrls: string[],
   ): Promise<void> {
     const response = await centralFetch(
       `/projects/${slug}/env-setup/submit`,
       {
         method: 'POST',
-        body: JSON.stringify({ agnosticv_url: agnosticvUrl, ci_url: ciUrl }),
+        body: JSON.stringify({ agnosticv_urls: agnosticvUrls, ci_urls: ciUrls }),
       },
     );
 

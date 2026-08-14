@@ -24,8 +24,8 @@ export interface WorkflowVariables {
     hasDrift?: boolean;
     auditTrailSha?: string;
     reviewHistory?: AuditEntry[];
-    agnosticvUrl?: string;
-    ciUrl?: string;
+    agnosticvUrls?: string[];
+    ciUrls?: string[];
   };
 }
 
