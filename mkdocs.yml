@@ -19,6 +19,7 @@ nav:
   - Home: index.md
   - Overview: overview.md
   - Getting Started: user/getting-started.md
+  - Intake Guide: user/intake-guide.md
   - Deployment Modes: user/deployment-modes.md
   - Developer Docs:
       - Architecture:
