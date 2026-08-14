@@ -15,17 +15,12 @@ exclude_docs: |
   feedback/
   /deployment.md
 
-# New Project and Migration intake guides are intentionally reachable only
-# via links from the Intake landing page (and each other), not the sidebar
-# nav tree, so exempt them from the "omitted from nav" strict warning.
-not_in_nav: |
-  user/intake-new.md
-  user/intake-migration.md
-
 nav:
   - Home: index.md
   - Overview: overview.md
   - Intake: user/intake.md
+  - New Project Intake: user/intake-new.md
+  - Migration Intake: user/intake-migration.md
   - Deployment Modes: user/deployment-modes.md
   - QA Automation: user/qa-automation.md
   - Developer Docs:
