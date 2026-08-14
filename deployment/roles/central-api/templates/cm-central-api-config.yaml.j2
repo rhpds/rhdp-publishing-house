@@ -14,6 +14,7 @@ data:
   OIDC_ISSUER_URL: "https://keycloak-keycloak.{{ keycloak_domain | default(ocp_apps_domain) }}/realms/publishing-house"
   OIDC_CLIENT_ID: "central-api"
   RHDH_INTERNAL_URL: "http://backstage-developer-hub.{{ app_namespace }}.svc.cluster.local"
+  JIRA_DEFAULT_ASSIGNEE: "{{ jira_default_assignee | default('') }}"
   DRIFT_CACHE_TTL_SECONDS: "259200"
   CENTRAL_API_URL: "http://central-api.{{ app_namespace }}.svc.cluster.local:8000"
   # Drift checker

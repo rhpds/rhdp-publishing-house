@@ -38,6 +38,7 @@ jira_url: https://issues.redhat.com
 jira_email: you@redhat.com
 jira_api_token: changeme
 jira_project_key: RHDPCD
+jira_default_assignee: psrivast@redhat.com
 
 # ─── LiteLLM ────────────────────────────────────────────────
 litellm_api_url: https://maas-rhdp.apps.maas.redhatworkshops.io
