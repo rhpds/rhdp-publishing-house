@@ -5,6 +5,8 @@ This guide walks you through intake for an **existing Showroom repo** — import
 !!! tip "Starting from scratch?"
     If you don't have an existing Showroom repo, use the [New Project Intake](intake-new.md) path instead. It walks you through a conversational discovery to build the spec from your idea.
 
+See the [Intake overview](intake.md) for a side-by-side comparison of both paths.
+
 ---
 
 ## 1. Log in to Publishing House
