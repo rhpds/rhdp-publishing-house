@@ -258,11 +258,10 @@ Claude presents a final summary of everything captured, flagging any fields stil
 
 Once approved, Claude executes the remaining steps without further prompts:
 
-1. **Generates a draft automation manifest** (`automation-manifest.yaml`) — derived from your spec, covering operators, infrastructure, RBAC, and external services
-2. **Generates `mkdocs.yml`** — for TechDocs rendering in Developer Hub
-3. **Asks for final confirmation** — one last checkpoint before submission
-4. **Commits and pushes** all spec artifacts to your repo
-5. **Submits to Central** via `ph-intake.py`
+1. **Generates `mkdocs.yml`** — for TechDocs rendering in Developer Hub
+2. **Asks for final confirmation** — one last checkpoint before submission
+3. **Commits and pushes** all spec artifacts to your repo
+4. **Submits to Central** via `ph-intake.py`
 
 After submission:
 
