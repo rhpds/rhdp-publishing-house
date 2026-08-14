@@ -19,7 +19,7 @@ After logging in, you'll see the project pipeline board showing any existing pro
 
 ## 2. Create a project from the migration template
 
-Click **Self Service** in the left navigation bar, then select the **Publishing House Migration** template.
+Click **Create New Project** from the Home screen, then select the **Publishing House Migration** template.
 
 The template walks you through three pages:
 
