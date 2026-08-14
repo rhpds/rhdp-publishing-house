@@ -161,18 +161,6 @@ ocp4_workload_gitops_bootstrap_helm_values:
 
 The `ocp4_workload_openshift_gitops` workload installs the OpenShift GitOps operator (ArgoCD). The `ocp4_workload_gitops_bootstrap` workload creates an ArgoCD `Application` that points to your Helm chart and syncs it.
 
-For multi-user labs with a tenant chart, add a second bootstrap call for per-user environments:
-
-```yaml
-ocp4_workload_gitops_bootstrap_repo_url: https://github.com/rhpds/<your-repo>
-ocp4_workload_gitops_bootstrap_repo_revision: "{{ gitops_repo_revision }}"
-ocp4_workload_gitops_bootstrap_repo_path: automation/gitops/bootstrap-tenant
-ocp4_workload_gitops_bootstrap_application_project: tenants
-ocp4_workload_gitops_bootstrap_application_name: "bootstrap-{{ guid }}"
-ocp4_workload_gitops_bootstrap_helm_values:
-  username: "{{ ocp4_workload_user_base }}{{ user_num }}"
-```
-
 Only include values that should be deployer-managed (operator channels, git revisions, image tags, secrets, user count). Leave everything else to the chart's `values.yaml` defaults.
 
 ---
