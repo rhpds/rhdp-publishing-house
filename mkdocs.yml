@@ -19,7 +19,9 @@ nav:
   - Home: index.md
   - Overview: overview.md
   - Getting Started: user/getting-started.md
-  - Intake Guide: user/intake-guide.md
+  - Intake:
+      - New Project: user/intake-new.md
+      - Migration: user/intake-migration.md
   - Deployment Modes: user/deployment-modes.md
   - QA Automation: user/qa-automation.md
   - Developer Docs:
