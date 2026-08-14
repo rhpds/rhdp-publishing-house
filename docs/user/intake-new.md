@@ -5,6 +5,8 @@ This guide walks you through intake for a **new** project — from logging in to
 !!! tip "Migrating an existing Showroom repo?"
     If you already have a working Showroom repo with `content/`, `site.yml`, and `nav.adoc`, use the [Migration Intake](intake-migration.md) path instead. It imports your content and reverse-engineers the spec from it.
 
+See the [Intake overview](intake.md) for a side-by-side comparison of both paths.
+
 ---
 
 ## 1. Log in to Publishing House
