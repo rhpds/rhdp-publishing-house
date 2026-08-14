@@ -31,11 +31,7 @@ Checks that the services **your workshop/demo provisions** are up after provisio
 
 ## e2e.yml
 
-Walks through the learner's steps from the module content and confirms the workshop/demo can be completed start to finish, unattended.
-
-**Guided patterns** (AgD v2 Guided, ZT Guided) — reuse what already exists instead of re-implementing it. Each module already has standalone `runtime-automation/<module>/{setup,solve,validate}.yml` playbooks that take the same extravars Nookbag passes when a learner clicks Solve/Validate (`k8s_kubeconfig`, `student_ns`, `bastion_host`, etc.). Loop through modules in `ui-config.yml` order and run `setup.yml` (if present) → `solve.yml` → `validate.yml` for each, stopping on the first failure. (The template repo's `.scaffolds/zt-guided-migration/qa-automation/` shows this same loop-and-fail-fast shape adapted for older shell-script-based modules — same idea, different execution mechanism.)
-
-**Open/classic pattern** (AgD v2 Open) — there are no solve/validate playbooks to call into, since classic Showroom has no solve/validate buttons. Script the learner's documented steps directly (CLI/API calls that mirror what they'd do manually).
+Walks through the learner's steps from the module content and confirms the workshop/demo can be completed start to finish, unattended. Script the learner's documented steps directly — CLI/API calls that mirror what they'd do manually.
 
 **Requirements:**
 
