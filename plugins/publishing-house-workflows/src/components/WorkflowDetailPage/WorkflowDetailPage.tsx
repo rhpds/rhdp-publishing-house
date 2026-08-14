@@ -570,7 +570,6 @@ export function WorkflowDetailPage() {
                     { label: 'spec.yaml', path: 'publishing-house/spec.yaml' },
                     { label: 'design.md', path: 'publishing-house/spec/design.md' },
                     { label: 'Module Outlines', path: 'publishing-house/spec/modules' },
-                    { label: 'automation-manifest.yaml', path: 'publishing-house/spec/automation-manifest.yaml' },
                   ].map(f => (
                     <Button
                       key={f.path}

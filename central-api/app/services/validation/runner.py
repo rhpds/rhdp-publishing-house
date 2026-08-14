@@ -14,7 +14,6 @@ from . import (
     design_structure,
     module_outlines,
     cross_validation,
-    automation_manifest,
     vocabulary,
     auto_compute,
     development_checks,
@@ -23,11 +22,11 @@ from . import (
 logger = logging.getLogger(__name__)
 
 STAGE_GROUPS = {
-    "intake": ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
+    "intake": ["A", "B", "C", "D", "E", "F", "H", "I"],
     "review": ["A", "B", "C", "D", "E", "F"],
-    "development": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
-    "testing": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
-    "published": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+    "development": ["A", "B", "C", "D", "E", "F", "H", "I", "J"],
+    "testing": ["A", "B", "C", "D", "E", "F", "H", "I", "J"],
+    "published": ["A", "B", "C", "D", "E", "F", "H", "I", "J"],
 }
 
 
@@ -35,8 +34,6 @@ def _read_project_files(repo: ClonedRepo) -> dict:
     """Read all needed files from a cloned repo."""
     spec_raw = repo.read_file("publishing-house/spec.yaml")
     design_text = repo.read_file("publishing-house/spec/design.md")
-    manifest_text = repo.read_file("publishing-house/spec/automation-manifest.yaml")
-
     outline_files = {}
     module_filenames = repo.list_dir("publishing-house/spec/modules")
     for fname in module_filenames:
@@ -59,7 +56,6 @@ def _read_project_files(repo: ClonedRepo) -> dict:
     return {
         "spec_data": spec_data,
         "design_text": design_text,
-        "manifest_text": manifest_text,
         "outline_files": outline_files,
         "page_files": page_files,
         "page_contents": page_contents,
@@ -88,7 +84,6 @@ async def run_validation(
         files = _read_project_files(repo)
         spec_data = files["spec_data"]
         design_text = files["design_text"]
-        manifest_text = files["manifest_text"]
         outline_files = files["outline_files"]
 
         if not spec_data:
@@ -122,9 +117,6 @@ async def run_validation(
 
         if "F" in groups:
             all_results.extend(cross_validation.run_checks(spec_data, design_text, outline_files, policy))
-
-        if "G" in groups:
-            all_results.extend(automation_manifest.run_checks(manifest_text, policy))
 
         if "H" in groups:
             all_results.extend(vocabulary.run_checks(spec_data, policy))

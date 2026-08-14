@@ -18,9 +18,9 @@ exclude_docs: |
 nav:
   - Home: index.md
   - Overview: overview.md
-  - Intake:
-      - New Project: user/intake-new.md
-      - Migration: user/intake-migration.md
+  - Intake: user/intake.md
+  - New Project Intake: user/intake-new.md
+  - Migration Intake: user/intake-migration.md
   - Deployment Modes: user/deployment-modes.md
   - QA Automation: user/qa-automation.md
   - Developer Docs:
