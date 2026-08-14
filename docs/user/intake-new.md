@@ -48,11 +48,11 @@ Click **Next**.
 !!! note
     If you're not sure about any of these, just accept the defaults.
 
-    | Field | Description |
-    |-------|-------------|
-    | **Initiative** | Which initiative this content is for — `RH1 2027`, `Summit 2027`, or `None`. |
-    | **Showroom Type** | `Classic` (standard Showroom lab) or `Zero Touch` (embedded runtime and setup automation with solve/validate buttons). |
-    | **Automation Type** | `Ansible`, `GitOps`, or `Both`. This determines which automation scaffolding is set up in your repo. |
+| Field | Description |
+|-------|-------------|
+| **Initiative** | Which initiative this content is for — `RH1 2027`, `Summit 2027`, or `None`. |
+| **Showroom Type** | `Classic` (standard Showroom lab) or `Zero Touch` (embedded runtime and setup automation with solve/validate buttons). |
+| **Automation Type** | `Ansible`, `GitOps`, or `Both`. This determines which automation scaffolding is set up in your repo. |
 
 Click **Review**, verify your selections, then click **Create**.
 
