@@ -20,17 +20,18 @@ nav:
   - Overview: overview.md
   - Getting Started: user/getting-started.md
   - Deployment Modes: user/deployment-modes.md
-  - Architecture:
-      - System Design: architecture/system-design.md
-      - Central Backend: architecture/central.md
-      - Skills System: architecture/skills.md
-      - Lifecycle & Phases: architecture/lifecycle-phases.md
-      - RCARS Integration: architecture/rcars-integration.md
-      - Jira Integration: architecture/jira-integration.md
-  - Admin:
-      - Deployment Guide: admin/deployment.md
-      - MCP Authentication: admin/mcp-auth.md
-      - Operations: admin/operations.md
+  - Developer Docs:
+      - Architecture:
+          - System Design: architecture/system-design.md
+          - Central Backend: architecture/central.md
+          - Skills System: architecture/skills.md
+          - Lifecycle & Phases: architecture/lifecycle-phases.md
+          - RCARS Integration: architecture/rcars-integration.md
+          - Jira Integration: architecture/jira-integration.md
+      - Admin:
+          - Deployment Guide: admin/deployment.md
+          - MCP Authentication: admin/mcp-auth.md
+          - Operations: admin/operations.md
 
 theme:
   name: material
@@ -39,7 +40,6 @@ theme:
   icon:
     repo: fontawesome/brands/github
   features:
-    - navigation.sections
     - navigation.top
     - navigation.tracking
     - content.code.copy
