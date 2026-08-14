@@ -733,14 +733,14 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, status
                     try:
                         from .projects import _get_workflow_data
                         wd = _get_workflow_data(slug)
-                        agnosticv_url = wd.get("agnosticvUrl", "")
-                        ci_url = wd.get("ciUrl", "")
-                        if agnosticv_url or ci_url:
+                        agnosticv_urls = wd.get("agnosticvUrls", [])
+                        ci_urls = wd.get("ciUrls", [])
+                        if agnosticv_urls or ci_urls:
                             desc_lines = []
-                            if agnosticv_url:
-                                desc_lines.append(f"AgnosticV Catalog Item: {agnosticv_url}")
-                            if ci_url:
-                                desc_lines.append(f"CI Catalog Item: {ci_url}")
+                            for url in agnosticv_urls:
+                                desc_lines.append(f"AgnosticV Catalog Item: {url}")
+                            for url in ci_urls:
+                                desc_lines.append(f"CI Catalog Item: {url}")
                             _update_task_fields(dev_ci_task["key"], dev_ci_task["summary"], "\n".join(desc_lines), settings)
                     except Exception as e:
                         logger.warning("jira sync bg: failed to update Dev CI description: %s", e)

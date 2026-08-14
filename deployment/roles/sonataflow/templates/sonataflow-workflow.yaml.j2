@@ -340,8 +340,8 @@ spec:
           output: |
             . + {
               reviewHistory: ((.reviewHistory // []) + (if .latestAudit then [.latestAudit] else [] end)),
-              agnosticvUrl: (.latestAudit.agnosticvUrl // .agnosticvUrl // ""),
-              ciUrl: (.latestAudit.ciUrl // .ciUrl // "")
+              agnosticvUrls: (.latestAudit.agnosticvUrls // .agnosticvUrls // []),
+              ciUrls: (.latestAudit.ciUrls // .ciUrls // [])
             }
         timeouts:
           stateExecTimeout: PT168H

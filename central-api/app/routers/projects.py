@@ -211,8 +211,8 @@ def _get_workflow_data(project_id: str):
             "baselineSha": wd.get("baselineSha", ""),
             "hasDrift": wd.get("hasDrift", False),
             "repoUrl": wd.get("repoUrl", ""),
-            "agnosticvUrl": wd.get("agnosticvUrl", ""),
-            "ciUrl": wd.get("ciUrl", ""),
+            "agnosticvUrls": wd.get("agnosticvUrls", []),
+            "ciUrls": wd.get("ciUrls", []),
         }
         if rejection and rejection.get("isRejected"):
             result["rejection"] = rejection
@@ -861,8 +861,8 @@ async def reject_infra_review(
 # ── Env Setup ──────────────────────────────────────────────────────────────
 
 class EnvSetupSubmitRequest(BaseModel):
-    agnosticv_url: str
-    ci_url: str
+    agnosticv_urls: list[str]
+    ci_urls: list[str]
 
 
 @router.post("/{slug}/env-setup/submit")
@@ -885,8 +885,8 @@ async def submit_env_setup(
         "stage": "env_setup",
         "action": "submitted",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "agnosticvUrl": body.agnosticv_url,
-        "ciUrl": body.ci_url,
+        "agnosticvUrls": body.agnosticv_urls,
+        "ciUrls": body.ci_urls,
     })
 
     return {"slug": slug, "action": "submitted", "stage": "env_setup"}
