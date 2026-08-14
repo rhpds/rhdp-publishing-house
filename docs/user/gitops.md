@@ -143,10 +143,14 @@ This prevents ArgoCD from failing the dry-run when the CRD doesn't exist yet (th
 
 ## AgnosticV integration
 
-After generating templates, the skill prints a suggested AgnosticV `common.yml` snippet. For `bootstrap-infra`:
+To deploy your GitOps automation, include the `ocp4_workload_gitops_bootstrap` workload in your AgnosticV catalog item's `common.yaml` and configure it to point at your chart:
 
 ```yaml
-ocp4_workload_gitops_bootstrap_repo_url: https://github.com/ORG/REPO
+workloads:
+  - agnosticd.core_workloads.ocp4_workload_openshift_gitops
+  - agnosticd.core_workloads.ocp4_workload_gitops_bootstrap
+
+ocp4_workload_gitops_bootstrap_repo_url: https://github.com/rhpds/<your-repo>
 ocp4_workload_gitops_bootstrap_repo_revision: "{{ gitops_repo_revision }}"
 ocp4_workload_gitops_bootstrap_repo_path: automation/gitops/bootstrap-infra
 ocp4_workload_gitops_bootstrap_application_name: bootstrap-infra
@@ -155,10 +159,12 @@ ocp4_workload_gitops_bootstrap_helm_values:
   # deployer.domain, deployer.apiUrl, and deployer.guid are auto-injected.
 ```
 
-For `bootstrap-tenant` (if it exists):
+The `ocp4_workload_openshift_gitops` workload installs the OpenShift GitOps operator (ArgoCD). The `ocp4_workload_gitops_bootstrap` workload creates an ArgoCD `Application` that points to your Helm chart and syncs it.
+
+For multi-user labs with a tenant chart, add a second bootstrap call for per-user environments:
 
 ```yaml
-ocp4_workload_gitops_bootstrap_repo_url: https://github.com/ORG/REPO
+ocp4_workload_gitops_bootstrap_repo_url: https://github.com/rhpds/<your-repo>
 ocp4_workload_gitops_bootstrap_repo_revision: "{{ gitops_repo_revision }}"
 ocp4_workload_gitops_bootstrap_repo_path: automation/gitops/bootstrap-tenant
 ocp4_workload_gitops_bootstrap_application_project: tenants
