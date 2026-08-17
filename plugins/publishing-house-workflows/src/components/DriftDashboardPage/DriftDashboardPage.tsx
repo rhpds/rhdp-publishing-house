@@ -136,19 +136,37 @@ function DriftDetailPanel({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+                  <th style={{ padding: '6px 8px' }}>Severity</th>
                   <th style={{ padding: '6px 8px' }}>File</th>
                   <th style={{ padding: '6px 8px' }}>Field / Section</th>
                   <th style={{ padding: '6px 8px' }}>Difference</th>
                 </tr>
               </thead>
               <tbody>
-                {state.report.changes.map((c, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{c.file}</td>
-                    <td style={{ padding: '6px 8px' }}>{c.comparing}</td>
-                    <td style={{ padding: '6px 8px' }}>{c.difference}</td>
-                  </tr>
-                ))}
+                {state.report.changes.map((c, i) => {
+                  const sevColor = c.severity === 'critical' ? '#f44336'
+                    : c.severity === 'warning' ? '#ff9800'
+                    : '#2196f3';
+                  return (
+                    <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                      <td style={{ padding: '6px 8px' }}>
+                        <Chip
+                          label={c.severity || 'info'}
+                          size="small"
+                          style={{
+                            backgroundColor: sevColor,
+                            color: '#fff',
+                            fontWeight: 600,
+                            fontSize: '0.7rem',
+                          }}
+                        />
+                      </td>
+                      <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{c.file}</td>
+                      <td style={{ padding: '6px 8px' }}>{c.comparing}</td>
+                      <td style={{ padding: '6px 8px' }}>{c.difference}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

@@ -157,13 +157,27 @@ export function WorkflowDetailPage() {
         .catch((err: any) => setSnackbar({ open: true, severity: 'error', message: `Validation report failed: ${err.message}` }))
         .finally(() => setValidationLoading(false));
 
-    const driftMode = isReview ? 'structural' : 'semantic';
+    const driftMode = isReview || stage === 'env_setup' ? 'structural' : 'semantic';
     const skipDrift = stage === 'published';
+    const runInfra = !isReview && stage !== 'env_setup' && !skipDrift;
     const driftPromise = baselineSha && !skipDrift
-      ? client.fetchDriftReport(slug, driftMode)
-          .then(report => setDriftReport(report))
-          .catch((err: any) => setSnackbar({ open: true, severity: 'error', message: `Drift check failed: ${err.message}` }))
-          .finally(() => setDriftLoading(false))
+      ? (async () => {
+          try {
+            const report = await client.fetchDriftReport(slug, driftMode);
+            if (runInfra) {
+              try {
+                const infraReport = await client.fetchDriftReport(slug, 'infra');
+                report.changes = [...report.changes, ...infraReport.changes];
+                if (!report.summary && infraReport.summary) report.summary = infraReport.summary;
+              } catch { /* infra check is best-effort */ }
+            }
+            setDriftReport(report);
+          } catch (err: any) {
+            setSnackbar({ open: true, severity: 'error', message: `Drift check failed: ${err.message}` });
+          } finally {
+            setDriftLoading(false);
+          }
+        })()
       : Promise.resolve().then(() => { setDriftReport(null); setDriftLoading(false); });
 
     await Promise.all([validationPromise, driftPromise]);
@@ -594,42 +608,64 @@ export function WorkflowDetailPage() {
                 <Progress />
               </InfoCard>
             )}
-            {!driftLoading && driftReport?.has_drift && (
-              <InfoCard title="Changes Since Last Approval">
+            {!driftLoading && driftReport && driftReport.changes.length > 0 && (
+              <InfoCard title={driftReport.has_drift ? 'Changes Since Last Approval' : 'Drift Check'}>
                 <div style={{
                   padding: '8px 16px',
                   marginBottom: 16,
                   borderRadius: 4,
-                  backgroundColor: '#fff3e0',
-                  color: '#e65100',
+                  backgroundColor: driftReport.has_drift ? '#fff3e0' : '#e3f2fd',
+                  color: driftReport.has_drift ? '#e65100' : '#1565c0',
                   fontWeight: 600,
                 }}>
-                  Changes detected since last approval
+                  {driftReport.has_drift ? 'Changes detected since last approval' : driftReport.summary}
                 </div>
-                <Typography variant="body2" style={{ marginBottom: 8, color: '#757575' }}>
-                  Baseline: <code>{driftReport.baseline_sha.substring(0, 7)}</code>
-                  {' → HEAD: '}
-                  <code>{driftReport.current_sha.substring(0, 7)}</code>
-                </Typography>
-                <Typography variant="body2" style={{ marginBottom: 12 }}>
-                  {driftReport.summary}
-                </Typography>
+                {driftReport.baseline_sha && (
+                  <Typography variant="body2" style={{ marginBottom: 8, color: '#757575' }}>
+                    Baseline: <code>{driftReport.baseline_sha.substring(0, 7)}</code>
+                    {' → HEAD: '}
+                    <code>{driftReport.current_sha.substring(0, 7)}</code>
+                  </Typography>
+                )}
+                {driftReport.has_drift && (
+                  <Typography variant="body2" style={{ marginBottom: 12 }}>
+                    {driftReport.summary}
+                  </Typography>
+                )}
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+                      <th style={{ padding: '6px 8px' }}>Severity</th>
                       <th style={{ padding: '6px 8px' }}>File</th>
                       <th style={{ padding: '6px 8px' }}>Field / Section</th>
                       <th style={{ padding: '6px 8px' }}>Difference</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {driftReport.changes.map((change, ci) => (
-                      <tr key={ci} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                        <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{change.file}</td>
-                        <td style={{ padding: '6px 8px' }}>{change.comparing}</td>
-                        <td style={{ padding: '6px 8px' }}>{change.difference}</td>
-                      </tr>
-                    ))}
+                    {driftReport.changes.map((change, ci) => {
+                      const sevColor = change.severity === 'critical' ? '#f44336'
+                        : change.severity === 'warning' ? '#ff9800'
+                        : '#2196f3';
+                      return (
+                        <tr key={ci} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                          <td style={{ padding: '6px 8px' }}>
+                            <Chip
+                              label={change.severity || 'info'}
+                              size="small"
+                              style={{
+                                backgroundColor: sevColor,
+                                color: '#fff',
+                                fontWeight: 600,
+                                fontSize: '0.7rem',
+                              }}
+                            />
+                          </td>
+                          <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{change.file}</td>
+                          <td style={{ padding: '6px 8px' }}>{change.comparing}</td>
+                          <td style={{ padding: '6px 8px' }}>{change.difference}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </InfoCard>

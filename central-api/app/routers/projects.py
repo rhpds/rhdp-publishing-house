@@ -490,7 +490,7 @@ async def submit_development(
     from fastapi.responses import JSONResponse
     from ..services.github import GitHubService
     from ..services.validation.runner import run_validation
-    from ..services.drift import check_drift_semantic, drift_cache_evict
+    from ..services.drift import check_drift_semantic, check_drift_infra, drift_cache_evict
 
     owner, groups = auth
     _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
@@ -556,6 +556,23 @@ async def submit_development(
                 _patch_workflow_data(wf_uuid, {"hasDrift": False}, settings=settings)
                 logger.info("development: drift cleared for %s", project_slug)
 
+        # Infra drift check (informational — does not block)
+        agnosticv_urls = wd.get("agnosticvUrls", [])
+        if agnosticv_urls:
+            try:
+                import yaml
+                spec_raw = await github.get_file_content(body.repo_url, "publishing-house/spec.yaml", body.branch)
+                spec_env = {}
+                if spec_raw:
+                    spec_data = yaml.safe_load(spec_raw) or {}
+                    spec_env = spec_data.get("spec", {}).get("environment", {})
+                current_sha = await github.get_head_sha(body.repo_url, body.branch) or ""
+                infra_result = await check_drift_infra(github, agnosticv_urls, spec_env, current_sha)
+                if infra_result.changes:
+                    logger.info("development: %d infra sizing mismatch(es) for %s", len(infra_result.changes), project_slug)
+            except Exception as e:
+                logger.warning("development: infra drift check failed for %s: %s", project_slug, e)
+
         _advance_workflow(
             project_slug, wf_uuid, owner, stage="development",
             commit_sha=result.commit_sha, settings=settings,
@@ -595,7 +612,7 @@ async def submit_testing(
     from fastapi.responses import JSONResponse
     from ..services.github import GitHubService
     from ..services.validation.runner import run_validation
-    from ..services.drift import check_drift_semantic, drift_cache_evict
+    from ..services.drift import check_drift_semantic, check_drift_infra, drift_cache_evict
 
     owner, groups = auth
     allowed = GROUP_BITS["rhdp-operations"] | GROUP_BITS["rhdp-administrators"]
@@ -658,6 +675,23 @@ async def submit_testing(
             elif wd.get("hasDrift"):
                 _patch_workflow_data(wf_uuid, {"hasDrift": False}, settings=settings)
                 logger.info("testing: drift cleared for %s", project_slug)
+
+        # Infra drift check (informational — does not block)
+        agnosticv_urls = wd.get("agnosticvUrls", [])
+        if agnosticv_urls:
+            try:
+                import yaml
+                spec_raw = await github.get_file_content(body.repo_url, "publishing-house/spec.yaml", body.branch)
+                spec_env = {}
+                if spec_raw:
+                    spec_data = yaml.safe_load(spec_raw) or {}
+                    spec_env = spec_data.get("spec", {}).get("environment", {})
+                current_sha = await github.get_head_sha(body.repo_url, body.branch) or ""
+                infra_result = await check_drift_infra(github, agnosticv_urls, spec_env, current_sha)
+                if infra_result.changes:
+                    logger.info("testing: %d infra sizing mismatch(es) for %s", len(infra_result.changes), project_slug)
+            except Exception as e:
+                logger.warning("testing: infra drift check failed for %s: %s", project_slug, e)
 
         _advance_workflow(
             project_slug, wf_uuid, owner, stage="testing",
@@ -879,6 +913,28 @@ async def submit_env_setup(
     if not wf_uuid:
         raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
     _require_stage(wf_uuid, ["env_setup"])
+
+    # Validate AgnosticV URLs — each must point to a folder with common.yaml and dev.yaml
+    settings = get_settings()
+    if settings.github_token:
+        from ..services.drift import _parse_agnosticv_url
+        from ..services.github import GitHubService
+        github = GitHubService(token=settings.github_token)
+        errors = []
+        for url in body.agnosticv_urls:
+            parsed = _parse_agnosticv_url(url)
+            if not parsed:
+                errors.append(f"Invalid AgnosticV URL format: {url}")
+                continue
+            repo_url, branch, path = parsed
+            common = await github.get_file_content(repo_url, f"{path}/common.yaml", branch)
+            if not common:
+                errors.append(f"common.yaml not found at {path}")
+            dev = await github.get_file_content(repo_url, f"{path}/dev.yaml", branch)
+            if not dev:
+                errors.append(f"dev.yaml not found at {path}")
+        if errors:
+            raise HTTPException(status_code=422, detail="; ".join(errors))
 
     _send_cloud_event("ph.env-setup.complete", slug, {
         "user": owner,

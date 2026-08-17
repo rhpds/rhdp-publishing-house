@@ -182,6 +182,7 @@ export interface DriftChange {
   file: string;
   comparing: string;
   difference: string;
+  severity?: 'info' | 'warning' | 'critical';
 }
 
 export interface DriftReport {

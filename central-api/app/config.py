@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # API Configuration
     api_title: str = "Publishing House Central API"
-    api_version: str = "1.20.0"
+    api_version: str = "1.21.7"
     api_prefix: str = "/api/v1"
 
     # Authentication
@@ -56,6 +56,9 @@ class Settings(BaseSettings):
 
     # Drift semantic cache TTL (seconds, default 3 days)
     drift_cache_ttl_seconds: int = 259200
+
+    # AWS instance type map (JSON string: {"type": [cpu, ram_gb], ...})
+    aws_instance_type_map: str = "{}"
 
     # CORS (comma-separated origins for direct browser→API calls)
     cors_origins: str = ""
