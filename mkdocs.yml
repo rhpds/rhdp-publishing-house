@@ -24,6 +24,7 @@ nav:
       - Migration: user/intake-migration.md
   - Development:
       - Overview: user/development.md
+      - Content Helpers: user/content-helper.md
       - GitOps Automation: user/gitops.md
       - Ansible Automation: user/ansible.md
   - Deployment Modes: user/deployment-modes.md
