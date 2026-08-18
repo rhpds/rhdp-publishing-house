@@ -1,1 +1,205 @@
-IyBBbnNpYmxlIEF1dG9tYXRpb24KClB1Ymxpc2hpbmcgSG91c2UgcHJvdmlkZXMgYW4gYGFuc2libGUtaGVscGVyYCBza2lsbCB0aGF0IGNyZWF0ZXMgYW5kIGltcG9ydHMgQW5zaWJsZSByb2xlcyBpbnRvIHlvdXIgcHJvamVjdCdzIGNvbGxlY3Rpb24uCgohISEgaW5mbyAiVGhpcyBoZWxwZXIgaXMgb3B0aW9uYWwiCiAgICBZb3UgY2FuIGJ1aWxkIEFuc2libGUgYXV0b21hdGlvbiBtYW51YWxseSBvciB3aXRoIGFueSB0b29sIHlvdSBwcmVmZXIuIElmIHlvdSBkbyB1c2UgdGhlIGhlbHBlciwKICAgIGl0cyBvdXRwdXQgaXMgYSBzdGFydGluZyBwb2ludCDigJQgcmVhZCB0aHJvdWdoIGV2ZXJ5dGhpbmcgaXQgcHJvZHVjZXMgYW5kIHZlcmlmeSBpdCB5b3Vyc2VsZgogICAgYmVmb3JlIG1hcmtpbmcgYSB3b3Jrc3RyZWFtIGNvbXBsZXRlLgoKU2VlIFtEZXZlbG9wbWVudF0oZGV2ZWxvcG1lbnQubWQpIGZvciBob3cgQW5zaWJsZSBBdXRvbWF0aW9uIGZpdHMgaW50byB0aGUgb3ZlcmFsbCBkZXZlbG9wbWVudCB3b3JrZmxvdy4KCi0tLQoKIyMgT3ZlcnZpZXcKCkFuc2libGUgYXV0b21hdGlvbiBpbiBSSERQIHVzZXMgYW4gKipBbnNpYmxlIENvbGxlY3Rpb24qKiBzdHJ1Y3R1cmUgaW5zaWRlIGBhdXRvbWF0aW9uL2Fuc2libGUvYC4gRWFjaCByb2xlIGluIHRoZSBjb2xsZWN0aW9uIGhhbmRsZXMgYSBzcGVjaWZpYyBwaWVjZSBvZiBsYWIgcHJvdmlzaW9uaW5nIOKAlCBkZXBsb3lpbmcgYW4gYXBwbGljYXRpb24sIGNvbmZpZ3VyaW5nIGEgc2VydmljZSwgY3JlYXRpbmcgdXNlciBlbnZpcm9ubWVudHMsIGV0Yy4gVGhlIHJvbGVzIGFyZSBjYWxsZWQgYnkgQWdub3N0aWNEIHYyIHdvcmtsb2FkcyBkdXJpbmcgbGFiIGRlcGxveW1lbnQuCgotLS0KCiMjIERpcmVjdG9yeSBzdHJ1Y3R1cmUKClRoZSBhdXRvbWF0aW9uIHNjYWZmb2xkaW5nIChjcmVhdGVkIGJ5IHRoZSBkZXZlbG9wbWVudCBza2lsbCdzIGNvbmZpZy1oZWxwZXIpIHByb2R1Y2VzIHRoaXMgbGF5b3V0OgoKYGBgCmF1dG9tYXRpb24vYW5zaWJsZS8K4pSc4pSA4pSAIGdhbGF4eS55bWwK4pSc4pSA4pSAIFJFQURNRS5tZArilJzilIDilIAgbWV0YS8K4pSCICAg4pSU4pSA4pSAIHJ1bnRpbWUueW1sCuKUlOKUgOKUgCByb2xlcy8KICAgIOKUlOKUgOKUgCA8cm9sZV9uYW1lPi8KICAgICAgICDilJzilIDilIAgdGFza3MvbWFpbi55bWwKICAgICAgICDilJzilIDilIAgZGVmYXVsdHMvbWFpbi55bWwKICAgICAgICDilJzilIDilIAgbWV0YS9tYWluLnltbAogICAgICAgIOKUlOKUgOKUgCBSRUFETUUubWQKYGBgCgpPcHRpb25hbCBkaXJlY3RvcmllcyBjYW4gYmUgYWRkZWQgcGVyIHJvbGUgYXMgbmVlZGVkOgoKLSBgdmFycy9tYWluLnltbGAg4oCUIHJvbGUtaW50ZXJuYWwgdmFyaWFibGVzIG5vdCBleHBvc2VkIHRvIGNhbGxlcnMKLSBgaGFuZGxlcnMvbWFpbi55bWxgIOKAlCBub3RpZmljYXRpb24gaGFuZGxlcnMKCi0tLQoKIyMgVXNpbmcgdGhlIEFuc2libGUgaGVscGVyIHNraWxsCgojIyMgRnJvbSB0aGUgZGV2ZWxvcG1lbnQgZGFzaGJvYXJkCgpTZWxlY3QgKipBbnNpYmxlIEF1dG9tYXRpb24qKiBmcm9tIHRoZSBkZXZlbG9wbWVudCBkYXNoYm9hcmQsIHRoZW4gY2hvb3NlICoqVXNlIEFuc2libGUgaGVscGVyKiouIENsYXVkZSBkaXNwYXRjaGVzIHRvIHRoZSBgYW5zaWJsZS1oZWxwZXJgIHNraWxsLCB3aGljaCBvZmZlcnMgdHdvIHBhdGhzOgoKfCAjIHwgUGF0aCB8IFdoYXQgaXQgZG9lcyB8CnwtLS18LS0tLS0tfC0tLS0tLS0tLS0tLS18CnwgMSB8ICoqTmV3IHJvbGUqKiB8IENyZWF0ZXMgYSBmcmVzaCBBbnNpYmxlIHJvbGUgc2tlbGV0b24gZnJvbSBzY3JhdGNoIHwKfCAyIHwgKipJbXBvcnQgZnJvbSBHaXQqKiB8IFB1bGxzIGV4aXN0aW5nIHJvbGVzIGZyb20gYSBHaXQgcmVwb3NpdG9yeSBpbnRvIHlvdXIgY29sbGVjdGlvbiB8CgojIyMgUGF0aCAxIOKAlCBOZXcgcm9sZQoKQ2xhdWRlIHdhbGtzIHlvdSB0aHJvdWdoOgoKMS4gKipSb2xlIG5hbWUqKiDigJQgcHJvdmlkZSBhIHNuYWtlX2Nhc2UgbmFtZSAoZS5nLiwgYGNvbmZpZ3VyZV9hYXBgLCBgZGVwbG95X25naW54YCkKMi4gKipSb2xlIHB1cnBvc2UqKiDigJQgZGVzY3JpYmUgd2hhdCB0aGUgcm9sZSBzaG91bGQgY29uZmlndXJlLCBkZXBsb3ksIG9yIG1hbmFnZQozLiAqKkR1cGxpY2F0ZSBjaGVjayoqIOKAlCBpZiBhIHJvbGUgd2l0aCB0aGF0IG5hbWUgYWxyZWFkeSBleGlzdHMsIENsYXVkZSBhc2tzIHdoZXRoZXIgdG8gY29udGludWUgb3IgcGljayBhIGRpZmZlcmVudCBuYW1lCjQuICoqU2NhZmZvbGQqKiDigJQgY3JlYXRlcyB0aGUgcm9sZSBza2VsZXRvbiB3aXRoIGB0YXNrcy9tYWluLnltbGAsIGBkZWZhdWx0cy9tYWluLnltbGAsIGBtZXRhL21haW4ueW1sYCwgYW5kIGBSRUFETUUubWRgCjUuICoqV3JpdGUgdGFza3MqKiDigJQgb3B0aW9uYWxseSwgQ2xhdWRlIHdyaXRlcyB0aGUgYWN0dWFsIHRhc2sgbG9naWMgYmFzZWQgb24geW91ciBkZXNjcmlwdGlvbi4gR2l2ZSBhcyBtdWNoIGRldGFpbCBhcyBwb3NzaWJsZSBmb3IgYmV0dGVyIHJlc3VsdHMuIFlvdSBjYW4gYWxzbyBkZWNsaW5lIGFuZCB3cml0ZSB0YXNrcyB5b3Vyc2VsZi4KNi4gKipSZXBvcnQqKiDigJQgcHJpbnRzIGEgc3VtbWFyeSBvZiBmaWxlcyBjcmVhdGVkCgpZb3UgY2FuIHJlcGVhdCB0aGlzIHRvIGFkZCBtdWx0aXBsZSByb2xlcyBpbiBvbmUgc2Vzc2lvbi4KCiMjIyBQYXRoIDIg4oCUIEltcG9ydCBmcm9tIEdpdAoKQ2xhdWRlIGhhbmRsZXMgdGhyZWUgcmVwbyBsYXlvdXRzIGF1dG9tYXRpY2FsbHk6Cgp8IFJlcG8gdHlwZSB8IERldGVjdGlvbiB8IEhvdyByb2xlcyBhcmUgZm91bmQgfAp8LS0tfC0tLXwtLS18CnwgKipBbnNpYmxlIENvbGxlY3Rpb24qKiB8IGBnYWxheHkueW1sYCBhdCByZXBvIHJvb3QgfCBTdWJkaXJlY3RvcmllcyBvZiBgcm9sZXMvYCB8CnwgKipTaW5nbGUgcm9sZSoqIHwgYHRhc2tzL21haW4ueW1sYCBhdCByZXBvIHJvb3QgfCBUaGUgZW50aXJlIHJlcG8gaXMgb25lIHJvbGUgfAp8ICoqTXVsdGktcm9sZSBtb25vcmVwbyoqIHwgTmVpdGhlciBvZiB0aGUgYWJvdmUgfCBEaXJlY3RvcmllcyBjb250YWluaW5nIGB0YXNrcy9tYWluLnltbGAgfAoKVGhlIGZsb3c6CgoxLiAqKlByb3ZpZGUgYSBHaXQgVVJMKiog4oCUIENsYXVkZSBjbG9uZXMgdGhlIHJlcG8KMi4gKipTZWxlY3Qgcm9sZXMqKiDigJQgQ2xhdWRlIGxpc3RzIGFsbCBkaXNjb3ZlcmVkIHJvbGVzOyB0eXBlIGBhbGxgIG9yIHNwZWNpZmljIG51bWJlcnMgdG8gaW1wb3J0CjMuICoqRHVwbGljYXRlIGNoZWNrKiog4oCUIGZvciBhbnkgcm9sZSB0aGF0IGFscmVhZHkgZXhpc3RzLCBjaG9vc2Ugb3ZlcndyaXRlLCBza2lwLCBvciByZW5hbWUKNC4gKipDb3B5IGFuZCB1cGRhdGUqKiDigJQgcm9sZXMgYXJlIGNvcGllZCBpbnRvIGBhdXRvbWF0aW9uL2Fuc2libGUvcm9sZXMvYCwgYW5kIGBtZXRhL21haW4ueW1sYCBpcyB1cGRhdGVkIHdpdGggeW91ciBhdXRob3IgZW1haWwKNS4gKipSZXBvcnQqKiDigJQgcHJpbnRzIGEgc3VtbWFyeSBvZiBpbXBvcnRlZCByb2xlcwoKWW91IGNhbiBpbXBvcnQgZnJvbSBtdWx0aXBsZSByZXBvc2l0b3JpZXMgaW4gb25lIHNlc3Npb24uCgojIyMgU3RhbmRhbG9uZSBtb2RlCgpUaGUgc2tpbGwgYWxzbyB3b3JrcyBvdXRzaWRlIG9mIFB1Ymxpc2hpbmcgSG91c2UgcHJvamVjdHM6CgpgYGAKL3JoZHAtcHVibGlzaGluZy1ob3VzZTphbnNpYmxlLWhlbHBlcgpgYGAKCkluIHN0YW5kYWxvbmUgbW9kZSwgdGhlIHByZS1mbGlnaHQgYW5kIHdvcmtmbG93IGNoZWNrcyBhcmUgc2tpcHBlZC4gVGhlIHNraWxsIHZlcmlmaWVzIHRoYXQgYGF1dG9tYXRpb24vYW5zaWJsZS9gIGV4aXN0cyBhbmQgcHJvY2VlZHMgZGlyZWN0bHkuCgotLS0KCiMjIENvbGxlY3Rpb24gY29udmVudGlvbnMKCiMjIyBnYWxheHkueW1sCgpUaGUgY29sbGVjdGlvbiBpZGVudGl0eSBmaWxlIGF0IGBhdXRvbWF0aW9uL2Fuc2libGUvZ2FsYXh5LnltbGA6CgpgYGB5YW1sCm5hbWVzcGFjZTogPHByb2plY3Rfc2x1Z191bmRlcnNjb3JlZD4KbmFtZTogYW5zaWJsZQp2ZXJzaW9uOiAxLjAuMAphdXRob3JzOgotIG93bmVyQHJlZGhhdC5jb20KZGVzY3JpcHRpb246IEFuc2libGUgY29sbGVjdGlvbiBmb3IgPHByb2plY3Qtc2x1Zz4gbGFiIGF1dG9tYXRpb24KbGljZW5zZToKLSBHUEwtMi4wLW9yLWxhdGVyCmBgYAoKVGhlIG5hbWVzcGFjZSBpcyBkZXJpdmVkIGZyb20geW91ciBwcm9qZWN0IHNsdWcgd2l0aCBoeXBoZW5zIGNvbnZlcnRlZCB0byB1bmRlcnNjb3Jlcy4KCiMjIyBSb2xlIG5hbWluZwoKLSBVc2UgKipzbmFrZV9jYXNlKiogZm9yIHJvbGUgbmFtZXMgKGUuZy4sIGBjb25maWd1cmVfYWFwYCwgYGRlcGxveV9naXRlYWAsIGBzZXR1cF91c2Vyc2ApCi0gSHlwaGVucyBhbmQgc3BhY2VzIGFyZSBhdXRvbWF0aWNhbGx5IGNvbnZlcnRlZCB0byB1bmRlcnNjb3JlcwotIFByZWZpeCB3aXRoIGEgdmVyYiB0aGF0IGRlc2NyaWJlcyB0aGUgYWN0aW9uOiBgY29uZmlndXJlX2AsIGBkZXBsb3lfYCwgYHNldHVwX2AsIGBpbnN0YWxsX2AKCiMjIyBSb2xlIG1ldGFkYXRhCgpFdmVyeSByb2xlIHNob3VsZCBoYXZlIGEgYG1ldGEvbWFpbi55bWxgIHdpdGggYXV0aG9yIGFuZCBkZXNjcmlwdGlvbjoKCmBgYHlhbWwKZ2FsYXh5X2luZm86CiAgYXV0aG9yOiBvd25lckByZWRoYXQuY29tCiAgZGVzY3JpcHRpb246IENvbmZpZ3VyZXMgQUFQIGNvbnRyb2xsZXIgZm9yIHRoZSBsYWIgZW52aXJvbm1lbnQKICBsaWNlbnNlOiBHUEwtMi4wLW9yLWxhdGVyCiAgbWluX2Fuc2libGVfdmVyc2lvbjogMi45CiAgZ2FsYXh5X3RhZ3M6IFtdCmRlcGVuZGVuY2llczogW10KYGBgCgojIyMgUm9sZSB2YXJpYWJsZXMKCkV4cG9zZSBjb25maWd1cmFibGUgdmFsdWVzIGluIGBkZWZhdWx0cy9tYWluLnltbGAuIERvY3VtZW50IHRoZW0gaW4gdGhlIHJvbGUncyBgUkVBRE1FLm1kYDoKCmBgYG1hcmtkb3duCiMjIFJvbGUgVmFyaWFibGVzCgp8IFZhcmlhYmxlIHwgRGVmYXVsdCB8IERlc2NyaXB0aW9uIHwKfC0tLS0tLS0tLS18LS0tLS0tLS0tfC0tLS0tLS0tLS0tLS18CnwgYGFhcF9hZG1pbl9wYXNzd29yZGAgfCBgcmVkaGF0YCB8IEFkbWluIHBhc3N3b3JkIGZvciB0aGUgQUFQIGNvbnRyb2xsZXIgfAp8IGBhYXBfdmVyc2lvbmAgfCBgMi42YCB8IEFBUCB2ZXJzaW9uIHRvIGluc3RhbGwgfApgYGAKCi0tLQoKIyMgTWFudWFsIHNldHVwCgpJZiB5b3UgcHJlZmVyIHRvIGJ1aWxkIEFuc2libGUgYXV0b21hdGlvbiB3aXRob3V0IHRoZSBza2lsbDoKCjEuIFNlbGVjdCAqKkFuc2libGUgQXV0b21hdGlvbioqIGZyb20gdGhlIGRldmVsb3BtZW50IGRhc2hib2FyZCwgY2hvb3NlICoqRG8gaXQgbXlzZWxmKioKMi4gQ3JlYXRlIHJvbGVzIGluIGBhdXRvbWF0aW9uL2Fuc2libGUvcm9sZXMvYCBmb2xsb3dpbmcgdGhlIHN0cnVjdHVyZSBhYm92ZQozLiBFbnN1cmUgZWFjaCByb2xlIGhhcyBgdGFza3MvbWFpbi55bWxgLCBgZGVmYXVsdHMvbWFpbi55bWxgLCBhbmQgYG1ldGEvbWFpbi55bWxgCjQuIENvbWUgYmFjayB0byB0aGUgZGFzaGJvYXJkIGFuZCBtYXJrIEFuc2libGUgYXV0b21hdGlvbiBjb21wbGV0ZSB3aGVuIGRvbmUKCllvdSBjYW4gYWxzbyB1c2UgYGFuc2libGUtZ2FsYXh5YCBkaXJlY3RseToKCmBgYGJhc2gKIyBJbml0aWFsaXplIGEgbmV3IHJvbGUKY2QgYXV0b21hdGlvbi9hbnNpYmxlL3JvbGVzCmFuc2libGUtZ2FsYXh5IHJvbGUgaW5pdCBteV9uZXdfcm9sZQpgYGAKCi0tLQoKIyMgQWdub3N0aWNWIGludGVncmF0aW9uCgpPbmNlIHlvdXIgY29sbGVjdGlvbiBhbmQgcm9sZXMgYXJlIHJlYWR5LCBpbmNsdWRlIHRoZSBjb2xsZWN0aW9uIGluIHlvdXIgQWdub3N0aWNWIGNhdGFsb2cgaXRlbSdzIGBjb21tb24ueWFtbGAgdXNpbmcgYHJlcXVpcmVtZW50c19jb250ZW50YC4gU2luY2UgdGhlIGNvbGxlY3Rpb24gbGl2ZXMgaW4gYSBzdWJkaXJlY3Rvcnkgb2YgeW91ciBwcm9qZWN0IHJlcG8sIHVzZSB0aGUgYCMvcGF0aGAgZnJhZ21lbnQgc3ludGF4IHRvIHBvaW50IHRvIGl0OgoKYGBgeWFtbApyZXF1aXJlbWVudHNfY29udGVudDoKICBjb2xsZWN0aW9uczoKICAtIG5hbWU6IGh0dHBzOi8vZ2l0aHViLmNvbS9yaHBkcy88eW91ci1yZXBvPi5naXQjL2F1dG9tYXRpb24vYW5zaWJsZQogICAgdHlwZTogZ2l0CiAgICB2ZXJzaW9uOiBtYWluCmBgYAoKVGhlIGAjL2F1dG9tYXRpb24vYW5zaWJsZWAgZnJhZ21lbnQgdGVsbHMgYGFuc2libGUtZ2FsYXh5YCB0byBpbnN0YWxsIGZyb20gdGhhdCBzdWJkaXJlY3RvcnkgcmF0aGVyIHRoYW4gdGhlIHJlcG8gcm9vdC4gVGhlIGB2ZXJzaW9uYCBmaWVsZCBpcyB0aGUgZ2l0IHJlZiAoYnJhbmNoLCB0YWcsIG9yIGNvbW1pdCBTSEEpLgoKWW91IGNhbiB0aGVuIHJlZmVyZW5jZSB5b3VyIHJvbGVzIGFzIHdvcmtsb2FkcyBpbiB5b3VyIEFnbm9zdGljViBjYXRhbG9nIGl0ZW0gYWxvbmdzaWRlIGNvcmUgd29ya2xvYWRzOgoKYGBgeWFtbAp3b3JrbG9hZHM6CiAgLSBhZ25vc3RpY2QuY29yZV93b3JrbG9hZHMub2NwNF93b3JrbG9hZF9hdXRob3Jpbm8KICAtIDxuYW1lc3BhY2U+LmFuc2libGUuPHJvbGVfbmFtZT4KYGBgCgpXaGVyZSBgPG5hbWVzcGFjZT5gIGlzIHRoZSBuYW1lc3BhY2UgZnJvbSB5b3VyIGBnYWxheHkueW1sYCAoeW91ciBwcm9qZWN0IHNsdWcgd2l0aCBoeXBoZW5zIGNvbnZlcnRlZCB0byB1bmRlcnNjb3JlcykuCgotLS0KCiMjIFRpcHMKCi0gKipPbmUgcm9sZSBwZXIgY29uY2Vybi4qKiBFYWNoIHJvbGUgc2hvdWxkIGRvIG9uZSB0aGluZyB3ZWxsIOKAlCBkZXBsb3kgYW4gb3BlcmF0b3IsIGNvbmZpZ3VyZSBhIHNlcnZpY2UsIHNldCB1cCB1c2VyIGVudmlyb25tZW50cy4gVGhpcyBtYWtlcyByb2xlcyByZXVzYWJsZSBhY3Jvc3MgcHJvamVjdHMuCi0gKipVc2UgZGVmYXVsdHMgbGliZXJhbGx5LioqIFB1dCBhbGwgY29uZmlndXJhYmxlIHZhbHVlcyBpbiBgZGVmYXVsdHMvbWFpbi55bWxgIHNvIGNhbGxlcnMgY2FuIG92ZXJyaWRlIHRoZW0gd2l0aG91dCBtb2RpZnlpbmcgdGhlIHJvbGUuCi0gKipJbXBvcnQgYmVmb3JlIHdyaXRpbmcuKiogSWYgeW91IGhhdmUgZXhpc3Rpbmcgcm9sZXMgaW4gYW5vdGhlciByZXBvLCBpbXBvcnQgdGhlbSBmaXJzdCwgdGhlbiBjdXN0b21pemUuIEl0J3MgZmFzdGVyIHRoYW4gc3RhcnRpbmcgZnJvbSBzY3JhdGNoLgotICoqVGVzdCBsb2NhbGx5LioqIFVzZSBgYW5zaWJsZS1wbGF5Ym9vayAtLWNoZWNrYCBvciBhIHNhbmRib3ggZW52aXJvbm1lbnQgdG8gdmFsaWRhdGUgeW91ciByb2xlcyBiZWZvcmUgbWFya2luZyBhdXRvbWF0aW9uIGNvbXBsZXRlLgo=
+# Ansible Automation
+
+Publishing House provides an `ansible-helper` skill that creates and imports Ansible roles into your project's collection.
+
+!!! info "This helper is optional"
+    You can build Ansible automation manually or with any tool you prefer. If you do use the helper,
+    its output is a starting point — read through everything it produces and verify it yourself
+    before marking a workstream complete.
+
+See [Development](development.md) for how Ansible Automation fits into the overall development workflow.
+
+---
+
+## Overview
+
+Ansible automation in RHDP uses an **Ansible Collection** structure inside `automation/ansible/`. Each role in the collection handles a specific piece of lab provisioning — deploying an application, configuring a service, creating user environments, etc. The roles are called by AgnosticD v2 workloads during lab deployment.
+
+---
+
+## Directory structure
+
+The automation scaffolding (created by the development skill's config-helper) produces this layout:
+
+```
+automation/ansible/
+├── galaxy.yml
+├── README.md
+├── meta/
+│   └── runtime.yml
+└── roles/
+    └── <role_name>/
+        ├── tasks/main.yml
+        ├── defaults/main.yml
+        ├── meta/main.yml
+        └── README.md
+```
+
+Optional directories can be added per role as needed:
+
+- `vars/main.yml` — role-internal variables not exposed to callers
+- `handlers/main.yml` — notification handlers
+
+---
+
+## Using the Ansible helper skill
+
+### From the development dashboard
+
+Select **Ansible Automation** from the development dashboard, then choose **Use Ansible helper**. Claude dispatches to the `ansible-helper` skill, which offers two paths:
+
+| # | Path | What it does |
+|---|------|-------------|
+| 1 | **New role** | Creates a fresh Ansible role skeleton from scratch |
+| 2 | **Import from Git** | Pulls existing roles from a Git repository into your collection |
+
+### Path 1 — New role
+
+Claude walks you through:
+
+1. **Role name** — provide a snake_case name (e.g., `configure_aap`, `deploy_nginx`)
+2. **Role purpose** — describe what the role should configure, deploy, or manage
+3. **Duplicate check** — if a role with that name already exists, Claude asks whether to continue or pick a different name
+4. **Scaffold** — creates the role skeleton with `tasks/main.yml`, `defaults/main.yml`, `meta/main.yml`, and `README.md`
+5. **Write tasks** — optionally, Claude writes the actual task logic based on your description. Give as much detail as possible for better results. You can also decline and write tasks yourself.
+6. **Report** — prints a summary of files created
+
+You can repeat this to add multiple roles in one session.
+
+### Path 2 — Import from Git
+
+Claude handles three repo layouts automatically:
+
+| Repo type | Detection | How roles are found |
+|---|---|---|
+| **Ansible Collection** | `galaxy.yml` at repo root | Subdirectories of `roles/` |
+| **Single role** | `tasks/main.yml` at repo root | The entire repo is one role |
+| **Multi-role monorepo** | Neither of the above | Directories containing `tasks/main.yml` |
+
+The flow:
+
+1. **Provide a Git URL** — Claude clones the repo
+2. **Select roles** — Claude lists all discovered roles; type `all` or specific numbers to import
+3. **Duplicate check** — for any role that already exists, choose overwrite, skip, or rename
+4. **Copy and update** — roles are copied into `automation/ansible/roles/`, and `meta/main.yml` is updated with your author email
+5. **Report** — prints a summary of imported roles
+
+You can import from multiple repositories in one session.
+
+### Standalone mode
+
+The skill also works outside of Publishing House projects:
+
+```
+/rhdp-publishing-house:ansible-helper
+```
+
+In standalone mode, the pre-flight and workflow checks are skipped. The skill verifies that `automation/ansible/` exists and proceeds directly.
+
+---
+
+## Collection conventions
+
+### galaxy.yml
+
+The collection identity file at `automation/ansible/galaxy.yml`:
+
+```yaml
+namespace: <project_slug_underscored>
+name: ansible
+version: 1.0.0
+authors:
+- owner@redhat.com
+description: Ansible collection for <project-slug> lab automation
+license:
+- GPL-2.0-or-later
+```
+
+The namespace is derived from your project slug with hyphens converted to underscores.
+
+### Role naming
+
+- Use **snake_case** for role names (e.g., `configure_aap`, `deploy_gitea`, `setup_users`)
+- Hyphens and spaces are automatically converted to underscores
+- Prefix with a verb that describes the action: `configure_`, `deploy_`, `setup_`, `install_`
+
+### Role metadata
+
+Every role should have a `meta/main.yml` with author and description:
+
+```yaml
+galaxy_info:
+  author: owner@redhat.com
+  description: Configures AAP controller for the lab environment
+  license: GPL-2.0-or-later
+  min_ansible_version: 2.9
+  galaxy_tags: []
+dependencies: []
+```
+
+### Role variables
+
+Expose configurable values in `defaults/main.yml`. Document them in the role's `README.md`:
+
+```markdown
+## Role Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `aap_admin_password` | `redhat` | Admin password for the AAP controller |
+| `aap_version` | `2.6` | AAP version to install |
+```
+
+---
+
+## Manual setup
+
+If you prefer to build Ansible automation without the skill:
+
+1. Select **Ansible Automation** from the development dashboard, choose **Do it myself**
+2. Create roles in `automation/ansible/roles/` following the structure above
+3. Ensure each role has `tasks/main.yml`, `defaults/main.yml`, and `meta/main.yml`
+4. Come back to the dashboard and mark Ansible automation complete when done
+
+You can also use `ansible-galaxy` directly:
+
+```bash
+# Initialize a new role
+cd automation/ansible/roles
+ansible-galaxy role init my_new_role
+```
+
+---
+
+## AgnosticV integration
+
+Once your collection and roles are ready, include the collection in your AgnosticV catalog item's `common.yml` using `requirements_content`. Since the collection lives in a subdirectory of your project repo, use the `#/path` fragment syntax to point to it:
+
+```yaml
+requirements_content:
+  collections:
+  - name: https://github.com/rhpds/<your-repo>.git#/automation/ansible
+    type: git
+    version: main
+```
+
+The `#/automation/ansible` fragment tells `ansible-galaxy` to install from that subdirectory rather than the repo root. The `version` field is the git ref (branch, tag, or commit SHA).
+
+You can then reference your roles as workloads in your AgnosticV catalog item alongside core workloads:
+
+```yaml
+workloads:
+  - agnosticd.core_workloads.ocp4_workload_authorino
+  - <namespace>.ansible.<role_name>
+```
+
+Where `<namespace>` is the namespace from your `galaxy.yml` (your project slug with hyphens converted to underscores).
+
+---
+
+## Tips
+
+- **One role per concern.** Each role should do one thing well — deploy an operator, configure a service, set up user environments. This makes roles reusable across projects.
+- **Use defaults liberally.** Put all configurable values in `defaults/main.yml` so callers can override them without modifying the role.
+- **Import before writing.** If you have existing roles in another repo, import them first, then customize. It's faster than starting from scratch.
+- **Test locally.** Use `ansible-playbook --check` or a sandbox environment to validate your roles before marking automation complete.
