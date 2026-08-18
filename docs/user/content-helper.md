@@ -1,1 +1,114 @@
-IyBDb250ZW50IEhlbHBlcnMKCldyaXRpbmcgYW5kIHJldmlld2luZyB5b3VyIFNob3dyb29tIG1vZHVsZXMgY2FuIGJlIGRvbmUgbWFudWFsbHksIG9yIHdpdGggdHdvIG9wdGlvbmFsIEFJIGhlbHBlcnM6ICoqd3JpdGVyLWhlbHBlcioqIGFuZCAqKnJldmlld2VyLWhlbHBlcioqLgoKISEhIGluZm8gIlRoZXNlIGhlbHBlcnMgYXJlIG9wdGlvbmFsIgogICAgWW91IGNhbiB3cml0ZSBhbmQgcmV2aWV3IGNvbnRlbnQgbWFudWFsbHkgb3Igd2l0aCBhbnkgdG9vbCB5b3UgcHJlZmVyLiBJZiB5b3UgZG8gdXNlIHRoZW0sCiAgICB0aGVpciBvdXRwdXQgaXMgYSBzdGFydGluZyBwb2ludCDigJQgcmVhZCB0aHJvdWdoIGV2ZXJ5dGhpbmcgdGhleSBwcm9kdWNlIGFuZCB2ZXJpZnkgaXQgeW91cnNlbGYKICAgIGJlZm9yZSBtYXJraW5nIGEgd29ya3N0cmVhbSBjb21wbGV0ZS4KClNlZSBbRGV2ZWxvcG1lbnRdKGRldmVsb3BtZW50Lm1kKSBmb3IgaG93IGNvbnRlbnQgaGVscGVycyBmaXQgaW50byB0aGUgb3ZlcmFsbCBkZXZlbG9wbWVudCB3b3JrZmxvdy4KCi0tLQoKIyMgRmlsZSBuYW1pbmcKCldoZXRoZXIgeW91IHdyaXRlIG1hbnVhbGx5IG9yIHVzZSB0aGUgd3JpdGVyIGhlbHBlciwgeW91ciBgLmFkb2NgIGZpbGVzIG11c3QgZm9sbG93IHRoZSBzYW1lIG5hbWluZyBjb252ZW50aW9uIOKAlCB0aGUgaGVscGVyIGRlcml2ZXMgdGhlIGZpbGVuYW1lIGZyb20geW91ciBvdXRsaW5lIGF1dG9tYXRpY2FsbHk6Cgp8IE91dGxpbmUgZmlsZSB8IENvbnRlbnQgZmlsZSB8CnwtLS18LS0tfAp8IGBwdWJsaXNoaW5nLWhvdXNlL3NwZWMvbW9kdWxlcy9tb2R1bGUtMDEtcGlwZWxpbmUtc2V0dXAubWRgIHwgYGNvbnRlbnQvbW9kdWxlcy9ST09UL3BhZ2VzL21vZHVsZS0wMS1waXBlbGluZS1zZXR1cC5hZG9jYCB8CnwgYHB1Ymxpc2hpbmctaG91c2Uvc3BlYy9tb2R1bGVzL21vZHVsZS0wMi1kZXBsb3ktYXBwLm1kYCB8IGBjb250ZW50L21vZHVsZXMvUk9PVC9wYWdlcy9tb2R1bGUtMDItZGVwbG95LWFwcC5hZG9jYCB8CgpTYW1lIGZpbGVuYW1lIHN0ZW0sIGAuYWRvY2AgZXh0ZW5zaW9uLCBzYW1lIHBvc2l0aW9uIGluIHRoZSBzZXF1ZW5jZS4gSWYgeW91IHdyaXRlIG1hbnVhbGx5LCB1c2UgdGhlIHNhbWUgcGF0dGVybi4KCi0tLQoKIyMgV3JpdGVyIEhlbHBlcgoKVGhlIHdyaXRlciBoZWxwZXIgZ2VuZXJhdGVzIEFzY2lpRG9jIGNvbnRlbnQgZnJvbSB5b3VyIG1vZHVsZSBvdXRsaW5lcy4KCiMjIyBIb3cgaXQgd29ya3MKCjEuIFJlYWRzIHlvdXIgb3V0bGluZSBmcm9tIGBwdWJsaXNoaW5nLWhvdXNlL3NwZWMvbW9kdWxlcy9tb2R1bGUtTk4tPHNsdWc+Lm1kYAoyLiBSZWFkcyB5b3VyIGBwdWJsaXNoaW5nLWhvdXNlL3NwZWMvZGVzaWduLm1kYCBhbmQgYHB1Ymxpc2hpbmctaG91c2Uvc3BlYy55YW1sYCBmb3IgcHJvamVjdCBjb250ZXh0CjMuIFByZXNlbnRzIGEgcGxhbiDigJQgd2FpdHMgZm9yIHlvdXIgYXBwcm92YWwgYmVmb3JlIHdyaXRpbmcgYW55dGhpbmcKNC4gV3JpdGVzIGBjb250ZW50L21vZHVsZXMvUk9PVC9wYWdlcy9tb2R1bGUtTk4tPHNsdWc+LmFkb2NgIChzYW1lIGZpbGVuYW1lIHN0ZW0gYXMgdGhlIG91dGxpbmUpCjUuIFJlcG9ydHMgYW55IG9wZW4gaXRlbXM6IG1pc3NpbmcgaW1hZ2VzLCBwbGFjZWhvbGRlciB0ZXh0LCBUT0RPcwo2LiBBc2tzIHlvdSB0byByZXZpZXcgdGhlIG91dHB1dCBiZWZvcmUgbWFya2luZyB0aGUgbW9kdWxlIGNvbXBsZXRlCgpNb2R1bGVzIGFyZSB3cml0dGVuIG9uZSBhdCBhIHRpbWUsIGluIG9yZGVyLiBFYWNoIG1vZHVsZSB3YWl0cyBmb3IgeW91ciBhcHByb3ZhbCBiZWZvcmUgc3RhcnRpbmcuCgojIyMgSW5kZXggYW5kIGNvbmNsdXNpb24KCkFmdGVyIGFsbCBtb2R1bGVzIGFyZSBjb21wbGV0ZSwgdGhlIHdyaXRlciBoZWxwZXIgZ2VuZXJhdGVzIHR3byBhZGRpdGlvbmFsIGZpbGVzOgoKfCBGaWxlIHwgUHVycG9zZSB8CnwtLS18LS0tfAp8IGBjb250ZW50L21vZHVsZXMvUk9PVC9wYWdlcy9pbmRleC5hZG9jYCB8IExlYXJuZXItZmFjaW5nIGludHJvZHVjdGlvbiB8CnwgYGNvbnRlbnQvbW9kdWxlcy9ST09UL3BhZ2VzL2NvbmNsdXNpb24uYWRvY2AgfCBSZWNhcCBvZiBsZWFybmluZyBvYmplY3RpdmVzIGFuZCBuZXh0IHN0ZXBzIHwKCkJvdGggYXJlIGdlbmVyYXRlZCBzZXF1ZW50aWFsbHkgd2l0aCB0aGUgc2FtZSBhcHByb3ZlLWJlZm9yZS13cml0aW5nIHN0ZXAuCgojIyMgVXNpbmcgaXQKClNlbGVjdCBhIG1vZHVsZSBmcm9tIHRoZSAqKk1vZHVsZXMqKiB3b3Jrc3RyZWFtIGluIHRoZSBkZXZlbG9wbWVudCBkYXNoYm9hcmQsIHRoZW4gY2hvb3NlICoqVXNlIEFJIHdyaXRlciBoZWxwZXIqKi4gVGhlIHNraWxsIHJlYWRzIHlvdXIgb3V0bGluZXMgYW5kIHByZXNlbnRzIGEgcGxhbi4KCiEhISB0aXAgIkludmVzdCBpbiB5b3VyIG91dGxpbmVzIgogICAgVGhlIHdyaXRlciBnZW5lcmF0ZXMgY29udGVudCBkaXJlY3RseSBmcm9tIGBwdWJsaXNoaW5nLWhvdXNlL3NwZWMvbW9kdWxlcy9gLiBUaGUgbW9yZSBkZXRhaWwKICAgIHlvdSBwdXQgaW4gdGhvc2Ugb3V0bGluZXMgZHVyaW5nIGludGFrZSwgdGhlIGJldHRlciB0aGUgZ2VuZXJhdGVkIGNvbnRlbnQuCgojIyMgV3JpdGluZyBtYW51YWxseQoKU2VsZWN0ICoqV3JpdGUgaXQgbXlzZWxmKiogZnJvbSB0aGUgTW9kdWxlcyB3b3Jrc3RyZWFtLiBDbGF1ZGUgcG9pbnRzIHlvdSB0byB0aGUgZmlsZSBwYXRoIGFuZCB3YWl0cy4gV3JpdGUgeW91ciBgLmFkb2NgIGZpbGUgaW4geW91ciBlZGl0b3IsIHRoZW4gY29tZSBiYWNrIGFuZCBjb25maXJtIHlvdSdyZSBkb25lLgoKLS0tCgojIyBSZXZpZXdlciBIZWxwZXIKClRoZSByZXZpZXdlciBoZWxwZXIgcnVucyBhIHF1YWxpdHkgcGFzcyBvbiBhbnkgYC5hZG9jYCBmaWxlIOKAlCBjb250ZW50IHlvdSB3cm90ZSB5b3Vyc2VsZiBvciBBSS1nZW5lcmF0ZWQuCgojIyMgV2hhdCBpdCBjaGVja3MKCi0gKipSZWQgSGF0IHN0YW5kYXJkcyoqIOKAlCBoZWFkaW5nIHN0cnVjdHVyZSwgYWRtb25pdGlvbiB1c2FnZSwgY29kZSBibG9jayBmb3JtYXR0aW5nLCB0ZXJtaW5vbG9neQotICoqU3BlYyBhbGlnbm1lbnQqKiDigJQgZG9lcyB0aGUgY29udGVudCBjb3ZlciBldmVyeXRoaW5nIGluIHRoZSBvdXRsaW5lPyBEbyBsZWFybmluZyBvYmplY3RpdmVzIG1hdGNoPyBBcmUgcHJvZHVjdCBuYW1lcyBhbmQgdmVyc2lvbnMgY29uc2lzdGVudD8KLSAqKkZpbmRpbmdzKiog4oCUIHNldmVyaXR5LXJhdGVkIChDUklUSUNBTCwgSElHSCwgTUVESVVNLCBMT1cpOyB3cml0dGVuIHRvIGBwdWJsaXNoaW5nLWhvdXNlL3Jldmlld3MvZWRpdGluZy1yZXZpZXctbW9kdWxlLU5OLm1kYAoKRmluZGluZ3MgYXJlIGd1aWRhbmNlLCBub3QgbWFuZGF0b3J5IGZpeGVzLiBSZXZpZXcgdGhlbSBhbmQgYXBwbHkgeW91ciBvd24ganVkZ21lbnQg4oCUIHNvbWUgbWF5IG5vdCBhcHBseSB0byB5b3VyIHNwZWNpZmljIGxhYi4KCiMjIyBVc2luZyBpdAoKRnJvbSB0aGUgKipNb2R1bGVzKiogd29ya3N0cmVhbSwgYWZ0ZXIgd3JpdGluZywgY2hvb3NlICoqUnVuIEFJIHF1YWxpdHkgcGFzcyoqLiBZb3UgY2FuIGFsc28gaW52b2tlIGl0IGRpcmVjdGx5OgoKYGBgCi9yaGRwLXB1Ymxpc2hpbmctaG91c2U6cmV2aWV3ZXItaGVscGVyCmBgYAoKIyMjIEZpeCBsb29wCgpBZnRlciB0aGUgcmV2aWV3LCB5b3UgaGF2ZSB0aHJlZSBvcHRpb25zOgoKfCAjIHwgT3B0aW9uIHwKfC0tLXwtLS0tLS0tLXwKfCAxIHwgRWRpdCB0aGUgZmlsZSB5b3Vyc2VsZiwgdGhlbiByZS1ydW4gdGhlIHJldmlldyB8CnwgMiB8IEFzayBDbGF1ZGUgdG8gZml4IHNwZWNpZmljIGl0ZW1zIHwKfCAzIHwgRG9uZSDigJQgZ28gYmFjayB0byBkZXZlbG9wbWVudCB0byBtYXJrIHRoZSBtb2R1bGUgY29tcGxldGUgfAoKLS0tCgojIyBUeXBpY2FsIGZsb3cKCmBgYApzcGVjL21vZHVsZXMvbW9kdWxlLU5OLXNsdWcubWQgICDihpIgICB3cml0ZXItaGVscGVyICAg4oaSICAgcmV2aWV3ZXItaGVscGVyICAg4oaSICAgbWFyayBjb21wbGV0ZQogICAgICAgICh5b3VyIG91dGxpbmUpICAgICAgICAgICAgICAgICAgKG9wdGlvbmFsKSAgICAgICAgICAgKG9wdGlvbmFsKQpgYGAKCllvdSBjYW4gc2tpcCBlaXRoZXIgaGVscGVyIGVudGlyZWx5LiBUaGUgZGV2ZWxvcG1lbnQgc2tpbGwgdHJhY2tzIHN0YXR1cyBhbmQgaGFuZGxlcyBzdWJtaXNzaW9uIHJlZ2FyZGxlc3Mgb2YgaG93IHlvdSBwcm9kdWNlIHRoZSB3b3JrLgoKLS0tCgojIyBUaXBzCgotICoqVGhlIHdyaXRlciBhbmQgcmV2aWV3ZXIgYXJlIGluZGVwZW5kZW50LioqIFVzZSBvbmUsIGJvdGgsIG9yIG5laXRoZXIuCi0gKipZb3UgY2FuIHJlLXJ1biB0aGUgcmV2aWV3ZXIgYWZ0ZXIgbWFudWFsIGVkaXRzLioqIENob29zZSAicmV2aWV3IGFnYWluIiB0byBnZXQgYSBmcmVzaCBwYXNzIG9uIHVwZGF0ZWQgY29udGVudC4KLSAqKkZpbGUgbmFtZXMgbXVzdCBtYXRjaCBiZXR3ZWVuIG91dGxpbmVzIGFuZCBjb250ZW50LioqIFRoZSBoZWxwZXIgZW5mb3JjZXMgdGhpcyBhdXRvbWF0aWNhbGx5OyBpZiB3cml0aW5nIG1hbnVhbGx5LCBmb2xsb3cgdGhlIHNhbWUgY29udmVudGlvbi4K
+# Content Helpers
+
+Writing and reviewing your Showroom modules can be done manually, or with two optional AI helpers: **writer-helper** and **reviewer-helper**.
+
+!!! info "These helpers are optional"
+    You can write and review content manually or with any tool you prefer. If you do use them,
+    their output is a starting point — read through everything they produce and verify it yourself
+    before marking a workstream complete.
+
+See [Development](development.md) for how content helpers fit into the overall development workflow.
+
+---
+
+## File naming
+
+Whether you write manually or use the writer helper, your `.adoc` files must follow the same naming convention — the helper derives the filename from your outline automatically:
+
+| Outline file | Content file |
+|---|---|
+| `publishing-house/spec/modules/module-01-pipeline-setup.md` | `content/modules/ROOT/pages/module-01-pipeline-setup.adoc` |
+| `publishing-house/spec/modules/module-02-deploy-app.md` | `content/modules/ROOT/pages/module-02-deploy-app.adoc` |
+
+Same filename stem, `.adoc` extension, same position in the sequence. If you write manually, use the same pattern.
+
+---
+
+## Writer Helper
+
+The writer helper generates AsciiDoc content from your module outlines.
+
+### How it works
+
+1. Reads your outline from `publishing-house/spec/modules/module-NN-<slug>.md`
+2. Reads your `publishing-house/spec/design.md` and `publishing-house/spec.yaml` for project context
+3. Presents a plan — waits for your approval before writing anything
+4. Writes `content/modules/ROOT/pages/module-NN-<slug>.adoc` (same filename stem as the outline)
+5. Reports any open items: missing images, placeholder text, TODOs
+6. Asks you to review the output before marking the module complete
+
+Modules are written one at a time, in order. Each module waits for your approval before starting.
+
+### Index and conclusion
+
+After all modules are complete, the writer helper generates two additional files:
+
+| File | Purpose |
+|---|---|
+| `content/modules/ROOT/pages/index.adoc` | Learner-facing introduction |
+| `content/modules/ROOT/pages/conclusion.adoc` | Recap of learning objectives and next steps |
+
+Both are generated sequentially with the same approve-before-writing step.
+
+### Using it
+
+Select a module from the **Modules** workstream in the development dashboard, then choose **Use AI writer helper**. The skill reads your outlines and presents a plan.
+
+!!! tip "Invest in your outlines"
+    The writer generates content directly from `publishing-house/spec/modules/`. The more detail
+    you put in those outlines during intake, the better the generated content.
+
+### Writing manually
+
+Select **Write it myself** from the Modules workstream. Claude points you to the file path and waits. Write your `.adoc` file in your editor, then come back and confirm you're done.
+
+---
+
+## Reviewer Helper
+
+The reviewer helper runs a quality pass on any `.adoc` file — content you wrote yourself or AI-generated.
+
+### What it checks
+
+- **Red Hat standards** — heading structure, admonition usage, code block formatting, terminology
+- **Spec alignment** — does the content cover everything in the outline? Do learning objectives match? Are product names and versions consistent?
+- **Findings** — severity-rated (CRITICAL, HIGH, MEDIUM, LOW); written to `publishing-house/reviews/editing-review-module-NN.md`
+
+Findings are guidance, not mandatory fixes. Review them and apply your own judgment — some may not apply to your specific lab.
+
+### Using it
+
+From the **Modules** workstream, after writing, choose **Run AI quality pass**. You can also invoke it directly:
+
+```
+/rhdp-publishing-house:reviewer-helper
+```
+
+### Fix loop
+
+After the review, you have three options:
+
+| # | Option |
+|---|--------|
+| 1 | Edit the file yourself, then re-run the review |
+| 2 | Ask Claude to fix specific items |
+| 3 | Done — go back to development to mark the module complete |
+
+---
+
+## Typical flow
+
+```
+spec/modules/module-NN-slug.md   ⇒   writer-helper   ⇒   reviewer-helper   ⇒   mark complete
+    (your outline)                        (optional)             (optional)
+```
+
+You can skip either helper entirely. The development skill tracks status and handles submission regardless of how you produce the work.
+
+---
+
+## Tips
+
+- **The writer and reviewer are independent.** Use one, both, or neither.
+- **You can re-run the reviewer after manual edits.** Choose "review again" to get a fresh pass on updated content.
+- **File names must match between outlines and content.** The helper enforces this automatically; if writing manually, follow the same convention.
