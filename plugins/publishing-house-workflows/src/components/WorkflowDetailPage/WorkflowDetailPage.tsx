@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAsync } from 'react-use';
 import {
@@ -133,10 +133,17 @@ export function WorkflowDetailPage() {
     error,
   } = useAsync(() => client.getWorkflowById(workflowId!), [workflowId, refreshKey]);
 
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
   const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
   const [validationLoading, setValidationLoading] = useState(false);
   const [driftReport, setDriftReport] = useState<DriftReport | null>(null);
   const [driftLoading, setDriftLoading] = useState(false);
+
+  useEffect(() => {
+    identityApi.getProfileInfo().then(profile => {
+      if (profile.email) setCurrentUserEmail(profile.email);
+    }).catch(() => {});
+  }, [identityApi]);
 
   const fetchReport = useCallback(async () => {
     if (!result) return;
@@ -1269,7 +1276,7 @@ export function WorkflowDetailPage() {
         <RejectionDialog
           open={rejectionDialogOpen}
           stage={rejectingStage || 'content_review'}
-          reviewerName={summary.ssoEmail || summary.owner}
+          reviewerName={currentUserEmail}
           submitting={submittingRejection}
           onConfirm={handleRejectionConfirm}
           onCancel={handleRejectionCancel}
@@ -1278,7 +1285,7 @@ export function WorkflowDetailPage() {
         <MessageDialog
           open={messageDialogOpen}
           stage={summary.stage}
-          senderName={summary.ssoEmail || summary.owner}
+          senderName={currentUserEmail}
           submitting={sendingMessage}
           onConfirm={handleSendMessage}
           onCancel={() => setMessageDialogOpen(false)}
