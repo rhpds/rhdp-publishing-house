@@ -107,6 +107,7 @@ class DriftChange(BaseModel):
     file: str
     comparing: str
     difference: str
+    severity: str | None = None
 
 
 class DriftResponse(BaseModel):
@@ -185,6 +186,7 @@ async def check_drift_structural(
                 file="spec.yaml",
                 comparing=field,
                 difference=f"{_format_value(old_val)} → {_format_value(new_val)}",
+                severity="critical",
             ))
 
     if not changes:
@@ -274,6 +276,7 @@ async def _check_content_alignment(
                         file=page_name,
                         comparing=f"{stem}: {obj['objective']}",
                         difference=obj.get("reason", "Learning objective not covered"),
+                        severity="critical",
                     ))
         except Exception as e:
             logger.error("alignment check error for %s: %s", outline_name, e)
@@ -369,6 +372,7 @@ async def check_drift_semantic(
                 file="design.md",
                 comparing=c["section"],
                 difference=c["difference"],
+                severity="critical",
             )
             for c in result.get("changes", [])
         ]
@@ -405,3 +409,359 @@ async def check_drift_semantic(
     except Exception as e:
         logger.error(f"Drift detection error: {e}")
         return _empty_response(baseline_sha, current_sha, f"Drift detection error: {str(e)}")
+
+
+# ── Infra (AgnosticV sizing) drift ──────────────────────────────────────────
+
+import re as _re
+
+_aws_instance_cache: dict | None = None
+
+
+def _get_aws_instance_map() -> dict[str, tuple[int, int]]:
+    global _aws_instance_cache
+    if _aws_instance_cache is not None:
+        return _aws_instance_cache
+    try:
+        raw = get_settings().aws_instance_type_map
+        parsed = json.loads(raw) if raw else {}
+        _aws_instance_cache = {k: tuple(v) for k, v in parsed.items()}
+    except Exception as e:
+        logger.warning("failed to parse AWS_INSTANCE_TYPE_MAP: %s", e)
+        _aws_instance_cache = {}
+    return _aws_instance_cache
+
+
+def _parse_agnosticv_url(url: str) -> tuple[str, str, str] | None:
+    """Extract (repo_url, branch, path) from a GitHub tree URL."""
+    m = _re.match(r"https?://github\.com/([^/]+/[^/]+)/tree/([^/]+)/(.+?)/?$", url)
+    if not m:
+        return None
+    return f"https://github.com/{m.group(1)}", m.group(2), m.group(3)
+
+
+def _parse_ram(value) -> int | None:
+    """Normalise RAM values: '128Gi'→128, '65536Mi'→64, plain int→int."""
+    if value is None:
+        return None
+    s = str(value).strip().strip("'\"")
+    m = _re.match(r"^(\d+)\s*[Gg]i?$", s)
+    if m:
+        return int(m.group(1))
+    m = _re.match(r"^(\d+)\s*[Mm]i?$", s)
+    if m:
+        return int(m.group(1)) // 1024
+    try:
+        return int(s)
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_cpu(value) -> int | None:
+    """Normalise CPU values: string or int → int."""
+    if value is None:
+        return None
+    s = str(value).strip().strip("'\"")
+    try:
+        return int(s)
+    except (ValueError, TypeError):
+        return None
+
+
+def _resolve_jinja_ternary(value, variables: dict):
+    """Resolve simple Jinja ternary: {{ A if var == 'val' else B }}."""
+    if not isinstance(value, str) or "{{" not in value:
+        return value
+    m = _re.match(
+        r"\{\{\s*['\"]?(.+?)['\"]?\s+if\s+(\w+)\s*==\s*['\"](.+?)['\"]\s+else\s+['\"]?(.+?)['\"]?\s*\}\}",
+        value.strip(),
+    )
+    if not m:
+        return value
+    true_val, var_name, test_val, false_val = m.group(1), m.group(2), m.group(3), m.group(4)
+    actual = str(variables.get(var_name, ""))
+    return true_val.strip("'\"") if actual == test_val else false_val.strip("'\"")
+
+
+def _extract_gpu_type(configs: list[dict]) -> str | None:
+    """Extract GPU instance type from AgnosticV config."""
+    for cfg in configs:
+        for key, val in cfg.items():
+            if key.startswith("gpu_instance_type"):
+                s = str(val).strip("'\"")
+                jinja_var = _re.match(r"\{\{\s*(\w+)\s*\}\}", s)
+                if jinja_var:
+                    for c in configs:
+                        v = c.get(jinja_var.group(1))
+                        if v:
+                            return str(v).strip("'\"")
+                elif s and "{{" not in s:
+                    return s
+                break
+
+    for cfg in configs:
+        ms_list = cfg.get("ocp4_workload_machineset_config", [])
+        if not isinstance(ms_list, list):
+            continue
+        for ms in ms_list:
+            if not isinstance(ms, dict):
+                continue
+            role = str(ms.get("role", ""))
+            if "gpu" not in role.lower():
+                continue
+            inst = str(ms.get("instance_type", ""))
+            jinja_var = _re.match(r"\{\{\s*(\w+)\s*\}\}", inst)
+            if jinja_var:
+                for c in configs:
+                    v = c.get(jinja_var.group(1))
+                    if v:
+                        return str(v).strip("'\"")
+            elif inst and "{{" not in inst:
+                return inst
+
+    return None
+
+
+async def check_drift_infra(
+    github: GitHubService,
+    agnosticv_urls: list[str],
+    spec_env: dict,
+    current_sha: str = "",
+) -> DriftResponse:
+    """Compare spec.yaml environment sizing against AgnosticV catalog item config."""
+    if not agnosticv_urls:
+        return _empty_response("", current_sha, "No AgnosticV URLs configured")
+
+    changes: list[DriftChange] = []
+
+    for url in agnosticv_urls:
+        parsed = _parse_agnosticv_url(url)
+        if not parsed:
+            logger.warning("infra drift: cannot parse agnosticv URL: %s", url)
+            continue
+
+        repo_url, branch, path = parsed
+
+        try:
+            common_raw = await github.get_file_content(repo_url, f"{path}/common.yaml", branch)
+            if not common_raw:
+                logger.warning("infra drift: common.yaml not found at %s", path)
+                continue
+
+            common = yaml.safe_load(common_raw) or {}
+            dev_raw = await github.get_file_content(repo_url, f"{path}/dev.yaml", branch)
+            dev = yaml.safe_load(dev_raw) or {} if dev_raw else {}
+            cloud_provider = common.get("cloud_provider", "")
+            config_type = common.get("config", "")
+            meta = common.get("__meta__", {})
+            components = meta.get("components", [])
+            display_file = f"{path.split('/')[-1]}/common.yaml"
+
+            # Determine if this is OCP or RHEL
+            is_rhel = config_type in ("ansible-multi-node",) or cloud_provider in ("ec2",)
+            platform = spec_env.get("platform", "").lower()
+            if platform == "rhel" or is_rhel:
+                # RHEL VM sizing comparison
+                spec_vms = spec_env.get("vms_per_student", [])
+                if not spec_vms:
+                    continue
+                # Look for cnv_instances or ec2_instances in the config
+                agv_vms = common.get("cnv_instances", common.get("ec2_instances", []))
+                for spec_vm in spec_vms:
+                    role = spec_vm.get("role", "unknown")
+                    matched = next((v for v in agv_vms if v.get("name", "") == role), None)
+                    if not matched:
+                        changes.append(DriftChange(
+                            file=display_file,
+                            comparing=f"vm:{role}",
+                            difference=f"VM role '{role}' in spec.yaml not found in AgnosticV config",
+                            severity="warning",
+                        ))
+                        continue
+                    agv_cpu = _parse_cpu(matched.get("cores", matched.get("cpu")))
+                    agv_ram = _parse_ram(matched.get("memory", matched.get("ram")))
+                    spec_cpu = spec_vm.get("cpu")
+                    spec_ram = spec_vm.get("ram_gb")
+                    if spec_cpu and agv_cpu and int(spec_cpu) != agv_cpu:
+                        changes.append(DriftChange(
+                            file=display_file,
+                            comparing=f"vm:{role}:cpu",
+                            difference=f"spec: {spec_cpu} vCPU vs agnosticv: {agv_cpu} vCPU",
+                            severity="warning",
+                        ))
+                    if spec_ram and agv_ram and int(spec_ram) != agv_ram:
+                        changes.append(DriftChange(
+                            file=display_file,
+                            comparing=f"vm:{role}:ram",
+                            difference=f"spec: {spec_ram} GB vs agnosticv: {agv_ram} GB",
+                            severity="warning",
+                        ))
+                continue
+
+            # OCP sizing comparison
+            pool_common = common
+            pool_file = display_file
+            param_values: dict = {}
+
+            if cloud_provider == "none" and components:
+                comp = components[0]
+                param_values = comp.get("parameter_values", {})
+                pool_ref = comp.get("item", "")
+                if pool_ref:
+                    # Convert item ref to path: agd-v2/foo/bar → agd_v2/foo (drop stage suffix)
+                    pool_path = pool_ref.replace("agd-v2/", "agd_v2/")
+                    # Strip stage suffix like /prod, /event, /dev
+                    pool_path = _re.sub(r"/(prod|dev|test|event)$", "", pool_path)
+                    pool_raw = await github.get_file_content(repo_url, f"{pool_path}/common.yaml", branch)
+                    if pool_raw:
+                        pool_common = yaml.safe_load(pool_raw) or {}
+                        pool_file = f"{pool_path.split('/')[-1]}/common.yaml"
+                    else:
+                        logger.warning("infra drift: pool common.yaml not found at %s", pool_path)
+
+            pool_cloud = pool_common.get("cloud_provider", cloud_provider)
+
+            # Resolve Jinja ternaries using parameter_values
+            resolve_vars = {**pool_common, **param_values}
+
+            if pool_cloud == "aws":
+                instance_map = _get_aws_instance_map()
+                # Control plane (pool → component common → component dev)
+                cp_type = _resolve_jinja_ternary(
+                    pool_common.get("control_plane_instance_type", pool_common.get("master_instance_type", ""))
+                    or common.get("control_plane_instance_type", common.get("master_instance_type", ""))
+                    or dev.get("control_plane_instance_type", dev.get("master_instance_type", "")),
+                    resolve_vars,
+                )
+                if cp_type and cp_type in instance_map:
+                    agv_cp_cpu, agv_cp_ram = instance_map[cp_type]
+                    spec_cp_cpu = spec_env.get("control_plane_cpu")
+                    spec_cp_ram = spec_env.get("control_plane_ram_gb")
+                    if spec_cp_cpu and int(spec_cp_cpu) != agv_cp_cpu:
+                        changes.append(DriftChange(
+                            file=pool_file,
+                            comparing="control_plane_cpu",
+                            difference=f"spec: {spec_cp_cpu} vCPU vs agnosticv: {agv_cp_cpu} vCPU ({cp_type})",
+                            severity="warning",
+                        ))
+                    if spec_cp_ram and int(spec_cp_ram) != agv_cp_ram:
+                        changes.append(DriftChange(
+                            file=pool_file,
+                            comparing="control_plane_ram_gb",
+                            difference=f"spec: {spec_cp_ram} GB vs agnosticv: {agv_cp_ram} GB ({cp_type})",
+                            severity="warning",
+                        ))
+
+                # Workers (check pool first, fall back to component common, then dev)
+                wk_type = _resolve_jinja_ternary(
+                    pool_common.get("worker_instance_type", "") or common.get("worker_instance_type", "") or dev.get("worker_instance_type", ""),
+                    resolve_vars,
+                )
+                if wk_type and wk_type in instance_map:
+                    agv_wk_cpu, agv_wk_ram = instance_map[wk_type]
+                    spec_wk_cpu = spec_env.get("worker_cpu")
+                    spec_wk_ram = spec_env.get("worker_ram_gb")
+                    if spec_wk_cpu and int(spec_wk_cpu) != agv_wk_cpu:
+                        changes.append(DriftChange(
+                            file=pool_file,
+                            comparing="worker_cpu",
+                            difference=f"spec: {spec_wk_cpu} vCPU vs agnosticv: {agv_wk_cpu} vCPU ({wk_type})",
+                            severity="warning",
+                        ))
+                    if spec_wk_ram and int(spec_wk_ram) != agv_wk_ram:
+                        changes.append(DriftChange(
+                            file=pool_file,
+                            comparing="worker_ram_gb",
+                            difference=f"spec: {spec_wk_ram} GB vs agnosticv: {agv_wk_ram} GB ({wk_type})",
+                            severity="warning",
+                        ))
+
+            else:
+                # CNV or other — direct values
+                agv_cp_cpu = _parse_cpu(_resolve_jinja_ternary(
+                    pool_common.get("ai_control_plane_cores", "") or common.get("ai_control_plane_cores", "") or dev.get("ai_control_plane_cores", ""), resolve_vars,
+                ))
+                agv_cp_ram = _parse_ram(_resolve_jinja_ternary(
+                    pool_common.get("ai_control_plane_memory", "") or common.get("ai_control_plane_memory", "") or dev.get("ai_control_plane_memory", ""), resolve_vars,
+                ))
+                spec_cp_cpu = spec_env.get("control_plane_cpu")
+                spec_cp_ram = spec_env.get("control_plane_ram_gb")
+
+                if spec_cp_cpu and agv_cp_cpu and int(spec_cp_cpu) != agv_cp_cpu:
+                    changes.append(DriftChange(
+                        file=pool_file,
+                        comparing="control_plane_cpu",
+                        difference=f"spec: {spec_cp_cpu} vCPU vs agnosticv: {agv_cp_cpu} vCPU",
+                        severity="warning",
+                    ))
+                if spec_cp_ram and agv_cp_ram and int(spec_cp_ram) != agv_cp_ram:
+                    changes.append(DriftChange(
+                        file=pool_file,
+                        comparing="control_plane_ram_gb",
+                        difference=f"spec: {spec_cp_ram} GB vs agnosticv: {agv_cp_ram} GB",
+                        severity="warning",
+                    ))
+
+                agv_wk_cpu = _parse_cpu(_resolve_jinja_ternary(
+                    pool_common.get("ai_workers_cores", "") or common.get("ai_workers_cores", "") or dev.get("ai_workers_cores", ""), resolve_vars,
+                ))
+                agv_wk_ram = _parse_ram(_resolve_jinja_ternary(
+                    pool_common.get("ai_workers_memory", "") or common.get("ai_workers_memory", "") or dev.get("ai_workers_memory", ""), resolve_vars,
+                ))
+                spec_wk_cpu = spec_env.get("worker_cpu")
+                spec_wk_ram = spec_env.get("worker_ram_gb")
+
+                if spec_wk_cpu and agv_wk_cpu and int(spec_wk_cpu) != agv_wk_cpu:
+                    changes.append(DriftChange(
+                        file=pool_file,
+                        comparing="worker_cpu",
+                        difference=f"spec: {spec_wk_cpu} vCPU vs agnosticv: {agv_wk_cpu} vCPU",
+                        severity="warning",
+                    ))
+                if spec_wk_ram and agv_wk_ram and int(spec_wk_ram) != agv_wk_ram:
+                    changes.append(DriftChange(
+                        file=pool_file,
+                        comparing="worker_ram_gb",
+                        difference=f"spec: {spec_wk_ram} GB vs agnosticv: {agv_wk_ram} GB",
+                        severity="warning",
+                    ))
+
+            # GPU type comparison
+            spec_gpu_type = spec_env.get("gpu_type", "")
+            agv_gpu_type = _extract_gpu_type([pool_common, common, dev])
+
+            if spec_gpu_type or agv_gpu_type:
+                if spec_gpu_type and agv_gpu_type and spec_gpu_type.lower() != agv_gpu_type.lower():
+                    changes.append(DriftChange(
+                        file=display_file,
+                        comparing="gpu_type",
+                        difference=f"spec: {spec_gpu_type} vs agnosticv: {agv_gpu_type}",
+                        severity="warning",
+                    ))
+                elif spec_gpu_type and not agv_gpu_type:
+                    changes.append(DriftChange(
+                        file=display_file,
+                        comparing="gpu_type",
+                        difference=f"spec: {spec_gpu_type} vs agnosticv: <not found>",
+                        severity="warning",
+                    ))
+                elif agv_gpu_type and not spec_gpu_type:
+                    changes.append(DriftChange(
+                        file=display_file,
+                        comparing="gpu_type",
+                        difference=f"spec: <not set> vs agnosticv: {agv_gpu_type}",
+                        severity="warning",
+                    ))
+
+        except Exception as e:
+            logger.error("infra drift check failed for %s: %s", url, e)
+            continue
+
+    summary = f"{len(changes)} sizing mismatch(es)" if changes else "Spec sizing matches AgnosticV config"
+    return DriftResponse(
+        has_drift=False,
+        baseline_sha="",
+        current_sha=current_sha,
+        summary=summary,
+        changes=changes,
+    )

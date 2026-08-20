@@ -83,6 +83,11 @@ export interface AutoComputedFields {
   provisioning_time_min?: number;
 }
 
+export interface RcarsWorkload {
+  role: string;
+  collection: string;
+}
+
 export interface RcarsMatch {
   ci_name: string;
   display_name: string;
@@ -90,6 +95,7 @@ export interface RcarsMatch {
   title?: string;
   relevance_score?: number;
   why_it_fits?: string;
+  workloads?: RcarsWorkload[];
 }
 
 export interface ApprovalChecklist {
@@ -182,6 +188,7 @@ export interface DriftChange {
   file: string;
   comparing: string;
   difference: string;
+  severity?: 'info' | 'warning' | 'critical';
 }
 
 export interface DriftReport {

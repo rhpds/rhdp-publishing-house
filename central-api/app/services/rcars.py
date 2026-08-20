@@ -110,3 +110,18 @@ def rcars_advisor_result(job_id: str) -> dict:
         return {"status": "failed", "error": str(e)}
 
 
+def rcars_catalog_item(ci_name: str) -> dict:
+    """Fetch a single catalog item by identifier. Returns full item including workloads."""
+    try:
+        url = f"{_get_base_url()}/api/v1/catalog/{urllib.parse.quote(ci_name)}"
+        req = urllib.request.Request(url, headers=_get_headers())
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=15) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        logger.error("RCARS catalog item fetch failed %s: %s", e.code, e.read().decode()[:200])
+        return {"error": f"HTTP {e.code}"}
+    except Exception as e:
+        logger.error("RCARS catalog item error for %s: %s", ci_name, e)
+        return {"error": str(e)}
+
+

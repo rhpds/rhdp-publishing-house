@@ -138,7 +138,7 @@ def create_epic(
         "summary": "[PH] Testing",
         "issuetype": {"name": "Task"},
         "parent": {"key": epic_key},
-        "labels": ["publishing-house", "ph:testing"],
+        "labels": ["publishing-house", "ph:testing", "rhdp_ops"],
         "assignee": None,
         STORY_POINTS_FIELD: float(POINTS["testing"]),
         "description": {

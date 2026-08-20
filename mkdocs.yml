@@ -18,9 +18,15 @@ exclude_docs: |
 nav:
   - Home: index.md
   - Overview: overview.md
-  - Intake: user/intake.md
-  - New Project Intake: user/intake-new.md
-  - Migration Intake: user/intake-migration.md
+  - Intake:
+      - Overview: user/intake.md
+      - New Project: user/intake-new.md
+      - Migration: user/intake-migration.md
+  - Development:
+      - Overview: user/development.md
+      - Content Helpers: user/content-helper.md
+      - GitOps Automation: user/gitops.md
+      - Ansible Automation: user/ansible.md
   - Deployment Modes: user/deployment-modes.md
   - QA Automation: user/qa-automation.md
   - Developer Docs:

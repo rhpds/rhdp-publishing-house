@@ -321,7 +321,7 @@ export function createPhWorkflowsClient(options: {
 
   async function fetchDriftReport(
     slug: string,
-    mode: 'structural' | 'semantic' = 'semantic',
+    mode: 'structural' | 'semantic' | 'infra' = 'semantic',
   ): Promise<DriftReport> {
     const response = await centralFetch(
       `/spec/drift/${slug}?mode=${mode}`,

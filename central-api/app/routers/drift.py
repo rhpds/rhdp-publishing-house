@@ -11,7 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from ..auth.groups import decode_signed_key
 from ..config import get_settings
 from ..services.github import GitHubService
-from ..services.drift import DriftResponse, check_drift_structural, check_drift_semantic, drift_cache_evict
+from ..services.drift import DriftResponse, check_drift_structural, check_drift_semantic, check_drift_infra, drift_cache_evict
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/spec/drift", tags=["drift"])
@@ -72,7 +72,7 @@ def _require_auth(
 @router.post("/{slug}", response_model=DriftResponse)
 async def detect_drift(
     slug: str,
-    mode: str = Query("semantic", regex="^(structural|semantic)$"),
+    mode: str = Query("semantic", regex="^(structural|semantic|infra)$"),
     owner: str = Depends(_require_auth),
 ):
     """Look up workflow data for slug, then compare spec.yaml (structural) or design.md (semantic)
@@ -98,6 +98,19 @@ async def detect_drift(
 
     if mode == "structural":
         return await check_drift_structural(github, repo_url, "main", baseline_sha)
+
+    if mode == "infra":
+        agnosticv_urls = wd.get("agnosticvUrls", [])
+        if not agnosticv_urls:
+            raise HTTPException(status_code=422, detail="Workflow has no agnosticvUrls set")
+        spec_raw = await github.get_file_content(repo_url, "publishing-house/spec.yaml", "main")
+        spec_env = {}
+        if spec_raw:
+            import yaml
+            spec_data = yaml.safe_load(spec_raw) or {}
+            spec_env = spec_data.get("spec", {}).get("environment", {})
+        current_sha = await github.get_head_sha(repo_url, "main") or ""
+        return await check_drift_infra(github, agnosticv_urls, spec_env, current_sha)
 
     if not settings.ph_internal_ai_api_key:
         raise HTTPException(status_code=500, detail="PH_INTERNAL_AI_API_KEY not configured on Central API")
