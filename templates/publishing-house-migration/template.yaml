@@ -77,8 +77,9 @@ spec:
           items:
             type: string
             title: Tag
-            ui:placeholder: "e.g. LB1234, openshift, ansible"
-          ui:help: "e.g. LB1234, openshift, ansible"
+            pattern: "^[a-zA-Z0-9_-]+$"
+            ui:placeholder: "e.g. openshift"
+          ui:help: "One tag per entry — letters, numbers, hyphens, underscores only"
 
     - title: GitHub Collaborators
       description: Enter your GitHub username first. You can also add collaborators who will have write access to the project repo.
