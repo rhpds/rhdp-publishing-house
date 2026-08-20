@@ -37,8 +37,10 @@ import RefreshIcon from '@material-ui/icons/Refresh';
 import ReplayIcon from '@material-ui/icons/Replay';
 import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 import MenuBookIcon from '@material-ui/icons/MenuBook';
+import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
+import ExpandLessIcon from '@material-ui/icons/ExpandLess';
 import { createPhWorkflowsClient } from '../../api/client';
-import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport, TestingComment } from '../../api/types';
+import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport, TestingComment, RcarsMatch } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
 import { useUserGroups } from '../../hooks/useUserGroups';
 
@@ -209,6 +211,7 @@ export function WorkflowDetailPage() {
   const [submittingTestingComment, setSubmittingTestingComment] = useState(false);
   const [loadingTestingComments, setLoadingTestingComments] = useState(false);
   const [completingTesting, setCompletingTesting] = useState(false);
+  const [expandedRcarsRows, setExpandedRcarsRows] = useState<Set<number>>(new Set());
 
   const handleApprove = async (stage: WorkflowStage) => {
     if (!result) return;
@@ -780,6 +783,7 @@ export function WorkflowDetailPage() {
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', marginTop: 4 }}>
                         <thead>
                           <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+                            <th style={{ padding: '6px 8px', width: 24 }} />
                             <th style={{ padding: '6px 8px' }}>Catalog Item</th>
                             <th style={{ padding: '6px 8px' }}>Display Name</th>
                             <th style={{ padding: '6px 8px' }}>Relevance</th>
@@ -788,17 +792,63 @@ export function WorkflowDetailPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {validationReport.approval_checklist.content.rcars_top_matches!.map((m, i) => (
-                            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                              <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{m.ci_name}</td>
-                              <td style={{ padding: '6px 8px' }}>{m.display_name || m.title || '—'}</td>
-                              <td style={{ padding: '6px 8px' }}>{m.relevance_score != null ? `${m.relevance_score}%` : '—'}</td>
-                              <td style={{ padding: '6px 8px', maxWidth: 300 }}>{m.why_it_fits || '—'}</td>
-                              <td style={{ padding: '6px 8px' }}>
-                                {m.url ? <a href={m.url} target="_blank" rel="noopener noreferrer">View</a> : '—'}
-                              </td>
-                            </tr>
-                          ))}
+                          {validationReport.approval_checklist.content.rcars_top_matches!.map((m, i) => {
+                            const hasWorkloads = (m.workloads ?? []).length > 0;
+                            const isExpanded = expandedRcarsRows.has(i);
+                            return (
+                              <React.Fragment key={i}>
+                                <tr style={{ borderBottom: hasWorkloads && isExpanded ? 'none' : '1px solid rgba(255,255,255,0.06)' }}>
+                                  <td style={{ padding: '6px 4px', textAlign: 'center' }}>
+                                    {hasWorkloads && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          const next = new Set(expandedRcarsRows);
+                                          if (next.has(i)) next.delete(i); else next.add(i);
+                                          setExpandedRcarsRows(next);
+                                        }}
+                                        style={{ padding: 2 }}
+                                      >
+                                        {isExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                                      </IconButton>
+                                    )}
+                                  </td>
+                                  <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{m.ci_name}</td>
+                                  <td style={{ padding: '6px 8px' }}>{m.display_name || m.title || '—'}</td>
+                                  <td style={{ padding: '6px 8px' }}>{m.relevance_score != null ? `${m.relevance_score}%` : '—'}</td>
+                                  <td style={{ padding: '6px 8px', maxWidth: 300 }}>{m.why_it_fits || '—'}</td>
+                                  <td style={{ padding: '6px 8px' }}>
+                                    {m.url ? <a href={m.url} target="_blank" rel="noopener noreferrer">View</a> : '—'}
+                                  </td>
+                                </tr>
+                                {hasWorkloads && isExpanded && (
+                                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                                    <td colSpan={6} style={{ padding: '4px 8px 12px 40px' }}>
+                                      <Typography variant="caption" style={{ fontWeight: 600, color: '#90caf9' }}>
+                                        Reusable Workloads ({m.workloads!.length})
+                                      </Typography>
+                                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', marginTop: 4 }}>
+                                        <thead>
+                                          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left' }}>
+                                            <th style={{ padding: '4px 8px' }}>Role</th>
+                                            <th style={{ padding: '4px 8px' }}>Collection</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {m.workloads!.map((w, wi) => (
+                                            <tr key={wi} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                              <td style={{ padding: '3px 8px', fontFamily: 'monospace' }}>{w.role}</td>
+                                              <td style={{ padding: '3px 8px', fontFamily: 'monospace' }}>{w.collection}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </Grid>

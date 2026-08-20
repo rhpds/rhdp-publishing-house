@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import get_settings, Settings
 from .models import HealthResponse
 from .routers import litellm, projects, jira, validate, drift, auth as auth_router, messages, cleanup
-from .services.rcars import rcars_health, rcars_advisor_submit, rcars_advisor_result
+from .services.rcars import rcars_health, rcars_advisor_submit, rcars_advisor_result, rcars_catalog_item
 from .auth import init_oidc
 from .auth.groups import decode_signed_key
 from .auth.token_cache import load_backup, save_backup
@@ -124,6 +124,11 @@ def create_app() -> FastAPI:
     async def get_advisor_result(job_id: str, _caller: str = Depends(_require_token)):
         """Poll for advisor query result. Returns {status, result, error}."""
         return rcars_advisor_result(job_id)
+
+    @app.get(f"{settings.api_prefix}/rcars/catalog/{{ci_name}}")
+    async def get_catalog_item(ci_name: str, _caller: str = Depends(_require_token)):
+        """Fetch a single RCARS catalog item by identifier (includes workloads)."""
+        return rcars_catalog_item(ci_name)
 
     @app.get(f"{settings.api_prefix}/rcars/health")
     async def get_rcars_health():
