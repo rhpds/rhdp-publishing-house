@@ -38,6 +38,29 @@ Walks through the learner's steps from the module content and confirms the works
 - Fails on the first broken step, with a message identifying which module/step failed
 - Runs unattended, start to finish, no manual intervention
 
+## Running against a deployed Showroom
+
+Once the environment is provisioned, copy the Showroom URL from the order. Hosts, GUIDs, and clusters vary — the paths do not. Example: `https://showroom-abc12.apps.ocpv00.rhdp.net`
+
+The easiest way to run a playbook is to open it in a browser. Ansible output streams in the tab until the playbook finishes (`✓ Completed successfully!` or `✗ Failed (exit code N)`, then `__DONE__`).
+
+- Health check: `https://showroom-abc12.apps.ocpv00.rhdp.net/stream/qa/healthcheck`
+- E2E: `https://showroom-abc12.apps.ocpv00.rhdp.net/stream/qa/e2e`
+
+A 404 means that playbook is not in the **deployed** content tree. Push `qa-automation/` and re-provision or re-sync before retrying.
+
+The same endpoints work from curl if you prefer the command line (`-N` streams `TASK` lines live; `-k` covers cluster TLS):
+
+```bash
+SHOWROOM=https://showroom-abc12.apps.ocpv00.rhdp.net
+
+# Fast readiness check (< 60s)
+curl -sk -N "$SHOWROOM/stream/qa/healthcheck"
+
+# Full unattended walkthrough
+curl -sk -N "$SHOWROOM/stream/qa/e2e"
+```
+
 ## Marking complete
 
 `publishing-house/spec.yaml` tracks these independently: `development.e2e.status` and `development.healthCheck.status`. Set each to `complete` once implemented and tested — both must be `complete` to pass compliance checks.
