@@ -495,7 +495,6 @@ async def submit_development(
     owner, groups = auth
     _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
     stage = None
-    drift_msg = "Design drift detected. Your submission has been referred for additional review."
 
     try:
         try:
@@ -549,8 +548,16 @@ async def submit_development(
             if drift_result.has_drift:
                 _patch_workflow_data(wf_uuid, {"hasDrift": True}, settings=settings)
                 logger.info("development: drift detected for %s, set hasDrift", project_slug)
+
+                # Build detailed drift message
+                detailed_msg = f"Design drift detected: {drift_result.summary}\n\nChanges:\n"
+                for i, change in enumerate(drift_result.changes[:5], 1):
+                    detailed_msg += f"{i}. {change.comparing}: {change.difference}\n"
+                if len(drift_result.changes) > 5:
+                    detailed_msg += f"\n...and {len(drift_result.changes) - 5} more change(s)"
+
                 return JSONResponse(status_code=422, content=DevelopmentResponse(
-                    status=422, stage=stage, error=drift_msg,
+                    status=422, stage=stage, error=detailed_msg,
                 ).model_dump())
             elif wd.get("hasDrift"):
                 _patch_workflow_data(wf_uuid, {"hasDrift": False}, settings=settings)
@@ -618,7 +625,6 @@ async def submit_testing(
     allowed = GROUP_BITS["rhdp-operations"] | GROUP_BITS["rhdp-administrators"]
     _require_group(groups, allowed, "rhdp-operations or rhdp-administrators")
     stage = None
-    drift_msg = "Design drift detected. Your submission has been referred for additional review."
 
     try:
         try:
@@ -669,8 +675,16 @@ async def submit_testing(
             if drift_result.has_drift:
                 _patch_workflow_data(wf_uuid, {"hasDrift": True}, settings=settings)
                 logger.info("testing: drift detected for %s, set hasDrift", project_slug)
+
+                # Build detailed drift message
+                detailed_msg = f"Design drift detected: {drift_result.summary}\n\nChanges:\n"
+                for i, change in enumerate(drift_result.changes[:5], 1):
+                    detailed_msg += f"{i}. {change.comparing}: {change.difference}\n"
+                if len(drift_result.changes) > 5:
+                    detailed_msg += f"\n...and {len(drift_result.changes) - 5} more change(s)"
+
                 return JSONResponse(status_code=422, content=TestingResponse(
-                    status=422, stage=stage, error=drift_msg,
+                    status=422, stage=stage, error=detailed_msg,
                 ).model_dump())
             elif wd.get("hasDrift"):
                 _patch_workflow_data(wf_uuid, {"hasDrift": False}, settings=settings)

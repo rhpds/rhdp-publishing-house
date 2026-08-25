@@ -192,8 +192,17 @@ async def check_drift_structural(
     if not changes:
         return _empty_response(baseline_sha, current_sha, "No structural drift in contract fields")
 
-    field_names = [c.comparing for c in changes]
-    summary = f"Structural drift in {len(changes)} field(s): {', '.join(field_names)}"
+    # Build detailed summary showing actual changes, not just field names
+    if len(changes) == 1:
+        summary = f"Structural drift: {changes[0].comparing} changed ({changes[0].difference})"
+    elif len(changes) <= 3:
+        details = "; ".join([f"{c.comparing} ({c.difference})" for c in changes])
+        summary = f"Structural drift in {len(changes)} fields: {details}"
+    else:
+        # Show first 3, truncate rest
+        details = "; ".join([f"{c.comparing} ({c.difference})" for c in changes[:3]])
+        summary = f"Structural drift in {len(changes)} fields: {details}; ...and {len(changes) - 3} more"
+
     return DriftResponse(
         has_drift=True,
         baseline_sha=baseline_sha,
