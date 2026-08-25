@@ -550,7 +550,7 @@ async def submit_development(
                 logger.info("development: drift detected for %s, set hasDrift", project_slug)
 
                 # Build detailed drift message
-                detailed_msg = f"Design drift detected: {drift_result.summary}\n\nChanges:\n"
+                detailed_msg = "Design drift detected.\n\nChanges:\n"
                 for i, change in enumerate(drift_result.changes[:5], 1):
                     detailed_msg += f"{i}. {change.comparing}: {change.difference}\n"
                 if len(drift_result.changes) > 5:
@@ -677,7 +677,7 @@ async def submit_testing(
                 logger.info("testing: drift detected for %s, set hasDrift", project_slug)
 
                 # Build detailed drift message
-                detailed_msg = f"Design drift detected: {drift_result.summary}\n\nChanges:\n"
+                detailed_msg = "Design drift detected.\n\nChanges:\n"
                 for i, change in enumerate(drift_result.changes[:5], 1):
                     detailed_msg += f"{i}. {change.comparing}: {change.difference}\n"
                 if len(drift_result.changes) > 5:
