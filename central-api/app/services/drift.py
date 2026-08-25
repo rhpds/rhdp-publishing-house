@@ -150,6 +150,69 @@ def _format_value(val) -> str:
     return str(val)
 
 
+def _compute_module_diff(old_modules: list, new_modules: list) -> str:
+    """Compute detailed diff for spec.modules showing indexed changes."""
+    if not old_modules and not new_modules:
+        return "<empty> → <empty>"
+    if not old_modules:
+        return f"Added {len(new_modules)} module(s)"
+    if not new_modules:
+        return f"Removed {len(old_modules)} module(s)"
+
+    # Build ID-to-module maps
+    old_by_id = {m.get("id"): m for m in old_modules if m.get("id")}
+    new_by_id = {m.get("id"): m for m in new_modules if m.get("id")}
+
+    # If no IDs, fall back to simple count comparison
+    if not old_by_id or not new_by_id:
+        return f"{len(old_modules)} module(s) → {len(new_modules)} module(s)"
+
+    old_ids = set(old_by_id.keys())
+    new_ids = set(new_by_id.keys())
+
+    added_ids = new_ids - old_ids
+    removed_ids = old_ids - new_ids
+    common_ids = old_ids & new_ids
+
+    parts = []
+
+    # Removed modules
+    for id in sorted(removed_ids):
+        m = old_by_id[id]
+        module_num = id.split("-")[-1] if "-" in id else "?"
+        parts.append(f'Module {module_num}: Removed "{m.get("title")}"')
+
+    # Modified modules (only check title and duration_min, ignore status)
+    for id in sorted(common_ids):
+        old_m = old_by_id[id]
+        new_m = new_by_id[id]
+
+        changes_detail = []
+        if old_m.get("title") != new_m.get("title"):
+            changes_detail.append(f'title: "{old_m.get("title")}" → "{new_m.get("title")}"')
+        if old_m.get("duration_min") != new_m.get("duration_min"):
+            changes_detail.append(f'duration: {old_m.get("duration_min")} → {new_m.get("duration_min")} min')
+
+        if changes_detail:
+            module_num = id.split("-")[-1] if "-" in id else "?"
+            parts.append(f'Module {module_num}: {" | ".join(changes_detail)}')
+
+    # Added modules
+    for id in sorted(added_ids):
+        m = new_by_id[id]
+        module_num = id.split("-")[-1] if "-" in id else "?"
+        parts.append(f'Module {module_num}: Added "{m.get("title")}"')
+
+    if not parts:
+        return "No changes detected (status/id changes only)"
+
+    # Show first 3 changes, truncate if more
+    if len(parts) <= 3:
+        return " | ".join(parts)
+    else:
+        return " | ".join(parts[:3]) + f" | ...and {len(parts) - 3} more change(s)"
+
+
 async def check_drift_structural(
     github: GitHubService,
     repo_url: str,
@@ -182,10 +245,16 @@ async def check_drift_structural(
         old_val = _get_nested(baseline_data, field)
         new_val = _get_nested(current_data, field)
         if old_val != new_val:
+            # Special handling for spec.modules - show detailed indexed diff
+            if field == "spec.modules" and isinstance(old_val, list) and isinstance(new_val, list):
+                difference = _compute_module_diff(old_val, new_val)
+            else:
+                difference = f"{_format_value(old_val)} → {_format_value(new_val)}"
+
             changes.append(DriftChange(
                 file="spec.yaml",
                 comparing=field,
-                difference=f"{_format_value(old_val)} → {_format_value(new_val)}",
+                difference=difference,
                 severity="critical",
             ))
 
