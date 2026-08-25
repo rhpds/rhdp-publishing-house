@@ -206,11 +206,8 @@ def _compute_module_diff(old_modules: list, new_modules: list) -> str:
     if not parts:
         return "No changes detected (status/id changes only)"
 
-    # Show first 3 changes, truncate if more
-    if len(parts) <= 3:
-        return " | ".join(parts)
-    else:
-        return " | ".join(parts[:3]) + f" | ...and {len(parts) - 3} more change(s)"
+    # Show all changes - reviewers need complete information
+    return " | ".join(parts)
 
 
 async def check_drift_structural(
@@ -261,16 +258,12 @@ async def check_drift_structural(
     if not changes:
         return _empty_response(baseline_sha, current_sha, "No structural drift in contract fields")
 
-    # Build detailed summary showing actual changes, not just field names
+    # Build high-level summary (details are in the changes table)
     if len(changes) == 1:
-        summary = f"Structural drift: {changes[0].comparing} changed ({changes[0].difference})"
-    elif len(changes) <= 3:
-        details = "; ".join([f"{c.comparing} ({c.difference})" for c in changes])
-        summary = f"Structural drift in {len(changes)} fields: {details}"
+        summary = f"Structural drift: {changes[0].comparing} changed"
     else:
-        # Show first 3, truncate rest
-        details = "; ".join([f"{c.comparing} ({c.difference})" for c in changes[:3]])
-        summary = f"Structural drift in {len(changes)} fields: {details}; ...and {len(changes) - 3} more"
+        field_names = ", ".join([c.comparing for c in changes])
+        summary = f"Structural drift in {len(changes)} fields: {field_names}"
 
     return DriftResponse(
         has_drift=True,
