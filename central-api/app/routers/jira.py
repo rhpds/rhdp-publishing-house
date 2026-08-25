@@ -786,6 +786,37 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, status
                         if _transition_to_done(task["key"], settings):
                             tasks_closed += 1
 
+            dev = spec_data.get("development", {})
+
+            automation = dev.get("automation", {})
+            if any(isinstance(v, dict) and v.get("status") == "complete" for v in automation.values()):
+                task = label_to_task.get("ph:write-automation")
+                if task and task["status"].lower() != "done":
+                    if _transition_to_done(task["key"], settings):
+                        tasks_closed += 1
+
+            if dev.get("e2e", {}).get("status") == "complete":
+                task = label_to_task.get("ph:write-e2e-tests")
+                if task and task["status"].lower() != "done":
+                    if _transition_to_done(task["key"], settings):
+                        tasks_closed += 1
+
+            if dev.get("healthCheck", {}).get("status") == "complete":
+                task = label_to_task.get("ph:write-health-check")
+                if task and task["status"].lower() != "done":
+                    if _transition_to_done(task["key"], settings):
+                        tasks_closed += 1
+
+        if status == "TestingComplete":
+            testing_task = label_to_task.get("ph:testing")
+            if testing_task and testing_task["status"].lower() != "done":
+                if _transition_to_done(testing_task["key"], settings):
+                    tasks_closed += 1
+
+        if status == "Published":
+            if _transition_to_done(epic_key, settings):
+                logger.info("jira sync bg: closed epic %s", epic_key)
+
         logger.info(
             "jira sync bg: epic %s — created=%d updated=%d closed=%d",
             epic_key, tasks_created, tasks_updated, tasks_closed,
