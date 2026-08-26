@@ -51,7 +51,7 @@ import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
 import { createPhWorkflowsClient } from '../../api/client';
-import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport, TestingComment, RcarsMatch } from '../../api/types';
+import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport, RcarsMatch } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
 import { useUserGroups } from '../../hooks/useUserGroups';
 
@@ -227,10 +227,8 @@ export function WorkflowDetailPage() {
   const [stagingAgnosticvUrls, setStagingAgnosticvUrls] = useState<string[]>(['']);
   const [stagingCiUrls, setStagingCiUrls] = useState<string[]>(['']);
   const [submittingStaging, setSubmittingStaging] = useState(false);
-  const [testingComments, setTestingComments] = useState<TestingComment[]>([]);
-  const [testingCommentText, setTestingCommentText] = useState('');
-  const [submittingTestingComment, setSubmittingTestingComment] = useState(false);
-  const [loadingTestingComments, setLoadingTestingComments] = useState(false);
+  const [testingNoteText, setTestingNoteText] = useState('');
+  const [submittingTestingNote, setSubmittingTestingNote] = useState(false);
   const [completingTesting, setCompletingTesting] = useState(false);
   const [expandedRcarsRows, setExpandedRcarsRows] = useState<Set<number>>(new Set());
 
@@ -363,31 +361,18 @@ export function WorkflowDetailPage() {
     }
   };
 
-  const loadTestingComments = useCallback(async () => {
-    if (!result?.summary.epicKey) return;
-    setLoadingTestingComments(true);
+  const handlePostTestingNote = async () => {
+    if (!result?.summary.projectId || !testingNoteText.trim()) return;
+    setSubmittingTestingNote(true);
     try {
-      const data = await client.getTestingComments(result.summary.epicKey);
-      setTestingComments(data.comments);
-    } catch {
-      setTestingComments([]);
-    } finally {
-      setLoadingTestingComments(false);
-    }
-  }, [result, client]);
-
-  const handlePostTestingComment = async () => {
-    if (!result?.summary.epicKey || !testingCommentText.trim()) return;
-    setSubmittingTestingComment(true);
-    try {
-      await client.postTestingComment(result.summary.epicKey, testingCommentText.trim());
-      setTestingCommentText('');
-      setSnackbar({ open: true, severity: 'success', message: 'Comment posted to Jira.' });
-      await loadTestingComments();
+      await client.addNote(result.summary.projectId, testingNoteText.trim());
+      setTestingNoteText('');
+      setSnackbar({ open: true, severity: 'success', message: 'Note added.' });
+      setRefreshKey(k => k + 1);
     } catch (err: any) {
-      setSnackbar({ open: true, severity: 'error', message: `Comment failed: ${err.message}` });
+      setSnackbar({ open: true, severity: 'error', message: `Add note failed: ${err.message}` });
     } finally {
-      setSubmittingTestingComment(false);
+      setSubmittingTestingNote(false);
     }
   };
 
@@ -405,11 +390,6 @@ export function WorkflowDetailPage() {
     }
   };
 
-  React.useEffect(() => {
-    if (result && ['testing', 'published'].includes(result.summary.stage) && result.summary.epicKey) {
-      loadTestingComments();
-    }
-  }, [result, loadTestingComments]);
 
   if (loading) {
     return (
@@ -1133,22 +1113,22 @@ export function WorkflowDetailPage() {
         )}
 
         {hasTestingTab && activeTab === testingTabIndex && (
-          <InfoCard title="Testing Comments">
+          <InfoCard title="Testing Notes">
             <Typography variant="body2" style={{ marginBottom: 16, color: '#757575' }}>
-              Comments posted here are forwarded to the Testing Jira ticket.
+              Add notes about testing progress. Notes will appear in the Notes tab.
             </Typography>
             {canPostTestingComment && (
               <div style={{ marginBottom: 24 }}>
                 <TextField
-                  label="Add a comment"
+                  label="Add a note"
                   placeholder="Enter your testing feedback..."
                   fullWidth
                   multiline
                   minRows={3}
                   variant="outlined"
-                  value={testingCommentText}
-                  onChange={e => setTestingCommentText(e.target.value)}
-                  disabled={submittingTestingComment}
+                  value={testingNoteText}
+                  onChange={e => setTestingNoteText(e.target.value)}
+                  disabled={submittingTestingNote}
                   style={{ marginBottom: 8 }}
                 />
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -1157,42 +1137,14 @@ export function WorkflowDetailPage() {
                     color="primary"
                     size="small"
                     style={{ fontWeight: 600 }}
-                    onClick={handlePostTestingComment}
-                    disabled={submittingTestingComment || !testingCommentText.trim()}
-                    startIcon={submittingTestingComment ? <CircularProgress size={16} color="inherit" /> : undefined}
+                    onClick={handlePostTestingNote}
+                    disabled={submittingTestingNote || !testingNoteText.trim()}
+                    startIcon={submittingTestingNote ? <CircularProgress size={16} color="inherit" /> : undefined}
                   >
-                    {submittingTestingComment ? 'Posting...' : 'Post Comment'}
+                    {submittingTestingNote ? 'Adding...' : 'Add Note'}
                   </Button>
-                  <IconButton size="small" onClick={loadTestingComments} disabled={loadingTestingComments}>
-                    <RefreshIcon fontSize="small" />
-                  </IconButton>
                 </div>
               </div>
-            )}
-            {loadingTestingComments ? (
-              <Progress />
-            ) : testingComments.length > 0 ? (
-              <div>
-                {testingComments.map((c, i) => (
-                  <div key={i} style={{
-                    padding: '12px 16px',
-                    marginBottom: 8,
-                    borderRadius: 4,
-                    backgroundColor: 'rgba(255,255,255,0.06)',
-                    borderLeft: '3px solid #1976d2',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Typography variant="subtitle2" style={{ fontWeight: 600 }}>{c.author}</Typography>
-                      <Typography variant="caption" style={{ color: '#757575' }}>
-                        {new Date(c.created).toLocaleString()}
-                      </Typography>
-                    </div>
-                    <Typography variant="body2" style={{ whiteSpace: 'pre-wrap' }}>{c.text}</Typography>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <Typography variant="body2" style={{ color: '#757575' }}>No comments yet.</Typography>
             )}
             {canCompleteTesting && summary.stage === 'testing' && (
               <div style={{ marginTop: 16 }}>

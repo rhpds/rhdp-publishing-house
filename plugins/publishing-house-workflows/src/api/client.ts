@@ -482,12 +482,12 @@ export function createPhWorkflowsClient(options: {
     return await response.json();
   }
 
-  async function postTestingComment(
-    epicKey: string,
+  async function addNote(
+    projectId: string,
     text: string,
-  ): Promise<{ posted: boolean; ticket_key: string }> {
+  ): Promise<{ slug: string; action: string }> {
     const response = await centralFetch(
-      `/jira/${epicKey}/comment`,
+      `/projects/${projectId}/notes`,
       {
         method: 'POST',
         body: JSON.stringify({ text }),
@@ -496,18 +496,8 @@ export function createPhWorkflowsClient(options: {
 
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      throw new Error(body.detail || `Post comment failed: ${response.status}`);
+      throw new Error(body.detail || `Add note failed: ${response.status}`);
     }
-
-    return await response.json();
-  }
-
-  async function getTestingComments(
-    epicKey: string,
-  ): Promise<{ comments: TestingComment[]; ticket_key: string }> {
-    const response = await centralFetch(`/jira/${epicKey}/comments`);
-
-    if (!response.ok) return { comments: [], ticket_key: '' };
 
     return await response.json();
   }
@@ -569,8 +559,7 @@ export function createPhWorkflowsClient(options: {
     searchTokens,
     revokeToken,
     revokeAllTokens,
-    postTestingComment,
-    getTestingComments,
+    addNote,
     completeTask,
   };
 }
