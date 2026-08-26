@@ -29,6 +29,13 @@ import {
   Tab,
   Popover,
   TextField,
+  Menu,
+  MenuItem,
+  ButtonGroup,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
 import GitHubIcon from '@material-ui/icons/GitHub';
@@ -39,8 +46,12 @@ import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 import MenuBookIcon from '@material-ui/icons/MenuBook';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import ExpandLessIcon from '@material-ui/icons/ExpandLess';
+import ErrorIcon from '@material-ui/icons/Error';
+import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
+import AddIcon from '@material-ui/icons/Add';
+import DeleteIcon from '@material-ui/icons/Delete';
 import { createPhWorkflowsClient } from '../../api/client';
-import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport, TestingComment, RcarsMatch } from '../../api/types';
+import { WorkflowStage, RejectionData, ValidationReport, CheckStatus, DriftReport, RcarsMatch } from '../../api/types';
 import { STAGE_LABELS, STAGE_DESCRIPTIONS } from '../../utils/stageMapping';
 import { useUserGroups } from '../../hooks/useUserGroups';
 
@@ -210,13 +221,14 @@ export function WorkflowDetailPage() {
   const [reasonsPopover, setReasonsPopover] = useState<{ anchorEl: HTMLElement | null; reasons: { id: number; text: string }[] }>({ anchorEl: null, reasons: [] });
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [approvalNotes, setApprovalNotes] = useState<Array<{ text: string }>>([]);
+  const [approvalNotesDialogOpen, setApprovalNotesDialogOpen] = useState(false);
+  const [approvalNotesMenuAnchor, setApprovalNotesMenuAnchor] = useState<HTMLElement | null>(null);
   const [stagingAgnosticvUrls, setStagingAgnosticvUrls] = useState<string[]>(['']);
   const [stagingCiUrls, setStagingCiUrls] = useState<string[]>(['']);
   const [submittingStaging, setSubmittingStaging] = useState(false);
-  const [testingComments, setTestingComments] = useState<TestingComment[]>([]);
-  const [testingCommentText, setTestingCommentText] = useState('');
-  const [submittingTestingComment, setSubmittingTestingComment] = useState(false);
-  const [loadingTestingComments, setLoadingTestingComments] = useState(false);
+  const [testingNoteText, setTestingNoteText] = useState('');
+  const [submittingTestingNote, setSubmittingTestingNote] = useState(false);
   const [completingTesting, setCompletingTesting] = useState(false);
   const [expandedRcarsRows, setExpandedRcarsRows] = useState<Set<number>>(new Set());
 
@@ -249,7 +261,8 @@ export function WorkflowDetailPage() {
 
       const user = result.summary.ssoEmail || result.summary.owner;
       const commitSha = validationReport?.commit_sha;
-      await client.sendApprovalEvent(result.summary.id, stage, result.summary.projectId, { user, commitSha });
+      const notes = approvalNotes.length > 0 ? approvalNotes : undefined;
+      await client.sendApprovalEvent(result.summary.id, stage, result.summary.projectId, { user, commitSha, notes });
       setSnackbar({
         open: true,
         severity: 'success',
@@ -348,31 +361,18 @@ export function WorkflowDetailPage() {
     }
   };
 
-  const loadTestingComments = useCallback(async () => {
-    if (!result?.summary.epicKey) return;
-    setLoadingTestingComments(true);
+  const handlePostTestingNote = async () => {
+    if (!result?.summary.projectId || !testingNoteText.trim()) return;
+    setSubmittingTestingNote(true);
     try {
-      const data = await client.getTestingComments(result.summary.epicKey);
-      setTestingComments(data.comments);
-    } catch {
-      setTestingComments([]);
-    } finally {
-      setLoadingTestingComments(false);
-    }
-  }, [result, client]);
-
-  const handlePostTestingComment = async () => {
-    if (!result?.summary.epicKey || !testingCommentText.trim()) return;
-    setSubmittingTestingComment(true);
-    try {
-      await client.postTestingComment(result.summary.epicKey, testingCommentText.trim());
-      setTestingCommentText('');
-      setSnackbar({ open: true, severity: 'success', message: 'Comment posted to Jira.' });
-      await loadTestingComments();
+      await client.addNote(result.summary.projectId, testingNoteText.trim());
+      setTestingNoteText('');
+      setSnackbar({ open: true, severity: 'success', message: 'Note added.' });
+      setRefreshKey(k => k + 1);
     } catch (err: any) {
-      setSnackbar({ open: true, severity: 'error', message: `Comment failed: ${err.message}` });
+      setSnackbar({ open: true, severity: 'error', message: `Add note failed: ${err.message}` });
     } finally {
-      setSubmittingTestingComment(false);
+      setSubmittingTestingNote(false);
     }
   };
 
@@ -390,11 +390,6 @@ export function WorkflowDetailPage() {
     }
   };
 
-  React.useEffect(() => {
-    if (result && ['testing', 'published'].includes(result.summary.stage) && result.summary.epicKey) {
-      loadTestingComments();
-    }
-  }, [result, loadTestingComments]);
 
   if (loading) {
     return (
@@ -446,6 +441,7 @@ export function WorkflowDetailPage() {
   const stagingTabIndex = hasReviewTab ? 2 : 1;
   const testingTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0);
   const timelineTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0) + (hasTestingTab ? 1 : 0);
+  const notesTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0) + (hasTestingTab ? 1 : 0) + 1;
 
   return (
     <Page themeId="tool">
@@ -539,6 +535,7 @@ export function WorkflowDetailPage() {
           {hasStagingTab && <Tab label="Env Setup" />}
           {hasTestingTab && <Tab label="Testing" />}
           <Tab label="Timeline" />
+          <Tab label="Notes" />
         </Tabs>
 
         {activeTab === 0 && (
@@ -966,20 +963,32 @@ export function WorkflowDetailPage() {
             {canReview && (validationReport || driftReport) && (
               <InfoCard>
                 <div style={{ display: 'flex', gap: 12 }}>
-                  <Button
-                    variant="contained"
-                    style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
-                    size="large"
-                    startIcon={
-                      approvingStage === summary.stage ? (
-                        <CircularProgress size={16} color="inherit" />
-                      ) : undefined
-                    }
-                    onClick={() => handleApprove(summary.stage)}
-                    disabled={approvingStage !== null}
-                  >
-                    {approvingStage === summary.stage ? 'Approving...' : 'Approve'}
-                  </Button>
+                  <ButtonGroup variant="contained" disabled={approvingStage !== null}>
+                    <Button
+                      style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
+                      size="large"
+                      startIcon={
+                        approvingStage === summary.stage ? (
+                          <CircularProgress size={16} color="inherit" />
+                        ) : undefined
+                      }
+                      onClick={() => {
+                        setApprovalNotes([]);
+                        handleApprove(summary.stage);
+                      }}
+                      disabled={approvingStage !== null}
+                    >
+                      {approvingStage === summary.stage ? 'Approving...' : 'Approve'}
+                    </Button>
+                    <Button
+                      size="small"
+                      style={{ backgroundColor: '#4caf50', color: '#fff', padding: '0 8px' }}
+                      onClick={(e) => setApprovalNotesMenuAnchor(e.currentTarget)}
+                      disabled={approvingStage !== null}
+                    >
+                      <ArrowDropDownIcon />
+                    </Button>
+                  </ButtonGroup>
                   <Button
                     variant="contained"
                     style={{ backgroundColor: '#e57373', color: '#fff', fontWeight: 600 }}
@@ -990,6 +999,20 @@ export function WorkflowDetailPage() {
                     Reject
                   </Button>
                 </div>
+                <Menu
+                  anchorEl={approvalNotesMenuAnchor}
+                  open={Boolean(approvalNotesMenuAnchor)}
+                  onClose={() => setApprovalNotesMenuAnchor(null)}
+                >
+                  <MenuItem
+                    onClick={() => {
+                      setApprovalNotesMenuAnchor(null);
+                      setApprovalNotesDialogOpen(true);
+                    }}
+                  >
+                    Approve with Notes
+                  </MenuItem>
+                </Menu>
               </InfoCard>
             )}
           </>
@@ -1090,22 +1113,22 @@ export function WorkflowDetailPage() {
         )}
 
         {hasTestingTab && activeTab === testingTabIndex && (
-          <InfoCard title="Testing Comments">
+          <InfoCard title="Testing Notes">
             <Typography variant="body2" style={{ marginBottom: 16, color: '#757575' }}>
-              Comments posted here are forwarded to the Testing Jira ticket.
+              Add notes about testing progress. Notes will appear in the Notes tab.
             </Typography>
             {canPostTestingComment && (
               <div style={{ marginBottom: 24 }}>
                 <TextField
-                  label="Add a comment"
+                  label="Add a note"
                   placeholder="Enter your testing feedback..."
                   fullWidth
                   multiline
                   minRows={3}
                   variant="outlined"
-                  value={testingCommentText}
-                  onChange={e => setTestingCommentText(e.target.value)}
-                  disabled={submittingTestingComment}
+                  value={testingNoteText}
+                  onChange={e => setTestingNoteText(e.target.value)}
+                  disabled={submittingTestingNote}
                   style={{ marginBottom: 8 }}
                 />
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -1114,42 +1137,14 @@ export function WorkflowDetailPage() {
                     color="primary"
                     size="small"
                     style={{ fontWeight: 600 }}
-                    onClick={handlePostTestingComment}
-                    disabled={submittingTestingComment || !testingCommentText.trim()}
-                    startIcon={submittingTestingComment ? <CircularProgress size={16} color="inherit" /> : undefined}
+                    onClick={handlePostTestingNote}
+                    disabled={submittingTestingNote || !testingNoteText.trim()}
+                    startIcon={submittingTestingNote ? <CircularProgress size={16} color="inherit" /> : undefined}
                   >
-                    {submittingTestingComment ? 'Posting...' : 'Post Comment'}
+                    {submittingTestingNote ? 'Adding...' : 'Add Note'}
                   </Button>
-                  <IconButton size="small" onClick={loadTestingComments} disabled={loadingTestingComments}>
-                    <RefreshIcon fontSize="small" />
-                  </IconButton>
                 </div>
               </div>
-            )}
-            {loadingTestingComments ? (
-              <Progress />
-            ) : testingComments.length > 0 ? (
-              <div>
-                {testingComments.map((c, i) => (
-                  <div key={i} style={{
-                    padding: '12px 16px',
-                    marginBottom: 8,
-                    borderRadius: 4,
-                    backgroundColor: 'rgba(255,255,255,0.06)',
-                    borderLeft: '3px solid #1976d2',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Typography variant="subtitle2" style={{ fontWeight: 600 }}>{c.author}</Typography>
-                      <Typography variant="caption" style={{ color: '#757575' }}>
-                        {new Date(c.created).toLocaleString()}
-                      </Typography>
-                    </div>
-                    <Typography variant="body2" style={{ whiteSpace: 'pre-wrap' }}>{c.text}</Typography>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <Typography variant="body2" style={{ color: '#757575' }}>No comments yet.</Typography>
             )}
             {canCompleteTesting && summary.stage === 'testing' && (
               <div style={{ marginTop: 16 }}>
@@ -1254,6 +1249,60 @@ export function WorkflowDetailPage() {
           </InfoCard>
         )}
 
+        {activeTab === notesTabIndex && (
+          <InfoCard title="Notes">
+            {(() => {
+              const notes = (wd?.notes ?? []) as Array<{ user: string; text: string; type: 'rejection' | 'info'; timestamp: string; stage: string }>;
+              if (notes.length === 0) {
+                return (
+                  <Typography variant="body2" style={{ color: '#757575', fontStyle: 'italic' }}>
+                    No notes have been added yet.
+                  </Typography>
+                );
+              }
+              return (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+                      <th style={{ padding: '6px 8px', width: 40 }}>Type</th>
+                      <th style={{ padding: '6px 8px' }}>User</th>
+                      <th style={{ padding: '6px 8px' }}>Note</th>
+                      <th style={{ padding: '6px 8px' }}>Stage</th>
+                      <th style={{ padding: '6px 8px' }}>When</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...notes].reverse().map((note, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                        <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                          {note.type === 'rejection' ? (
+                            <ErrorIcon style={{ fontSize: 20, color: '#f44336', verticalAlign: 'middle' }} />
+                          ) : (
+                            <InfoOutlinedIcon style={{ fontSize: 20, color: '#2196f3', verticalAlign: 'middle' }} />
+                          )}
+                        </td>
+                        <td style={{ padding: '6px 8px' }}>{note.user || '—'}</td>
+                        <td style={{ padding: '6px 8px' }}>{note.text}</td>
+                        <td style={{ padding: '6px 8px' }}>{STAGE_LABELS[note.stage as WorkflowStage] || note.stage}</td>
+                        <td style={{ padding: '6px 8px' }}>
+                          {(() => {
+                            if (!note.timestamp) return '—';
+                            const n = Number(note.timestamp);
+                            if (!isNaN(n) && n > 1_000_000_000 && n < 10_000_000_000_000) {
+                              return new Date(n < 10_000_000_000 ? n * 1000 : n).toLocaleString();
+                            }
+                            return new Date(note.timestamp).toLocaleString();
+                          })()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              );
+            })()}
+          </InfoCard>
+        )}
+
         <Popover
           open={Boolean(reasonsPopover.anchorEl)}
           anchorEl={reasonsPopover.anchorEl}
@@ -1290,6 +1339,59 @@ export function WorkflowDetailPage() {
           onConfirm={handleSendMessage}
           onCancel={() => setMessageDialogOpen(false)}
         />
+
+        <Dialog open={approvalNotesDialogOpen} onClose={() => setApprovalNotesDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Approve with Notes</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" color="textSecondary" gutterBottom style={{ marginBottom: 16 }}>
+              Add notes about your approval (optional). These will be visible in the Notes tab.
+            </Typography>
+            {approvalNotes.map((note, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  size="small"
+                  value={note.text}
+                  onChange={(e) => {
+                    const next = [...approvalNotes];
+                    next[i] = { text: e.target.value };
+                    setApprovalNotes(next);
+                  }}
+                  placeholder="Note text..."
+                />
+                <IconButton
+                  size="small"
+                  onClick={() => setApprovalNotes(approvalNotes.filter((_, j) => j !== i))}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </div>
+            ))}
+            <Button
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => setApprovalNotes([...approvalNotes, { text: '' }])}
+              style={{ marginTop: 8 }}
+            >
+              Add Note
+            </Button>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setApprovalNotesDialogOpen(false)}>Cancel</Button>
+            <Button
+              variant="contained"
+              style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
+              onClick={() => {
+                setApprovalNotesDialogOpen(false);
+                handleApprove(summary.stage);
+              }}
+              disabled={approvingStage !== null}
+            >
+              Approve
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Snackbar
           open={snackbar.open}

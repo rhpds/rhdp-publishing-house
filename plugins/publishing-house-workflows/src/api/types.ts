@@ -232,10 +232,12 @@ export interface RevokeAllResponse {
   revoked_count: number;
 }
 
-export interface TestingComment {
-  author: string;
+export interface Note {
+  user: string;
   text: string;
-  created: string;
+  type: 'rejection' | 'info';
+  timestamp: string;
+  stage: string;
 }
 
 export interface WorkflowSummary {

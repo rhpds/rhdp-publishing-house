@@ -116,6 +116,7 @@ spec:
                 isRejected: false
               },
               reviewHistory: [],
+              notes: [],
               baselineSha: "",
               auditTrailSha: (.auditTrailSha // ""),
               hasDrift: false
@@ -220,6 +221,7 @@ spec:
           output: |
             . + {
               reviewHistory: ((.reviewHistory // []) + (if .latestAudit then [.latestAudit] else [] end)),
+              notes: ((.notes // []) + (if .latestAudit then ((.latestAudit.notes // []) | map(. + {user: $.latestAudit.user, stage: $.latestAudit.stage, timestamp: $.latestAudit.timestamp, type: (if $.latestAudit.action == "rejected" then "rejection" else "info" end)})) else [] end)),
               auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
               baselineSha: (if .latestAudit then (if .latestAudit.action == "approved" then .latestAudit.commitSha else .baselineSha end) else .baselineSha end),
               rejection: (if .latestAudit then (if .latestAudit.action == "rejected" then { isRejected: true, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: ((.rejection.reasons // []) + .latestAudit.reasons) } else (.rejection + { isRejected: false, reasons: [(.rejection.reasons // [])[] | . + {resolved: true}] }) end) else { isRejected: false } end)
@@ -270,6 +272,7 @@ spec:
           output: |
             . + {
               reviewHistory: ((.reviewHistory // []) + (if .latestAudit then [.latestAudit] else [] end)),
+              notes: ((.notes // []) + (if .latestAudit then ((.latestAudit.notes // []) | map(. + {user: $.latestAudit.user, stage: $.latestAudit.stage, timestamp: $.latestAudit.timestamp, type: (if $.latestAudit.action == "rejected" then "rejection" else "info" end)})) else [] end)),
               auditTrailSha: (.latestAudit.commitSha // .auditTrailSha),
               baselineSha: (if .latestAudit then (if .latestAudit.action == "approved" then .latestAudit.commitSha else .baselineSha end) else .baselineSha end),
               rejection: (if .latestAudit then (if .latestAudit.action == "rejected" then { isRejected: true, reviewerName: .latestAudit.user, reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp, reasons: ((.rejection.reasons // []) + .latestAudit.reasons) } else (.rejection + { isRejected: false, reasons: [(.rejection.reasons // [])[] | . + {resolved: true}] }) end) else { isRejected: false } end)

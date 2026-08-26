@@ -732,6 +732,7 @@ async def submit_testing(
 
 class ApproveRequest(BaseModel):
     commit_sha: str = ""
+    notes: list = []
 
 
 class RejectRequest(BaseModel):
@@ -808,6 +809,7 @@ async def approve_content_review(
         "action": "approved",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "commitSha": body.commit_sha,
+        "notes": body.notes,
     })
 
     epic_key = wd.get("epic_key", "")
@@ -838,6 +840,7 @@ async def reject_content_review(
     _require_stage(wf_uuid, ["content_review"])
 
     reasons = [{**r, "id": str(uuid.uuid4()), "resolved": False} for r in body.reasons]
+    notes = [{"text": r["text"]} for r in body.reasons]
     _send_cloud_event("ph.content-review.rejected", slug, {
         "user": body.reviewer_name or owner,
         "stage": "content_review",
@@ -845,6 +848,7 @@ async def reject_content_review(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "commitSha": body.commit_sha,
         "reasons": reasons,
+        "notes": notes,
     })
     return {"slug": slug, "action": "rejected", "stage": "content_review"}
 
@@ -872,6 +876,7 @@ async def approve_infra_review(
         "action": "approved",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "commitSha": body.commit_sha,
+        "notes": body.notes,
     })
     return {"slug": slug, "action": "approved", "stage": "infra_review"}
 
@@ -892,6 +897,7 @@ async def reject_infra_review(
     _require_stage(wf_uuid, ["infra_review"])
 
     reasons = [{**r, "id": str(uuid.uuid4()), "resolved": False} for r in body.reasons]
+    notes = [{"text": r["text"]} for r in body.reasons]
     _send_cloud_event("ph.infra-review.rejected", slug, {
         "user": body.reviewer_name or owner,
         "stage": "infra_review",
@@ -899,8 +905,96 @@ async def reject_infra_review(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "commitSha": body.commit_sha,
         "reasons": reasons,
+        "notes": notes,
     })
     return {"slug": slug, "action": "rejected", "stage": "infra_review"}
+
+
+# ── Add Note ───────────────────────────────────────────────────────────────
+
+class AddNoteRequest(BaseModel):
+    text: str
+
+
+@router.post("/{slug}/notes")
+async def add_note(
+    slug: str,
+    body: AddNoteRequest,
+    auth: tuple[str, int] = Depends(_require_auth),
+):
+    owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-operations"] | GROUP_BITS["rhdp-administrators"], "rhdp-operations or rhdp-administrators")
+
+    wd = _get_workflow_data(slug)
+    wf_uuid = wd.get("workflow_id", "")
+    if not wf_uuid:
+        raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
+
+    # Get current stage from workflow
+    stage = _get_current_stage(wf_uuid)
+
+    # Get current workflow data
+    query = """
+      query GetWorkflow($id: String!) {
+        ProcessInstances(where: { id: { equal: $id } }) {
+          id
+          variables
+        }
+      }
+    """
+    settings = get_settings()
+    graphql_payload = json.dumps({"query": query, "variables": {"id": wf_uuid}}).encode()
+    graphql_req = urllib.request.Request(
+        f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+        data=graphql_payload,
+        headers={"Content-Type": "application/json"},
+    )
+
+    try:
+        with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+            result = json.loads(resp.read().decode())
+            instances = result.get("data", {}).get("ProcessInstances", [])
+            if not instances:
+                raise HTTPException(status_code=404, detail=f"Workflow {wf_uuid} not found")
+
+            variables = instances[0].get("variables", {})
+            workflowdata = variables.get("workflowdata", {})
+            notes = workflowdata.get("notes", [])
+
+            # Add new note
+            new_note = {
+                "user": owner,
+                "text": body.text,
+                "type": "info",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "stage": stage,
+            }
+            notes.append(new_note)
+
+            # Update workflow data
+            workflowdata["notes"] = notes
+            variables["workflowdata"] = workflowdata
+
+            # Patch via management API
+            patch_payload = json.dumps(variables).encode()
+            patch_req = urllib.request.Request(
+                f"{settings.sonataflow_url.rstrip('/')}/management/processes/publishinghouseworkflow/instances/{wf_uuid}",
+                data=patch_payload,
+                headers={"Content-Type": "application/json"},
+                method="PATCH",
+            )
+            with urllib.request.urlopen(patch_req, context=_SSL_CTX, timeout=30) as patch_resp:
+                pass
+
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode(errors="replace")
+        logger.warning("Note add failed for %s: %s %s", slug, e.code, body_text[:500])
+        raise HTTPException(status_code=502, detail=f"Failed to update workflow: {e.code}")
+    except Exception as e:
+        logger.warning("Note add failed for %s: %s", slug, e)
+        raise HTTPException(status_code=502, detail=f"Failed to update workflow: {e}")
+
+    return {"slug": slug, "action": "note_added"}
 
 
 # ── Jira CI Ticket Helpers ─────────────────────────────────────────────────
