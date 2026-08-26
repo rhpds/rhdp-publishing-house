@@ -1,5 +1,5 @@
 import { DiscoveryApi, FetchApi, IdentityApi } from '@backstage/core-plugin-api';
-import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult, ReviewMessage, TokenListResponse, RevokeResponse, RevokeAllResponse, TestingComment } from './types';
+import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult, ReviewMessage, TokenListResponse, RevokeResponse, RevokeAllResponse } from './types';
 import { deriveStage } from '../utils/stageMapping';
 
 const TOKEN_STORAGE_KEY = 'ph-central-token';

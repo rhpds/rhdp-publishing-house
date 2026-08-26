@@ -232,12 +232,6 @@ export interface RevokeAllResponse {
   revoked_count: number;
 }
 
-export interface TestingComment {
-  author: string;
-  text: string;
-  created: string;
-}
-
 export interface Note {
   user: string;
   text: string;

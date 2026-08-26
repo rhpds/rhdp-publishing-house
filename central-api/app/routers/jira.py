@@ -828,60 +828,6 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, status
 # ── Testing Comments ─────────────────────────────────────────────────────────
 
 
-class CommentRequest(BaseModel):
-    text: str
-
-
-@router.post("/{epic_key}/comment")
-def post_testing_comment(
-    epic_key: str,
-    body: CommentRequest,
-    auth: tuple[str, int] = Depends(_require_auth),
-    settings: Settings = Depends(get_settings),
-):
-    owner, groups = auth
-    allowed = GROUP_BITS["rhdp-operations"] | GROUP_BITS["rhdp-administrators"]
-    _require_group(groups, allowed, "rhdp-operations or rhdp-administrators")
-
-    if not settings.jira_url:
-        raise HTTPException(status_code=503, detail="Jira not configured")
-
-    task = _find_task_by_label(epic_key, "ph:testing", settings)
-    if not task:
-        raise HTTPException(status_code=404, detail=f"Testing ticket not found under {epic_key}")
-
-    if not task["assignee"]:
-        _assign_ticket(task["key"], owner, settings)
-
-    if not _add_comment(task["key"], body.text, owner, settings):
-        raise HTTPException(status_code=502, detail="Failed to post comment to Jira")
-
-    return {"posted": True, "ticket_key": task["key"]}
-
-
-@router.get("/{epic_key}/comments")
-def get_testing_comments(
-    epic_key: str,
-    auth: tuple[str, int] = Depends(_require_auth),
-    settings: Settings = Depends(get_settings),
-):
-    owner, groups = auth
-    has_ops = groups & GROUP_BITS["rhdp-operations"]
-    has_dev = groups & GROUP_BITS["rhdp-developers"]
-    if not (has_ops or has_dev):
-        raise HTTPException(status_code=403, detail="Requires rhdp-operations or rhdp-developers")
-
-    if not settings.jira_url:
-        raise HTTPException(status_code=503, detail="Jira not configured")
-
-    task = _find_task_by_label(epic_key, "ph:testing", settings)
-    if not task:
-        return {"comments": [], "ticket_key": ""}
-
-    comments = _get_comments(task["key"], settings)
-    return {"comments": comments, "ticket_key": task["key"]}
-
-
 # ── Task Complete ────────────────────────────────────────────────────────────
 
 
