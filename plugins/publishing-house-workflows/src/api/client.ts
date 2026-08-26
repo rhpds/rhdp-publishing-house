@@ -223,7 +223,7 @@ export function createPhWorkflowsClient(options: {
     workflowId: string,
     stage: WorkflowStage,
     projectId?: string,
-    auditData?: { user: string; commitSha?: string },
+    auditData?: { user: string; commitSha?: string; notes?: Array<{ text: string }> },
   ): Promise<void> {
     const stagePathMap: Partial<Record<WorkflowStage, string>> = {
       content_review: 'content-review',
@@ -241,6 +241,7 @@ export function createPhWorkflowsClient(options: {
         method: 'POST',
         body: JSON.stringify({
           commit_sha: auditData?.commitSha ?? '',
+          notes: auditData?.notes ?? [],
         }),
       },
     );

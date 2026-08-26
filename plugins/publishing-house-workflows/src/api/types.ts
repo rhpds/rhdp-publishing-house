@@ -238,6 +238,14 @@ export interface TestingComment {
   created: string;
 }
 
+export interface Note {
+  user: string;
+  text: string;
+  type: 'rejection' | 'info';
+  timestamp: string;
+  stage: string;
+}
+
 export interface WorkflowSummary {
   id: string;
   projectId: string;

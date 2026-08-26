@@ -732,6 +732,7 @@ async def submit_testing(
 
 class ApproveRequest(BaseModel):
     commit_sha: str = ""
+    notes: list = []
 
 
 class RejectRequest(BaseModel):
@@ -808,6 +809,7 @@ async def approve_content_review(
         "action": "approved",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "commitSha": body.commit_sha,
+        "notes": body.notes,
     })
 
     epic_key = wd.get("epic_key", "")
@@ -838,6 +840,7 @@ async def reject_content_review(
     _require_stage(wf_uuid, ["content_review"])
 
     reasons = [{**r, "id": str(uuid.uuid4()), "resolved": False} for r in body.reasons]
+    notes = [{"text": r["text"]} for r in body.reasons]
     _send_cloud_event("ph.content-review.rejected", slug, {
         "user": body.reviewer_name or owner,
         "stage": "content_review",
@@ -845,6 +848,7 @@ async def reject_content_review(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "commitSha": body.commit_sha,
         "reasons": reasons,
+        "notes": notes,
     })
     return {"slug": slug, "action": "rejected", "stage": "content_review"}
 
@@ -872,6 +876,7 @@ async def approve_infra_review(
         "action": "approved",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "commitSha": body.commit_sha,
+        "notes": body.notes,
     })
     return {"slug": slug, "action": "approved", "stage": "infra_review"}
 
@@ -892,6 +897,7 @@ async def reject_infra_review(
     _require_stage(wf_uuid, ["infra_review"])
 
     reasons = [{**r, "id": str(uuid.uuid4()), "resolved": False} for r in body.reasons]
+    notes = [{"text": r["text"]} for r in body.reasons]
     _send_cloud_event("ph.infra-review.rejected", slug, {
         "user": body.reviewer_name or owner,
         "stage": "infra_review",
@@ -899,6 +905,7 @@ async def reject_infra_review(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "commitSha": body.commit_sha,
         "reasons": reasons,
+        "notes": notes,
     })
     return {"slug": slug, "action": "rejected", "stage": "infra_review"}
 
