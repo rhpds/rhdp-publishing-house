@@ -125,7 +125,7 @@ function DriftDetailPanel({
             color: '#e65100',
             fontWeight: 600,
           }}>
-            Changes detected since last approval
+            Project drift detected
           </div>
           <Typography variant="body2" style={{ marginBottom: 8, color: '#757575' }}>
             Baseline: <code>{state.report.baseline_sha.substring(0, 7)}</code>

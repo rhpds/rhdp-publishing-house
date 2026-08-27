@@ -624,7 +624,7 @@ export function WorkflowDetailPage() {
                   color: driftReport.has_drift ? '#e65100' : '#1565c0',
                   fontWeight: 600,
                 }}>
-                  {driftReport.has_drift ? 'Changes detected since last approval' : driftReport.summary}
+                  {driftReport.has_drift ? 'Project drift detected' : driftReport.summary}
                 </div>
                 {driftReport.baseline_sha && (
                   <Typography variant="body2" style={{ marginBottom: 8, color: '#757575' }}>
