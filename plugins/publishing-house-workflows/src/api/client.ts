@@ -223,7 +223,7 @@ export function createPhWorkflowsClient(options: {
     workflowId: string,
     stage: WorkflowStage,
     projectId?: string,
-    auditData?: { user: string; commitSha?: string; notes?: Array<{ text: string }> },
+    auditData?: { user: string; commitSha?: string; notes?: string[] },
   ): Promise<void> {
     const stagePathMap: Partial<Record<WorkflowStage, string>> = {
       content_review: 'content-review',

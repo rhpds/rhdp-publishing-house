@@ -29,9 +29,6 @@ import {
   Tab,
   Popover,
   TextField,
-  Menu,
-  MenuItem,
-  ButtonGroup,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -47,7 +44,6 @@ import MenuBookIcon from '@material-ui/icons/MenuBook';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import ExpandLessIcon from '@material-ui/icons/ExpandLess';
 import ErrorIcon from '@material-ui/icons/Error';
-import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
 import { createPhWorkflowsClient } from '../../api/client';
@@ -223,7 +219,6 @@ export function WorkflowDetailPage() {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [approvalNotes, setApprovalNotes] = useState<Array<{ text: string }>>([]);
   const [approvalNotesDialogOpen, setApprovalNotesDialogOpen] = useState(false);
-  const [approvalNotesMenuAnchor, setApprovalNotesMenuAnchor] = useState<HTMLElement | null>(null);
   const [stagingAgnosticvUrls, setStagingAgnosticvUrls] = useState<string[]>(['']);
   const [stagingCiUrls, setStagingCiUrls] = useState<string[]>(['']);
   const [submittingStaging, setSubmittingStaging] = useState(false);
@@ -263,8 +258,10 @@ export function WorkflowDetailPage() {
 
       const user = result.summary.ssoEmail || result.summary.owner;
       const commitSha = validationReport?.commit_sha;
-      const notes = approvalNotes.length > 0 ? approvalNotes : undefined;
+      const notes = approvalNotes.length > 0 ? approvalNotes.map(n => n.text).filter(t => t.trim()) : undefined;
       await client.sendApprovalEvent(result.summary.id, stage, result.summary.projectId, { user, commitSha, notes });
+      setApprovalNotes([]);
+      setApprovalNotesDialogOpen(false);
       setSnackbar({
         open: true,
         severity: 'success',
@@ -965,32 +962,23 @@ export function WorkflowDetailPage() {
             {canReview && (validationReport || driftReport) && (
               <InfoCard>
                 <div style={{ display: 'flex', gap: 12 }}>
-                  <ButtonGroup variant="contained" disabled={approvingStage !== null}>
-                    <Button
-                      style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
-                      size="large"
-                      startIcon={
-                        approvingStage === summary.stage ? (
-                          <CircularProgress size={16} color="inherit" />
-                        ) : undefined
-                      }
-                      onClick={() => {
-                        setApprovalNotes([]);
-                        handleApprove(summary.stage);
-                      }}
-                      disabled={approvingStage !== null}
-                    >
-                      {approvingStage === summary.stage ? 'Approving...' : 'Approve'}
-                    </Button>
-                    <Button
-                      size="small"
-                      style={{ backgroundColor: '#4caf50', color: '#fff', padding: '0 8px' }}
-                      onClick={(e) => setApprovalNotesMenuAnchor(e.currentTarget)}
-                      disabled={approvingStage !== null}
-                    >
-                      <ArrowDropDownIcon />
-                    </Button>
-                  </ButtonGroup>
+                  <Button
+                    variant="contained"
+                    style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
+                    size="large"
+                    startIcon={
+                      approvingStage === summary.stage ? (
+                        <CircularProgress size={16} color="inherit" />
+                      ) : undefined
+                    }
+                    onClick={() => {
+                      setApprovalNotes([]);
+                      setApprovalNotesDialogOpen(true);
+                    }}
+                    disabled={approvingStage !== null}
+                  >
+                    {approvingStage === summary.stage ? 'Approving...' : 'Approve'}
+                  </Button>
                   <Button
                     variant="contained"
                     style={{ backgroundColor: '#e57373', color: '#fff', fontWeight: 600 }}
@@ -1001,20 +989,6 @@ export function WorkflowDetailPage() {
                     Reject
                   </Button>
                 </div>
-                <Menu
-                  anchorEl={approvalNotesMenuAnchor}
-                  open={Boolean(approvalNotesMenuAnchor)}
-                  onClose={() => setApprovalNotesMenuAnchor(null)}
-                >
-                  <MenuItem
-                    onClick={() => {
-                      setApprovalNotesMenuAnchor(null);
-                      setApprovalNotesDialogOpen(true);
-                    }}
-                  >
-                    Approve with Notes
-                  </MenuItem>
-                </Menu>
               </InfoCard>
             )}
           </>

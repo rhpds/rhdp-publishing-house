@@ -803,17 +803,59 @@ async def approve_content_review(
         raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
     _require_stage(wf_uuid, ["content_review"])
 
+    settings = get_settings()
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    # If approval notes provided, add them to workflow
+    if body.notes and len(body.notes) > 0:
+        query = """
+          query GetWorkflow($id: String!) {
+            ProcessInstances(where: { id: { equal: $id } }) {
+              id
+              variables
+            }
+          }
+        """
+        graphql_payload = json.dumps({"query": query, "variables": {"id": wf_uuid}}).encode()
+        graphql_req = urllib.request.Request(
+            f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+            data=graphql_payload,
+            headers={"Content-Type": "application/json"},
+        )
+
+        with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+            result = json.loads(resp.read().decode())
+            instances = result.get("data", {}).get("ProcessInstances", [])
+            if instances:
+                variables = instances[0].get("variables", {})
+                workflowdata = variables.get("workflowdata", {})
+                existing_notes = workflowdata.get("notes", [])
+            else:
+                existing_notes = []
+
+        approval_notes = [
+            {
+                "text": note,
+                "user": owner,
+                "stage": "content_review",
+                "timestamp": timestamp,
+                "type": "info"
+            }
+            for note in body.notes if note.strip()
+        ]
+        if approval_notes:
+            updated_notes = existing_notes + approval_notes
+            _patch_workflow_data(wf_uuid, {"notes": updated_notes}, settings=settings)
+
     _send_cloud_event("ph.content-review.complete", slug, {
         "user": owner,
         "stage": "content_review",
         "action": "approved",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": timestamp,
         "commitSha": body.commit_sha,
-        "notes": body.notes,
     })
 
     epic_key = wd.get("epic_key", "")
-    settings = get_settings()
     if epic_key and settings.jira_url:
         from .jira import notify_reviewers_bg
         asyncio.get_event_loop().run_in_executor(
@@ -843,8 +885,33 @@ async def reject_content_review(
     timestamp = datetime.now(timezone.utc).isoformat()
     reviewer = body.reviewer_name or owner
 
-    # Add rejection notes directly to workflow data
-    existing_notes = wd.get("notes", [])
+    # Get FRESH notes via direct GraphQL query (same as add_note)
+    settings = get_settings()
+    query = """
+      query GetWorkflow($id: String!) {
+        ProcessInstances(where: { id: { equal: $id } }) {
+          id
+          variables
+        }
+      }
+    """
+    graphql_payload = json.dumps({"query": query, "variables": {"id": wf_uuid}}).encode()
+    graphql_req = urllib.request.Request(
+        f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+        data=graphql_payload,
+        headers={"Content-Type": "application/json"},
+    )
+
+    with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+        result = json.loads(resp.read().decode())
+        instances = result.get("data", {}).get("ProcessInstances", [])
+        if instances:
+            variables = instances[0].get("variables", {})
+            workflowdata = variables.get("workflowdata", {})
+            existing_notes = workflowdata.get("notes", [])
+        else:
+            existing_notes = []
+
     rejection_notes = [
         {
             "text": r["text"],
@@ -856,8 +923,9 @@ async def reject_content_review(
         for r in body.reasons
     ]
     updated_notes = existing_notes + rejection_notes
-    _patch_workflow_data(wf_uuid, {"notes": updated_notes})
+    _patch_workflow_data(wf_uuid, {"notes": updated_notes}, settings=settings)
 
+    # Send CloudEvent to trigger state transition
     _send_cloud_event("ph.content-review.rejected", slug, {
         "user": reviewer,
         "stage": "content_review",
@@ -886,13 +954,56 @@ async def approve_infra_review(
         raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
     _require_stage(wf_uuid, ["infra_review"])
 
+    settings = get_settings()
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    # If approval notes provided, add them to workflow
+    if body.notes and len(body.notes) > 0:
+        query = """
+          query GetWorkflow($id: String!) {
+            ProcessInstances(where: { id: { equal: $id } }) {
+              id
+              variables
+            }
+          }
+        """
+        graphql_payload = json.dumps({"query": query, "variables": {"id": wf_uuid}}).encode()
+        graphql_req = urllib.request.Request(
+            f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+            data=graphql_payload,
+            headers={"Content-Type": "application/json"},
+        )
+
+        with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+            result = json.loads(resp.read().decode())
+            instances = result.get("data", {}).get("ProcessInstances", [])
+            if instances:
+                variables = instances[0].get("variables", {})
+                workflowdata = variables.get("workflowdata", {})
+                existing_notes = workflowdata.get("notes", [])
+            else:
+                existing_notes = []
+
+        approval_notes = [
+            {
+                "text": note,
+                "user": owner,
+                "stage": "infra_review",
+                "timestamp": timestamp,
+                "type": "info"
+            }
+            for note in body.notes if note.strip()
+        ]
+        if approval_notes:
+            updated_notes = existing_notes + approval_notes
+            _patch_workflow_data(wf_uuid, {"notes": updated_notes}, settings=settings)
+
     _send_cloud_event("ph.infra-review.complete", slug, {
         "user": owner,
         "stage": "infra_review",
         "action": "approved",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": timestamp,
         "commitSha": body.commit_sha,
-        "notes": body.notes,
     })
     return {"slug": slug, "action": "approved", "stage": "infra_review"}
 
@@ -916,8 +1027,33 @@ async def reject_infra_review(
     timestamp = datetime.now(timezone.utc).isoformat()
     reviewer = body.reviewer_name or owner
 
-    # Add rejection notes directly to workflow data
-    existing_notes = wd.get("notes", [])
+    # Get FRESH notes via direct GraphQL query (same as add_note)
+    settings = get_settings()
+    query = """
+      query GetWorkflow($id: String!) {
+        ProcessInstances(where: { id: { equal: $id } }) {
+          id
+          variables
+        }
+      }
+    """
+    graphql_payload = json.dumps({"query": query, "variables": {"id": wf_uuid}}).encode()
+    graphql_req = urllib.request.Request(
+        f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+        data=graphql_payload,
+        headers={"Content-Type": "application/json"},
+    )
+
+    with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+        result = json.loads(resp.read().decode())
+        instances = result.get("data", {}).get("ProcessInstances", [])
+        if instances:
+            variables = instances[0].get("variables", {})
+            workflowdata = variables.get("workflowdata", {})
+            existing_notes = workflowdata.get("notes", [])
+        else:
+            existing_notes = []
+
     rejection_notes = [
         {
             "text": r["text"],
@@ -929,8 +1065,9 @@ async def reject_infra_review(
         for r in body.reasons
     ]
     updated_notes = existing_notes + rejection_notes
-    _patch_workflow_data(wf_uuid, {"notes": updated_notes})
+    _patch_workflow_data(wf_uuid, {"notes": updated_notes}, settings=settings)
 
+    # Send CloudEvent to trigger state transition
     _send_cloud_event("ph.infra-review.rejected", slug, {
         "user": reviewer,
         "stage": "infra_review",
