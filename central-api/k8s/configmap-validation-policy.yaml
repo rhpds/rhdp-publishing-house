@@ -28,6 +28,9 @@ data:
       - cnv
       - aws
       - troshka
+      - azure
+      - aro
+      - rosa
 
     valid_cluster_types:
       - sno

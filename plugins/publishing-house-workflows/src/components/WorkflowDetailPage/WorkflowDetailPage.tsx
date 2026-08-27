@@ -231,6 +231,8 @@ export function WorkflowDetailPage() {
   const [submittingTestingNote, setSubmittingTestingNote] = useState(false);
   const [completingTesting, setCompletingTesting] = useState(false);
   const [expandedRcarsRows, setExpandedRcarsRows] = useState<Set<number>>(new Set());
+  const [addNoteText, setAddNoteText] = useState('');
+  const [submittingNote, setSubmittingNote] = useState(false);
 
   const handleApprove = async (stage: WorkflowStage) => {
     if (!result) return;
@@ -1114,9 +1116,6 @@ export function WorkflowDetailPage() {
 
         {hasTestingTab && activeTab === testingTabIndex && (
           <InfoCard title="Testing Notes">
-            <Typography variant="body2" style={{ marginBottom: 16, color: '#757575' }}>
-              Add notes about testing progress. Notes will appear in the Notes tab.
-            </Typography>
             {canPostTestingComment && (
               <div style={{ marginBottom: 24 }}>
                 <TextField
@@ -1251,6 +1250,46 @@ export function WorkflowDetailPage() {
 
         {activeTab === notesTabIndex && (
           <InfoCard title="Notes">
+            <div style={{ marginBottom: 24 }}>
+              <TextField
+                label="Add a note"
+                placeholder="Enter your note..."
+                fullWidth
+                multiline
+                minRows={3}
+                variant="outlined"
+                value={addNoteText}
+                onChange={e => setAddNoteText(e.target.value)}
+                disabled={submittingNote}
+                style={{ marginBottom: 8 }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="small"
+                  style={{ fontWeight: 600 }}
+                  onClick={async () => {
+                    if (!addNoteText.trim()) return;
+                    setSubmittingNote(true);
+                    try {
+                      await client.addNote(result.summary.projectId, addNoteText.trim());
+                      setAddNoteText('');
+                      setSnackbar({ open: true, severity: 'success', message: 'Note added successfully' });
+                      setRefreshKey(k => k + 1);
+                    } catch (err: any) {
+                      setSnackbar({ open: true, severity: 'error', message: `Failed to add note: ${err.message}` });
+                    } finally {
+                      setSubmittingNote(false);
+                    }
+                  }}
+                  disabled={submittingNote || !addNoteText.trim()}
+                  startIcon={submittingNote ? <CircularProgress size={16} color="inherit" /> : undefined}
+                >
+                  {submittingNote ? 'Adding...' : 'Add Note'}
+                </Button>
+              </div>
+            </div>
             {(() => {
               const notes = (wd?.notes ?? []) as Array<{ user: string; text: string; type: 'rejection' | 'info'; timestamp: string; stage: string }>;
               if (notes.length === 0) {

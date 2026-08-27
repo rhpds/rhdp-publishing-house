@@ -840,15 +840,31 @@ async def reject_content_review(
     _require_stage(wf_uuid, ["content_review"])
 
     reasons = [{**r, "id": str(uuid.uuid4()), "resolved": False} for r in body.reasons]
-    notes = [{"text": r["text"]} for r in body.reasons]
+    timestamp = datetime.now(timezone.utc).isoformat()
+    reviewer = body.reviewer_name or owner
+
+    # Add rejection notes directly to workflow data
+    existing_notes = wd.get("notes", [])
+    rejection_notes = [
+        {
+            "text": r["text"],
+            "user": reviewer,
+            "stage": "content_review",
+            "timestamp": timestamp,
+            "type": "rejection"
+        }
+        for r in body.reasons
+    ]
+    updated_notes = existing_notes + rejection_notes
+    _patch_workflow_data(wf_uuid, {"notes": updated_notes})
+
     _send_cloud_event("ph.content-review.rejected", slug, {
-        "user": body.reviewer_name or owner,
+        "user": reviewer,
         "stage": "content_review",
         "action": "rejected",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": timestamp,
         "commitSha": body.commit_sha,
         "reasons": reasons,
-        "notes": notes,
     })
     return {"slug": slug, "action": "rejected", "stage": "content_review"}
 
@@ -897,15 +913,31 @@ async def reject_infra_review(
     _require_stage(wf_uuid, ["infra_review"])
 
     reasons = [{**r, "id": str(uuid.uuid4()), "resolved": False} for r in body.reasons]
-    notes = [{"text": r["text"]} for r in body.reasons]
+    timestamp = datetime.now(timezone.utc).isoformat()
+    reviewer = body.reviewer_name or owner
+
+    # Add rejection notes directly to workflow data
+    existing_notes = wd.get("notes", [])
+    rejection_notes = [
+        {
+            "text": r["text"],
+            "user": reviewer,
+            "stage": "infra_review",
+            "timestamp": timestamp,
+            "type": "rejection"
+        }
+        for r in body.reasons
+    ]
+    updated_notes = existing_notes + rejection_notes
+    _patch_workflow_data(wf_uuid, {"notes": updated_notes})
+
     _send_cloud_event("ph.infra-review.rejected", slug, {
-        "user": body.reviewer_name or owner,
+        "user": reviewer,
         "stage": "infra_review",
         "action": "rejected",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": timestamp,
         "commitSha": body.commit_sha,
         "reasons": reasons,
-        "notes": notes,
     })
     return {"slug": slug, "action": "rejected", "stage": "infra_review"}
 
@@ -923,7 +955,7 @@ async def add_note(
     auth: tuple[str, int] = Depends(_require_auth),
 ):
     owner, groups = auth
-    _require_group(groups, GROUP_BITS["rhdp-operations"] | GROUP_BITS["rhdp-administrators"], "rhdp-operations or rhdp-administrators")
+    _require_group(groups, ALL_GROUPS_MASK, "any RHDP group")
 
     wd = _get_workflow_data(slug)
     wf_uuid = wd.get("workflow_id", "")
@@ -931,7 +963,7 @@ async def add_note(
         raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
 
     # Get current stage from workflow
-    stage = _get_current_stage(wf_uuid)
+    stage = _get_workflow_state(wf_uuid).get("stage", "unknown")
 
     # Get current workflow data
     query = """
@@ -971,21 +1003,11 @@ async def add_note(
             }
             notes.append(new_note)
 
-            # Update workflow data
-            workflowdata["notes"] = notes
-            variables["workflowdata"] = workflowdata
+            # Update workflow data using helper
+            _patch_workflow_data(wf_uuid, {"notes": notes}, settings=settings)
 
-            # Patch via management API
-            patch_payload = json.dumps(variables).encode()
-            patch_req = urllib.request.Request(
-                f"{settings.sonataflow_url.rstrip('/')}/management/processes/publishinghouseworkflow/instances/{wf_uuid}",
-                data=patch_payload,
-                headers={"Content-Type": "application/json"},
-                method="PATCH",
-            )
-            with urllib.request.urlopen(patch_req, context=_SSL_CTX, timeout=30) as patch_resp:
-                pass
-
+    except HTTPException:
+        raise
     except urllib.error.HTTPError as e:
         body_text = e.read().decode(errors="replace")
         logger.warning("Note add failed for %s: %s %s", slug, e.code, body_text[:500])
