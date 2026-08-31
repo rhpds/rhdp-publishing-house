@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useAsync } from 'react-use';
 import {
   Content,
@@ -224,7 +224,7 @@ export function DriftDashboardPage() {
   const [approvingSlug, setApprovingSlug] = useState<string | null>(null);
   const [approvedSlugs, setApprovedSlugs] = useState<Set<string>>(new Set());
 
-  const client = createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi });
+  const client = useMemo(() => createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi }), [centralApiUrl, discoveryApi, fetchApi, identityApi]);
 
   const { value: workflows, loading, error } = useAsync(async () => {
     const all = await client.getWorkflows();
