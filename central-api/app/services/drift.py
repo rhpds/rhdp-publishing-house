@@ -533,6 +533,46 @@ def _parse_cpu(value) -> int | None:
         return None
 
 
+def _is_static_int(value) -> bool:
+    """Check if value is a static integer (not a Jinja expression)."""
+    if value is None:
+        return False
+    if isinstance(value, int):
+        return True
+    if not isinstance(value, str):
+        return False
+    # Reject if contains Jinja markers
+    if "{{" in value or "}}" in value or "{%" in value or "%}" in value:
+        return False
+    # Check if it's a plain integer string
+    s = str(value).strip().strip("'\"")
+    try:
+        int(s)
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
+def _get_value_with_source(
+    key: str,
+    configs: list[tuple[dict, str]],
+) -> tuple[str, str]:
+    """Get value from configs with source file tracking.
+
+    Args:
+        key: The config key to look up
+        configs: List of (config_dict, file_name) tuples, checked in order
+
+    Returns:
+        (value, source_file) tuple. Returns ("", "") if not found.
+    """
+    for config_dict, file_name in configs:
+        value = config_dict.get(key, "")
+        if value:
+            return (value, file_name)
+    return ("", "")
+
+
 def _resolve_jinja_ternary(value, variables: dict):
     """Resolve simple Jinja ternary: {{ A if var == 'val' else B }}."""
     if not isinstance(value, str) or "{{" not in value:
@@ -691,51 +731,54 @@ async def check_drift_infra(
 
             if pool_cloud == "aws":
                 instance_map = _get_aws_instance_map()
-                # Control plane (pool → component common → component dev)
-                cp_type = _resolve_jinja_ternary(
-                    pool_common.get("control_plane_instance_type", pool_common.get("master_instance_type", ""))
-                    or common.get("control_plane_instance_type", common.get("master_instance_type", ""))
-                    or dev.get("control_plane_instance_type", dev.get("master_instance_type", "")),
-                    resolve_vars,
-                )
+                config_sources = [(pool_common, pool_file), (common, display_file), (dev, display_file)]
+
+                # Control plane (check both control_plane_instance_type and master_instance_type)
+                cp_type_raw = ""
+                cp_type_file = ""
+                for config_dict, file_name in config_sources:
+                    cp_type_raw = config_dict.get("control_plane_instance_type") or config_dict.get("master_instance_type", "")
+                    if cp_type_raw:
+                        cp_type_file = file_name
+                        break
+
+                cp_type = _resolve_jinja_ternary(cp_type_raw, resolve_vars)
                 if cp_type and cp_type in instance_map:
                     agv_cp_cpu, agv_cp_ram = instance_map[cp_type]
                     spec_cp_cpu = spec_env.get("control_plane_cpu")
                     spec_cp_ram = spec_env.get("control_plane_ram_gb")
                     if spec_cp_cpu and int(spec_cp_cpu) != agv_cp_cpu:
                         changes.append(DriftChange(
-                            file=pool_file,
+                            file=cp_type_file or pool_file,
                             comparing="control_plane_cpu",
                             difference=f"spec: {spec_cp_cpu} vCPU vs agnosticv: {agv_cp_cpu} vCPU ({cp_type})",
                             severity="warning",
                         ))
                     if spec_cp_ram and int(spec_cp_ram) != agv_cp_ram:
                         changes.append(DriftChange(
-                            file=pool_file,
+                            file=cp_type_file or pool_file,
                             comparing="control_plane_ram_gb",
                             difference=f"spec: {spec_cp_ram} GB vs agnosticv: {agv_cp_ram} GB ({cp_type})",
                             severity="warning",
                         ))
 
                 # Workers (check pool first, fall back to component common, then dev)
-                wk_type = _resolve_jinja_ternary(
-                    pool_common.get("worker_instance_type", "") or common.get("worker_instance_type", "") or dev.get("worker_instance_type", ""),
-                    resolve_vars,
-                )
+                wk_type_raw, wk_type_file = _get_value_with_source("worker_instance_type", config_sources)
+                wk_type = _resolve_jinja_ternary(wk_type_raw, resolve_vars)
                 if wk_type and wk_type in instance_map:
                     agv_wk_cpu, agv_wk_ram = instance_map[wk_type]
                     spec_wk_cpu = spec_env.get("worker_cpu")
                     spec_wk_ram = spec_env.get("worker_ram_gb")
                     if spec_wk_cpu and int(spec_wk_cpu) != agv_wk_cpu:
                         changes.append(DriftChange(
-                            file=pool_file,
+                            file=wk_type_file or display_file,
                             comparing="worker_cpu",
                             difference=f"spec: {spec_wk_cpu} vCPU vs agnosticv: {agv_wk_cpu} vCPU ({wk_type})",
                             severity="warning",
                         ))
                     if spec_wk_ram and int(spec_wk_ram) != agv_wk_ram:
                         changes.append(DriftChange(
-                            file=pool_file,
+                            file=wk_type_file or display_file,
                             comparing="worker_ram_gb",
                             difference=f"spec: {spec_wk_ram} GB vs agnosticv: {agv_wk_ram} GB ({wk_type})",
                             severity="warning",
@@ -743,51 +786,66 @@ async def check_drift_infra(
 
             else:
                 # CNV or other — direct values
-                agv_cp_cpu = _parse_cpu(_resolve_jinja_ternary(
-                    pool_common.get("ai_control_plane_cores", "") or common.get("ai_control_plane_cores", "") or dev.get("ai_control_plane_cores", ""), resolve_vars,
-                ))
-                agv_cp_ram = _parse_ram(_resolve_jinja_ternary(
-                    pool_common.get("ai_control_plane_memory", "") or common.get("ai_control_plane_memory", "") or dev.get("ai_control_plane_memory", ""), resolve_vars,
-                ))
+                # Track which file the value came from: [(config_dict, file_name), ...]
+                config_sources = [(pool_common, pool_file), (common, display_file), (dev, display_file)]
+
+                cp_cpu_raw, cp_cpu_file = _get_value_with_source("ai_control_plane_cores", config_sources)
+                agv_cp_cpu = _parse_cpu(_resolve_jinja_ternary(cp_cpu_raw, resolve_vars))
+                cp_ram_raw, cp_ram_file = _get_value_with_source("ai_control_plane_memory", config_sources)
+                agv_cp_ram = _parse_ram(_resolve_jinja_ternary(cp_ram_raw, resolve_vars))
                 spec_cp_cpu = spec_env.get("control_plane_cpu")
                 spec_cp_ram = spec_env.get("control_plane_ram_gb")
 
                 if spec_cp_cpu and agv_cp_cpu and int(spec_cp_cpu) != agv_cp_cpu:
                     changes.append(DriftChange(
-                        file=pool_file,
+                        file=cp_cpu_file or pool_file,
                         comparing="control_plane_cpu",
                         difference=f"spec: {spec_cp_cpu} vCPU vs agnosticv: {agv_cp_cpu} vCPU",
                         severity="warning",
                     ))
                 if spec_cp_ram and agv_cp_ram and int(spec_cp_ram) != agv_cp_ram:
                     changes.append(DriftChange(
-                        file=pool_file,
+                        file=cp_ram_file or pool_file,
                         comparing="control_plane_ram_gb",
                         difference=f"spec: {spec_cp_ram} GB vs agnosticv: {agv_cp_ram} GB",
                         severity="warning",
                     ))
 
-                agv_wk_cpu = _parse_cpu(_resolve_jinja_ternary(
-                    pool_common.get("ai_workers_cores", "") or common.get("ai_workers_cores", "") or dev.get("ai_workers_cores", ""), resolve_vars,
-                ))
-                agv_wk_ram = _parse_ram(_resolve_jinja_ternary(
-                    pool_common.get("ai_workers_memory", "") or common.get("ai_workers_memory", "") or dev.get("ai_workers_memory", ""), resolve_vars,
-                ))
+                wk_cpu_raw, wk_cpu_file = _get_value_with_source("ai_workers_cores", config_sources)
+                agv_wk_cpu = _parse_cpu(_resolve_jinja_ternary(wk_cpu_raw, resolve_vars))
+                wk_ram_raw, wk_ram_file = _get_value_with_source("ai_workers_memory", config_sources)
+                agv_wk_ram = _parse_ram(_resolve_jinja_ternary(wk_ram_raw, resolve_vars))
                 spec_wk_cpu = spec_env.get("worker_cpu")
                 spec_wk_ram = spec_env.get("worker_ram_gb")
 
                 if spec_wk_cpu and agv_wk_cpu and int(spec_wk_cpu) != agv_wk_cpu:
                     changes.append(DriftChange(
-                        file=pool_file,
+                        file=wk_cpu_file or pool_file,
                         comparing="worker_cpu",
                         difference=f"spec: {spec_wk_cpu} vCPU vs agnosticv: {agv_wk_cpu} vCPU",
                         severity="warning",
                     ))
                 if spec_wk_ram and agv_wk_ram and int(spec_wk_ram) != agv_wk_ram:
                     changes.append(DriftChange(
-                        file=pool_file,
+                        file=wk_ram_file or pool_file,
                         comparing="worker_ram_gb",
                         difference=f"spec: {spec_wk_ram} GB vs agnosticv: {agv_wk_ram} GB",
+                        severity="warning",
+                    ))
+
+            # Worker count comparison (only if AgnosticV value is static, not Jinja)
+            worker_count_raw, worker_count_file = _get_value_with_source(
+                "worker_instance_count",
+                [(pool_common, pool_file), (common, display_file), (dev, display_file)]
+            )
+            if _is_static_int(worker_count_raw):
+                agv_worker_count = _parse_cpu(worker_count_raw)
+                spec_worker_count = spec_env.get("worker_count")
+                if spec_worker_count and agv_worker_count is not None and int(spec_worker_count) != agv_worker_count:
+                    changes.append(DriftChange(
+                        file=worker_count_file or display_file,
+                        comparing="worker_count",
+                        difference=f"spec: {spec_worker_count} workers vs agnosticv: {agv_worker_count} workers",
                         severity="warning",
                     ))
 
