@@ -82,7 +82,99 @@ interface DriftRowState {
   fetched?: boolean;
 }
 
-const DriftDetailPanel = React.memo(({
+// Drift messages display - memoized separately, never re-renders after initial load
+const DriftMessagesDisplay = React.memo(({
+  state,
+  classes,
+}: {
+  state: DriftRowState | undefined;
+  classes: ReturnType<typeof useStyles>;
+}) => {
+  if (!state || state.loading) {
+    return (
+      <Box display="flex" alignItems="center" style={{ gap: 8 }}>
+        <CircularProgress size={20} />
+        <Typography variant="body2">Loading drift report...</Typography>
+      </Box>
+    );
+  }
+
+  if (state.error) {
+    return <Alert severity="error">{state.error}</Alert>;
+  }
+
+  if (state.report && !state.report.has_drift) {
+    return (
+      <Alert severity="success" className={classes.resolvedBanner}>
+        Drift appears to have been resolved by the developer. You can approve to clear the drift flag.
+      </Alert>
+    );
+  }
+
+  if (!state.report) {
+    return null;
+  }
+
+  return (
+    <>
+      <div style={{
+        padding: '8px 16px',
+        marginBottom: 16,
+        borderRadius: 4,
+        backgroundColor: '#fff3e0',
+        color: '#e65100',
+        fontWeight: 600,
+      }}>
+        Project drift detected
+      </div>
+      <Typography variant="body2" style={{ marginBottom: 8, color: '#757575' }}>
+        Baseline: <code>{state.report.baseline_sha.substring(0, 7)}</code>
+        {' → HEAD: '}
+        <code>{state.report.current_sha.substring(0, 7)}</code>
+      </Typography>
+      {state.report.changes.length > 0 && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+              <th style={{ padding: '6px 8px' }}>Severity</th>
+              <th style={{ padding: '6px 8px' }}>File</th>
+              <th style={{ padding: '6px 8px' }}>Field / Section</th>
+              <th style={{ padding: '6px 8px' }}>Difference</th>
+            </tr>
+          </thead>
+          <tbody>
+            {state.report.changes.map((c, i) => {
+              const sevColor = c.severity === 'critical' ? '#f44336'
+                : c.severity === 'warning' ? '#ff9800'
+                : '#2196f3';
+              return (
+                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <td style={{ padding: '6px 8px' }}>
+                    <Chip
+                      label={c.severity || 'info'}
+                      size="small"
+                      style={{
+                        backgroundColor: sevColor,
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: '0.7rem',
+                      }}
+                    />
+                  </td>
+                  <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{c.file}</td>
+                  <td style={{ padding: '6px 8px' }}>{c.comparing}</td>
+                  <td style={{ padding: '6px 8px' }}>{c.difference}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+});
+
+const DriftDetailPanel = ({
   slug,
   state,
   onFetch,
@@ -114,74 +206,10 @@ const DriftDetailPanel = React.memo(({
 
   return (
     <Box className={classes.driftDetails}>
-      {!state || state.loading ? (
-        <Box display="flex" alignItems="center" style={{ gap: 8 }}>
-          <CircularProgress size={20} />
-          <Typography variant="body2">Loading drift report...</Typography>
-        </Box>
-      ) : state.error ? (
-        <Alert severity="error">{state.error}</Alert>
-      ) : state.report && !state.report.has_drift ? (
-        <Alert severity="success" className={classes.resolvedBanner}>
-          Drift appears to have been resolved by the developer. You can approve to clear the drift flag.
-        </Alert>
-      ) : state.report ? (
-        <>
-          <div style={{
-            padding: '8px 16px',
-            marginBottom: 16,
-            borderRadius: 4,
-            backgroundColor: '#fff3e0',
-            color: '#e65100',
-            fontWeight: 600,
-          }}>
-            Project drift detected
-          </div>
-          <Typography variant="body2" style={{ marginBottom: 8, color: '#757575' }}>
-            Baseline: <code>{state.report.baseline_sha.substring(0, 7)}</code>
-            {' → HEAD: '}
-            <code>{state.report.current_sha.substring(0, 7)}</code>
-          </Typography>
-          {state.report.changes.length > 0 && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
-                  <th style={{ padding: '6px 8px' }}>Severity</th>
-                  <th style={{ padding: '6px 8px' }}>File</th>
-                  <th style={{ padding: '6px 8px' }}>Field / Section</th>
-                  <th style={{ padding: '6px 8px' }}>Difference</th>
-                </tr>
-              </thead>
-              <tbody>
-                {state.report.changes.map((c, i) => {
-                  const sevColor = c.severity === 'critical' ? '#f44336'
-                    : c.severity === 'warning' ? '#ff9800'
-                    : '#2196f3';
-                  return (
-                    <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                      <td style={{ padding: '6px 8px' }}>
-                        <Chip
-                          label={c.severity || 'info'}
-                          size="small"
-                          style={{
-                            backgroundColor: sevColor,
-                            color: '#fff',
-                            fontWeight: 600,
-                            fontSize: '0.7rem',
-                          }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{c.file}</td>
-                      <td style={{ padding: '6px 8px' }}>{c.comparing}</td>
-                      <td style={{ padding: '6px 8px' }}>{c.difference}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </>
-      ) : null}
+      {/* Drift messages - never re-renders after load */}
+      <DriftMessagesDisplay state={state} classes={classes} />
+
+      {/* Approve section - separate from messages, can re-render independently */}
       {reportLoaded && !isApproved && canApprove && (
         <Box className={classes.approveButton}>
           <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginBottom: 4 }}>
@@ -205,7 +233,7 @@ const DriftDetailPanel = React.memo(({
       )}
     </Box>
   );
-});
+};
 
 export function DriftDashboardPage() {
   const classes = useStyles();
@@ -285,71 +313,77 @@ export function DriftDashboardPage() {
     }
   }, [pendingApprovalSlug, approvalNotes, client]);
 
-  const columns: TableColumn<WorkflowSummary>[] = useMemo(() => [
-    {
-      title: 'Project ID',
-      field: 'projectId',
-      highlight: true,
-    },
-    {
-      title: 'Owner',
-      field: 'owner',
-    },
-    {
-      title: 'Type',
-      field: 'contentType',
-    },
-    {
-      title: 'Stage',
-      field: 'stage',
-      render: (row: WorkflowSummary) => (
-        <Chip
-          label={STAGE_LABELS[row.stage] || row.stage}
-          size="small"
-          className={classes.chip}
-        />
-      ),
-    },
-    {
-      title: 'Baseline SHA',
-      field: 'baselineSha',
-      render: (row: WorkflowSummary) =>
-        row.baselineSha ? row.baselineSha.substring(0, 8) : '—',
-    },
-    {
-      title: 'Last Updated',
-      field: 'lastUpdate',
-      render: (row: WorkflowSummary) =>
-        row.lastUpdate
-          ? new Date(row.lastUpdate).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : '—',
-      defaultSort: 'desc' as const,
-    },
-  ], [classes]);
+  const columns: TableColumn<WorkflowSummary>[] = useMemo(() => {
+    const cachedClasses = classes;
+    return [
+      {
+        title: 'Project ID',
+        field: 'projectId',
+        highlight: true,
+      },
+      {
+        title: 'Owner',
+        field: 'owner',
+      },
+      {
+        title: 'Type',
+        field: 'contentType',
+      },
+      {
+        title: 'Stage',
+        field: 'stage',
+        render: (row: WorkflowSummary) => (
+          <Chip
+            label={STAGE_LABELS[row.stage] || row.stage}
+            size="small"
+            className={cachedClasses.chip}
+          />
+        ),
+      },
+      {
+        title: 'Baseline SHA',
+        field: 'baselineSha',
+        render: (row: WorkflowSummary) =>
+          row.baselineSha ? row.baselineSha.substring(0, 8) : '—',
+      },
+      {
+        title: 'Last Updated',
+        field: 'lastUpdate',
+        render: (row: WorkflowSummary) =>
+          row.lastUpdate
+            ? new Date(row.lastUpdate).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : '—',
+        defaultSort: 'desc' as const,
+      },
+    ];
+  }, []);
 
-  const detailPanelConfig = useMemo(() => [
-    {
-      tooltip: 'Show drift details',
-      render: ({ rowData }: { rowData: WorkflowSummary }) => (
-        <DriftDetailPanel
-          slug={rowData.projectId}
-          state={rowStates[rowData.projectId]}
-          onFetch={fetchDrift}
-          onApprove={handleApprove}
-          canApprove={isContentReviewer || isAdmin}
-          approvingSlug={approvingSlug}
-          approvedSlugs={approvedSlugs}
-          classes={classes}
-        />
-      ),
-    },
-  ], [rowStates, fetchDrift, handleApprove, isContentReviewer, isAdmin, approvingSlug, approvedSlugs, classes]);
+  const detailPanelConfig = useMemo(() => {
+    const cachedClasses = classes;
+    return [
+      {
+        tooltip: 'Show drift details',
+        render: ({ rowData }: { rowData: WorkflowSummary }) => (
+          <DriftDetailPanel
+            slug={rowData.projectId}
+            state={rowStates[rowData.projectId]}
+            onFetch={fetchDrift}
+            onApprove={handleApprove}
+            canApprove={isContentReviewer || isAdmin}
+            approvingSlug={approvingSlug}
+            approvedSlugs={approvedSlugs}
+            classes={cachedClasses}
+          />
+        ),
+      },
+    ];
+  }, [rowStates, fetchDrift, handleApprove, isContentReviewer, isAdmin, approvingSlug, approvedSlugs]);
 
   return (
     <Page themeId="tool">
