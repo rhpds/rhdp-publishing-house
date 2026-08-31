@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useAsync } from 'react-use';
 import {
   Content,
@@ -79,6 +79,7 @@ interface DriftRowState {
   loading: boolean;
   report?: DriftReport;
   error?: string;
+  fetched?: boolean;
 }
 
 function DriftDetailPanel({
@@ -100,14 +101,11 @@ function DriftDetailPanel({
   approvedSlugs: Set<string>;
   classes: ReturnType<typeof useStyles>;
 }) {
-  const fetchedRef = useRef(false);
-
   useEffect(() => {
-    if (!state && !fetchedRef.current) {
-      fetchedRef.current = true;
+    if (!state?.fetched && !state?.loading) {
       onFetch(slug);
     }
-  }, [slug, state, onFetch]);
+  }, [slug, state?.fetched, state?.loading, onFetch]);
 
   const reportLoaded = state && !state.loading && !state.error && state.report;
   const isApproving = approvingSlug === slug;
@@ -240,17 +238,17 @@ export function DriftDashboardPage() {
 
   const fetchDrift = useCallback(async (slug: string) => {
     setRowStates(prev => {
-      if (prev[slug]?.report || prev[slug]?.loading) return prev;
-      return { ...prev, [slug]: { loading: true } };
+      if (prev[slug]?.report || prev[slug]?.loading || prev[slug]?.fetched) return prev;
+      return { ...prev, [slug]: { loading: true, fetched: true } };
     });
 
     try {
       const report = await client.fetchDriftReport(slug, 'semantic');
-      setRowStates(prev => ({ ...prev, [slug]: { loading: false, report } }));
+      setRowStates(prev => ({ ...prev, [slug]: { loading: false, report, fetched: true } }));
     } catch (e: any) {
       setRowStates(prev => ({
         ...prev,
-        [slug]: { loading: false, error: e.message || 'Failed to load drift report' },
+        [slug]: { loading: false, error: e.message || 'Failed to load drift report', fetched: true },
       }));
     }
   }, [client]);
