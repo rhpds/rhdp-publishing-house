@@ -79,8 +79,6 @@ interface DriftRowState {
   loading: boolean;
   report?: DriftReport;
   error?: string;
-  approving?: boolean;
-  approved?: boolean;
 }
 
 function DriftDetailPanel({
@@ -89,6 +87,8 @@ function DriftDetailPanel({
   onFetch,
   onApprove,
   canApprove,
+  approvingSlug,
+  approvedSlugs,
   classes,
 }: {
   slug: string;
@@ -96,6 +96,8 @@ function DriftDetailPanel({
   onFetch: (slug: string) => void;
   onApprove: (slug: string) => void;
   canApprove: boolean;
+  approvingSlug: string | null;
+  approvedSlugs: Set<string>;
   classes: ReturnType<typeof useStyles>;
 }) {
   const fetchedRef = useRef(false);
@@ -108,6 +110,8 @@ function DriftDetailPanel({
   }, [slug, state, onFetch]);
 
   const reportLoaded = state && !state.loading && !state.error && state.report;
+  const isApproving = approvingSlug === slug;
+  const isApproved = approvedSlugs.has(slug);
 
   return (
     <Box className={classes.driftDetails}>
@@ -179,7 +183,7 @@ function DriftDetailPanel({
           )}
         </>
       ) : null}
-      {reportLoaded && !state?.approved && canApprove && (
+      {reportLoaded && !isApproved && canApprove && (
         <Box className={classes.approveButton}>
           <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginBottom: 4 }}>
             Approving updates the baseline SHA to the latest commit.
@@ -187,15 +191,15 @@ function DriftDetailPanel({
           <Button
             variant="contained"
             size="small"
-            disabled={state?.approving}
+            disabled={isApproving}
             style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
             onClick={() => onApprove(slug)}
           >
-            {state?.approving ? <CircularProgress size={16} color="inherit" /> : 'Approve'}
+            {isApproving ? <CircularProgress size={16} color="inherit" /> : 'Approve'}
           </Button>
         </Box>
       )}
-      {state?.approved && (
+      {isApproved && (
         <Alert severity="success" className={classes.approveButton}>
           Baseline updated to latest commit.
         </Alert>
@@ -217,6 +221,7 @@ export function DriftDashboardPage() {
   const [approvalNotesDialogOpen, setApprovalNotesDialogOpen] = useState(false);
   const [approvalNotes, setApprovalNotes] = useState<Array<{ text: string }>>([]);
   const [pendingApprovalSlug, setPendingApprovalSlug] = useState<string | null>(null);
+  const [approvingSlug, setApprovingSlug] = useState<string | null>(null);
   const [approvedSlugs, setApprovedSlugs] = useState<Set<string>>(new Set());
 
   const client = createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi });
@@ -229,13 +234,15 @@ export function DriftDashboardPage() {
   const handleRefresh = useCallback(() => {
     setRefreshKey(k => k + 1);
     setRowStates({});
+    setApprovingSlug(null);
     setApprovedSlugs(new Set());
   }, []);
 
   const fetchDrift = useCallback(async (slug: string) => {
-    if (rowStates[slug]?.report || rowStates[slug]?.loading) return;
-
-    setRowStates(prev => ({ ...prev, [slug]: { loading: true } }));
+    setRowStates(prev => {
+      if (prev[slug]?.report || prev[slug]?.loading) return prev;
+      return { ...prev, [slug]: { loading: true } };
+    });
 
     try {
       const report = await client.fetchDriftReport(slug, 'semantic');
@@ -246,7 +253,7 @@ export function DriftDashboardPage() {
         [slug]: { loading: false, error: e.message || 'Failed to load drift report' },
       }));
     }
-  }, [rowStates, client]);
+  }, [client]);
 
   const handleApprove = useCallback((slug: string) => {
     setPendingApprovalSlug(slug);
@@ -260,27 +267,21 @@ export function DriftDashboardPage() {
     const slug = pendingApprovalSlug;
     setApprovalNotesDialogOpen(false);
     setPendingApprovalSlug(null);
-
-    setRowStates(prev => ({
-      ...prev,
-      [slug]: { ...prev[slug], approving: true },
-    }));
+    setApprovingSlug(slug);
 
     try {
       const notes = approvalNotes.length > 0 ? approvalNotes.map(n => n.text).filter(t => t.trim()) : undefined;
       await client.approveDrift(slug, notes);
-      setRowStates(prev => ({
-        ...prev,
-        [slug]: { ...prev[slug], approving: false, approved: true },
-      }));
-      // Remove from drift queue after a brief delay to show success state
+      setApprovingSlug(null);
+      // Remove from drift queue after a brief delay
       setTimeout(() => {
         setApprovedSlugs(prev => new Set(prev).add(slug));
       }, 1500);
     } catch (e: any) {
+      setApprovingSlug(null);
       setRowStates(prev => ({
         ...prev,
-        [slug]: { ...prev[slug], approving: false, error: e.message },
+        [slug]: { ...prev[slug], error: e.message },
       }));
     }
   }, [pendingApprovalSlug, approvalNotes, client]);
@@ -388,6 +389,8 @@ export function DriftDashboardPage() {
                   onFetch={fetchDrift}
                   onApprove={handleApprove}
                   canApprove={isContentReviewer || isAdmin}
+                  approvingSlug={approvingSlug}
+                  approvedSlugs={approvedSlugs}
                   classes={classes}
                 />
               ),

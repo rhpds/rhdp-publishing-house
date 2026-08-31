@@ -1,0 +1,10 @@
+{
+  "latestErrorEvent": {
+    "code": "TYPE-001",
+    "message": "Failed to generate type declaration. Execute the below cmd to reproduce and fix the error. #TYPE-001\nargs: {\"cmd\":\"/opt/homebrew/Cellar/node/24.5.0/bin/node /Users/treddy/gpte/github/rhpds/rhdp-publishing-house/plugins/publishing-house-workflows/node_modules/typescript/bin/tsc --project /Users/treddy/gpte/github/rhpds/rhdp-publishing-house/plugins/publishing-house-workflows/node_modules/.federation/tsconfig.db686a778a0003515548ce9c9e190327.json\"}\nView the docs to see how to solve: https://module-federation.io/guide/troubleshooting/type#type-001",
+    "args": {
+      "cmd": "/opt/homebrew/Cellar/node/24.5.0/bin/node /Users/treddy/gpte/github/rhpds/rhdp-publishing-house/plugins/publishing-house-workflows/node_modules/typescript/bin/tsc --project /Users/treddy/gpte/github/rhpds/rhdp-publishing-house/plugins/publishing-house-workflows/node_modules/.federation/tsconfig.db686a778a0003515548ce9c9e190327.json"
+    },
+    "timestamp": 1788141547084
+  }
+}
