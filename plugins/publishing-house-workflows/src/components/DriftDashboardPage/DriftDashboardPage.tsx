@@ -82,7 +82,7 @@ interface DriftRowState {
   fetched?: boolean;
 }
 
-function DriftDetailPanel({
+const DriftDetailPanel = React.memo(({
   slug,
   state,
   onFetch,
@@ -100,12 +100,13 @@ function DriftDetailPanel({
   approvingSlug: string | null;
   approvedSlugs: Set<string>;
   classes: ReturnType<typeof useStyles>;
-}) {
+}) => {
   useEffect(() => {
     if (!state?.fetched && !state?.loading) {
       onFetch(slug);
     }
-  }, [slug, state?.fetched, state?.loading, onFetch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, state?.fetched, state?.loading]);
 
   const reportLoaded = state && !state.loading && !state.error && state.report;
   const isApproving = approvingSlug === slug;
@@ -204,7 +205,7 @@ function DriftDetailPanel({
       )}
     </Box>
   );
-}
+});
 
 export function DriftDashboardPage() {
   const classes = useStyles();
