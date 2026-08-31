@@ -150,6 +150,66 @@ def _format_value(val) -> str:
     return str(val)
 
 
+def _compute_module_diff(old_modules: list, new_modules: list) -> str:
+    """Compute detailed diff for spec.modules showing indexed changes."""
+    if not old_modules and not new_modules:
+        return "<empty> → <empty>"
+    if not old_modules:
+        return f"Added {len(new_modules)} module(s)"
+    if not new_modules:
+        return f"Removed {len(old_modules)} module(s)"
+
+    # Build ID-to-module maps
+    old_by_id = {m.get("id"): m for m in old_modules if m.get("id")}
+    new_by_id = {m.get("id"): m for m in new_modules if m.get("id")}
+
+    # If no IDs, fall back to simple count comparison
+    if not old_by_id or not new_by_id:
+        return f"{len(old_modules)} module(s) → {len(new_modules)} module(s)"
+
+    old_ids = set(old_by_id.keys())
+    new_ids = set(new_by_id.keys())
+
+    added_ids = new_ids - old_ids
+    removed_ids = old_ids - new_ids
+    common_ids = old_ids & new_ids
+
+    parts = []
+
+    # Removed modules
+    for id in sorted(removed_ids):
+        m = old_by_id[id]
+        module_num = id.split("-")[-1] if "-" in id else "?"
+        parts.append(f'Module {module_num}: Removed "{m.get("title")}"')
+
+    # Modified modules (only check title and duration_min, ignore status)
+    for id in sorted(common_ids):
+        old_m = old_by_id[id]
+        new_m = new_by_id[id]
+
+        changes_detail = []
+        if old_m.get("title") != new_m.get("title"):
+            changes_detail.append(f'title: "{old_m.get("title")}" → "{new_m.get("title")}"')
+        if old_m.get("duration_min") != new_m.get("duration_min"):
+            changes_detail.append(f'duration: {old_m.get("duration_min")} → {new_m.get("duration_min")} min')
+
+        if changes_detail:
+            module_num = id.split("-")[-1] if "-" in id else "?"
+            parts.append(f'Module {module_num}: {" | ".join(changes_detail)}')
+
+    # Added modules
+    for id in sorted(added_ids):
+        m = new_by_id[id]
+        module_num = id.split("-")[-1] if "-" in id else "?"
+        parts.append(f'Module {module_num}: Added "{m.get("title")}"')
+
+    if not parts:
+        return "No changes detected (status/id changes only)"
+
+    # Show all changes - reviewers need complete information
+    return " | ".join(parts)
+
+
 async def check_drift_structural(
     github: GitHubService,
     repo_url: str,
@@ -182,23 +242,28 @@ async def check_drift_structural(
         old_val = _get_nested(baseline_data, field)
         new_val = _get_nested(current_data, field)
         if old_val != new_val:
+            # Special handling for spec.modules - show detailed indexed diff
+            if field == "spec.modules" and isinstance(old_val, list) and isinstance(new_val, list):
+                difference = _compute_module_diff(old_val, new_val)
+            else:
+                difference = f"{_format_value(old_val)} → {_format_value(new_val)}"
+
             changes.append(DriftChange(
                 file="spec.yaml",
                 comparing=field,
-                difference=f"{_format_value(old_val)} → {_format_value(new_val)}",
+                difference=difference,
                 severity="critical",
             ))
 
     if not changes:
         return _empty_response(baseline_sha, current_sha, "No structural drift in contract fields")
 
-    field_names = [c.comparing for c in changes]
-    summary = f"Structural drift in {len(changes)} field(s): {', '.join(field_names)}"
+    # Summary removed - all details are in the changes table
     return DriftResponse(
         has_drift=True,
         baseline_sha=baseline_sha,
         current_sha=current_sha,
-        summary=summary,
+        summary="",
         changes=changes,
     )
 
@@ -468,6 +533,46 @@ def _parse_cpu(value) -> int | None:
         return None
 
 
+def _is_static_int(value) -> bool:
+    """Check if value is a static integer (not a Jinja expression)."""
+    if value is None:
+        return False
+    if isinstance(value, int):
+        return True
+    if not isinstance(value, str):
+        return False
+    # Reject if contains Jinja markers
+    if "{{" in value or "}}" in value or "{%" in value or "%}" in value:
+        return False
+    # Check if it's a plain integer string
+    s = str(value).strip().strip("'\"")
+    try:
+        int(s)
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
+def _get_value_with_source(
+    key: str,
+    configs: list[tuple[dict, str]],
+) -> tuple[str, str]:
+    """Get value from configs with source file tracking.
+
+    Args:
+        key: The config key to look up
+        configs: List of (config_dict, file_name) tuples, checked in order
+
+    Returns:
+        (value, source_file) tuple. Returns ("", "") if not found.
+    """
+    for config_dict, file_name in configs:
+        value = config_dict.get(key, "")
+        if value:
+            return (value, file_name)
+    return ("", "")
+
+
 def _resolve_jinja_ternary(value, variables: dict):
     """Resolve simple Jinja ternary: {{ A if var == 'val' else B }}."""
     if not isinstance(value, str) or "{{" not in value:
@@ -626,51 +731,54 @@ async def check_drift_infra(
 
             if pool_cloud == "aws":
                 instance_map = _get_aws_instance_map()
-                # Control plane (pool → component common → component dev)
-                cp_type = _resolve_jinja_ternary(
-                    pool_common.get("control_plane_instance_type", pool_common.get("master_instance_type", ""))
-                    or common.get("control_plane_instance_type", common.get("master_instance_type", ""))
-                    or dev.get("control_plane_instance_type", dev.get("master_instance_type", "")),
-                    resolve_vars,
-                )
+                config_sources = [(pool_common, pool_file), (common, display_file), (dev, display_file)]
+
+                # Control plane (check both control_plane_instance_type and master_instance_type)
+                cp_type_raw = ""
+                cp_type_file = ""
+                for config_dict, file_name in config_sources:
+                    cp_type_raw = config_dict.get("control_plane_instance_type") or config_dict.get("master_instance_type", "")
+                    if cp_type_raw:
+                        cp_type_file = file_name
+                        break
+
+                cp_type = _resolve_jinja_ternary(cp_type_raw, resolve_vars)
                 if cp_type and cp_type in instance_map:
                     agv_cp_cpu, agv_cp_ram = instance_map[cp_type]
                     spec_cp_cpu = spec_env.get("control_plane_cpu")
                     spec_cp_ram = spec_env.get("control_plane_ram_gb")
                     if spec_cp_cpu and int(spec_cp_cpu) != agv_cp_cpu:
                         changes.append(DriftChange(
-                            file=pool_file,
+                            file=cp_type_file or pool_file,
                             comparing="control_plane_cpu",
                             difference=f"spec: {spec_cp_cpu} vCPU vs agnosticv: {agv_cp_cpu} vCPU ({cp_type})",
                             severity="warning",
                         ))
                     if spec_cp_ram and int(spec_cp_ram) != agv_cp_ram:
                         changes.append(DriftChange(
-                            file=pool_file,
+                            file=cp_type_file or pool_file,
                             comparing="control_plane_ram_gb",
                             difference=f"spec: {spec_cp_ram} GB vs agnosticv: {agv_cp_ram} GB ({cp_type})",
                             severity="warning",
                         ))
 
                 # Workers (check pool first, fall back to component common, then dev)
-                wk_type = _resolve_jinja_ternary(
-                    pool_common.get("worker_instance_type", "") or common.get("worker_instance_type", "") or dev.get("worker_instance_type", ""),
-                    resolve_vars,
-                )
+                wk_type_raw, wk_type_file = _get_value_with_source("worker_instance_type", config_sources)
+                wk_type = _resolve_jinja_ternary(wk_type_raw, resolve_vars)
                 if wk_type and wk_type in instance_map:
                     agv_wk_cpu, agv_wk_ram = instance_map[wk_type]
                     spec_wk_cpu = spec_env.get("worker_cpu")
                     spec_wk_ram = spec_env.get("worker_ram_gb")
                     if spec_wk_cpu and int(spec_wk_cpu) != agv_wk_cpu:
                         changes.append(DriftChange(
-                            file=pool_file,
+                            file=wk_type_file or display_file,
                             comparing="worker_cpu",
                             difference=f"spec: {spec_wk_cpu} vCPU vs agnosticv: {agv_wk_cpu} vCPU ({wk_type})",
                             severity="warning",
                         ))
                     if spec_wk_ram and int(spec_wk_ram) != agv_wk_ram:
                         changes.append(DriftChange(
-                            file=pool_file,
+                            file=wk_type_file or display_file,
                             comparing="worker_ram_gb",
                             difference=f"spec: {spec_wk_ram} GB vs agnosticv: {agv_wk_ram} GB ({wk_type})",
                             severity="warning",
@@ -678,51 +786,66 @@ async def check_drift_infra(
 
             else:
                 # CNV or other — direct values
-                agv_cp_cpu = _parse_cpu(_resolve_jinja_ternary(
-                    pool_common.get("ai_control_plane_cores", "") or common.get("ai_control_plane_cores", "") or dev.get("ai_control_plane_cores", ""), resolve_vars,
-                ))
-                agv_cp_ram = _parse_ram(_resolve_jinja_ternary(
-                    pool_common.get("ai_control_plane_memory", "") or common.get("ai_control_plane_memory", "") or dev.get("ai_control_plane_memory", ""), resolve_vars,
-                ))
+                # Track which file the value came from: [(config_dict, file_name), ...]
+                config_sources = [(pool_common, pool_file), (common, display_file), (dev, display_file)]
+
+                cp_cpu_raw, cp_cpu_file = _get_value_with_source("ai_control_plane_cores", config_sources)
+                agv_cp_cpu = _parse_cpu(_resolve_jinja_ternary(cp_cpu_raw, resolve_vars))
+                cp_ram_raw, cp_ram_file = _get_value_with_source("ai_control_plane_memory", config_sources)
+                agv_cp_ram = _parse_ram(_resolve_jinja_ternary(cp_ram_raw, resolve_vars))
                 spec_cp_cpu = spec_env.get("control_plane_cpu")
                 spec_cp_ram = spec_env.get("control_plane_ram_gb")
 
                 if spec_cp_cpu and agv_cp_cpu and int(spec_cp_cpu) != agv_cp_cpu:
                     changes.append(DriftChange(
-                        file=pool_file,
+                        file=cp_cpu_file or pool_file,
                         comparing="control_plane_cpu",
                         difference=f"spec: {spec_cp_cpu} vCPU vs agnosticv: {agv_cp_cpu} vCPU",
                         severity="warning",
                     ))
                 if spec_cp_ram and agv_cp_ram and int(spec_cp_ram) != agv_cp_ram:
                     changes.append(DriftChange(
-                        file=pool_file,
+                        file=cp_ram_file or pool_file,
                         comparing="control_plane_ram_gb",
                         difference=f"spec: {spec_cp_ram} GB vs agnosticv: {agv_cp_ram} GB",
                         severity="warning",
                     ))
 
-                agv_wk_cpu = _parse_cpu(_resolve_jinja_ternary(
-                    pool_common.get("ai_workers_cores", "") or common.get("ai_workers_cores", "") or dev.get("ai_workers_cores", ""), resolve_vars,
-                ))
-                agv_wk_ram = _parse_ram(_resolve_jinja_ternary(
-                    pool_common.get("ai_workers_memory", "") or common.get("ai_workers_memory", "") or dev.get("ai_workers_memory", ""), resolve_vars,
-                ))
+                wk_cpu_raw, wk_cpu_file = _get_value_with_source("ai_workers_cores", config_sources)
+                agv_wk_cpu = _parse_cpu(_resolve_jinja_ternary(wk_cpu_raw, resolve_vars))
+                wk_ram_raw, wk_ram_file = _get_value_with_source("ai_workers_memory", config_sources)
+                agv_wk_ram = _parse_ram(_resolve_jinja_ternary(wk_ram_raw, resolve_vars))
                 spec_wk_cpu = spec_env.get("worker_cpu")
                 spec_wk_ram = spec_env.get("worker_ram_gb")
 
                 if spec_wk_cpu and agv_wk_cpu and int(spec_wk_cpu) != agv_wk_cpu:
                     changes.append(DriftChange(
-                        file=pool_file,
+                        file=wk_cpu_file or pool_file,
                         comparing="worker_cpu",
                         difference=f"spec: {spec_wk_cpu} vCPU vs agnosticv: {agv_wk_cpu} vCPU",
                         severity="warning",
                     ))
                 if spec_wk_ram and agv_wk_ram and int(spec_wk_ram) != agv_wk_ram:
                     changes.append(DriftChange(
-                        file=pool_file,
+                        file=wk_ram_file or pool_file,
                         comparing="worker_ram_gb",
                         difference=f"spec: {spec_wk_ram} GB vs agnosticv: {agv_wk_ram} GB",
+                        severity="warning",
+                    ))
+
+            # Worker count comparison (only if AgnosticV value is static, not Jinja)
+            worker_count_raw, worker_count_file = _get_value_with_source(
+                "worker_instance_count",
+                [(pool_common, pool_file), (common, display_file), (dev, display_file)]
+            )
+            if _is_static_int(worker_count_raw):
+                agv_worker_count = _parse_cpu(worker_count_raw)
+                spec_worker_count = spec_env.get("worker_count")
+                if spec_worker_count and agv_worker_count is not None and int(spec_worker_count) != agv_worker_count:
+                    changes.append(DriftChange(
+                        file=worker_count_file or display_file,
+                        comparing="worker_count",
+                        difference=f"spec: {spec_worker_count} workers vs agnosticv: {agv_worker_count} workers",
                         severity="warning",
                     ))
 

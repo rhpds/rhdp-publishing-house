@@ -74,6 +74,9 @@ When the template completes, you'll see three links:
 
 The page also shows getting-started instructions for both DevSpaces and local setup.
 
+!!! warning "Accept your GitHub invitation"
+    The template adds you and any collaborators to the new repo, but GitHub requires each person to **accept the invitation** before they have write access. Check your email or visit [github.com/notifications](https://github.com/notifications) and accept the invite before opening DevSpaces or pushing changes.
+
 ---
 
 ## 3. Open your workspace

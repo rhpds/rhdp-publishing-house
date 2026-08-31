@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useAsync } from 'react-use';
 import {
   Content,
@@ -21,14 +21,21 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   makeStyles,
+  TextField,
   Tooltip,
   Typography,
 } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
 import RefreshIcon from '@material-ui/icons/Refresh';
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
+import AddIcon from '@material-ui/icons/Add';
+import DeleteIcon from '@material-ui/icons/Delete';
 import { createPhWorkflowsClient } from '../../api/client';
 import { WorkflowSummary, DriftReport } from '../../api/types';
 import { STAGE_LABELS } from '../../utils/stageMapping';
@@ -72,130 +79,229 @@ interface DriftRowState {
   loading: boolean;
   report?: DriftReport;
   error?: string;
-  approving?: boolean;
-  approved?: boolean;
+  fetched?: boolean;
 }
 
-function DriftDetailPanel({
+// Drift messages display - memoized separately, never re-renders after initial load
+const DriftMessagesDisplay = React.memo(({
+  state,
+  classes,
+}: {
+  state: DriftRowState | undefined;
+  classes: ReturnType<typeof useStyles>;
+}) => {
+  if (!state || state.loading) {
+    return (
+      <Box display="flex" alignItems="center" style={{ gap: 8 }}>
+        <CircularProgress size={20} />
+        <Typography variant="body2">Loading drift report...</Typography>
+      </Box>
+    );
+  }
+
+  if (state.error) {
+    return <Alert severity="error">{state.error}</Alert>;
+  }
+
+  if (state.report && !state.report.has_drift) {
+    return (
+      <Alert severity="success" className={classes.resolvedBanner}>
+        Drift appears to have been resolved by the developer. You can approve to clear the drift flag.
+      </Alert>
+    );
+  }
+
+  if (!state.report) {
+    return null;
+  }
+
+  return (
+    <>
+      <div style={{
+        padding: '8px 16px',
+        marginBottom: 16,
+        borderRadius: 4,
+        backgroundColor: '#fff3e0',
+        color: '#e65100',
+        fontWeight: 600,
+      }}>
+        Project drift detected
+      </div>
+      <Typography variant="body2" style={{ marginBottom: 8, color: '#757575' }}>
+        Baseline: <code>{state.report.baseline_sha.substring(0, 7)}</code>
+        {' → HEAD: '}
+        <code>{state.report.current_sha.substring(0, 7)}</code>
+      </Typography>
+      {state.report.changes.length > 0 && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+              <th style={{ padding: '6px 8px' }}>Severity</th>
+              <th style={{ padding: '6px 8px' }}>File</th>
+              <th style={{ padding: '6px 8px' }}>Field / Section</th>
+              <th style={{ padding: '6px 8px' }}>Difference</th>
+            </tr>
+          </thead>
+          <tbody>
+            {state.report.changes.map((c, i) => {
+              const sevColor = c.severity === 'critical' ? '#f44336'
+                : c.severity === 'warning' ? '#ff9800'
+                : '#2196f3';
+              return (
+                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <td style={{ padding: '6px 8px' }}>
+                    <Chip
+                      label={c.severity || 'info'}
+                      size="small"
+                      style={{
+                        backgroundColor: sevColor,
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: '0.7rem',
+                      }}
+                    />
+                  </td>
+                  <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{c.file}</td>
+                  <td style={{ padding: '6px 8px' }}>{c.comparing}</td>
+                  <td style={{ padding: '6px 8px' }}>{c.difference}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+});
+
+const DriftDetailPanel = ({
   slug,
   state,
   onFetch,
-  onApprove,
+  client,
   canApprove,
   classes,
 }: {
   slug: string;
   state: DriftRowState | undefined;
   onFetch: (slug: string) => void;
-  onApprove: (slug: string) => void;
+  client: ReturnType<typeof createPhWorkflowsClient>;
   canApprove: boolean;
   classes: ReturnType<typeof useStyles>;
-}) {
-  const fetchedRef = useRef(false);
+}) => {
+  const [approving, setApproving] = useState(false);
+  const [approved, setApproved] = useState(false);
+  const [approvalNotes, setApprovalNotes] = useState<Array<{ text: string }>>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (!state && !fetchedRef.current) {
-      fetchedRef.current = true;
+    if (!state?.fetched && !state?.loading) {
       onFetch(slug);
     }
-  }, [slug, state, onFetch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, state?.fetched, state?.loading]);
 
-  const reportLoaded = state && !state.loading && !state.error && state.report;
+  const handleApproveClick = useCallback(() => {
+    setApprovalNotes([]);
+    setDialogOpen(true);
+  }, []);
+
+  const handleApproveConfirm = useCallback(async () => {
+    setDialogOpen(false);
+    setApproving(true);
+    try {
+      const notes = approvalNotes.length > 0 ? approvalNotes.map(n => n.text).filter(t => t.trim()) : undefined;
+      await client.approveDrift(slug, notes);
+      setApproving(false);
+      setApproved(true);
+    } catch (e: any) {
+      setApproving(false);
+    }
+  }, [slug, approvalNotes, client]);
+
+  const isLoading = !state || state.loading;
 
   return (
-    <Box className={classes.driftDetails}>
-      {!state || state.loading ? (
-        <Box display="flex" alignItems="center" style={{ gap: 8 }}>
-          <CircularProgress size={20} />
-          <Typography variant="body2">Loading drift report...</Typography>
-        </Box>
-      ) : state.error ? (
-        <Alert severity="error">{state.error}</Alert>
-      ) : state.report && !state.report.has_drift ? (
-        <Alert severity="success" className={classes.resolvedBanner}>
-          Drift appears to have been resolved by the developer. You can approve to clear the drift flag.
-        </Alert>
-      ) : state.report ? (
-        <>
-          <div style={{
-            padding: '8px 16px',
-            marginBottom: 16,
-            borderRadius: 4,
-            backgroundColor: '#fff3e0',
-            color: '#e65100',
-            fontWeight: 600,
-          }}>
-            Changes detected since last approval
-          </div>
-          <Typography variant="body2" style={{ marginBottom: 8, color: '#757575' }}>
-            Baseline: <code>{state.report.baseline_sha.substring(0, 7)}</code>
-            {' → HEAD: '}
-            <code>{state.report.current_sha.substring(0, 7)}</code>
+    <>
+      <Box className={classes.driftDetails}>
+        {/* Drift messages - never re-renders after load */}
+        <DriftMessagesDisplay state={state} classes={classes} />
+
+        {/* Approve section - always visible, disabled while loading */}
+        {!approved && canApprove && (
+          <Box className={classes.approveButton}>
+            <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginBottom: 4 }}>
+              Approving updates the baseline SHA to the latest commit.
+            </Typography>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={isLoading || approving}
+              style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
+              onClick={handleApproveClick}
+            >
+              {approving ? <CircularProgress size={16} color="inherit" /> : 'Approve'}
+            </Button>
+          </Box>
+        )}
+        {approved && (
+          <Alert severity="success" className={classes.approveButton}>
+            Baseline updated to latest commit.
+          </Alert>
+        )}
+      </Box>
+
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Approve Drift with Notes</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary" gutterBottom style={{ marginBottom: 16 }}>
+            Add notes about this drift approval (optional). These will be visible in the Notes tab.
           </Typography>
-          {state.report.changes.length > 0 && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
-                  <th style={{ padding: '6px 8px' }}>Severity</th>
-                  <th style={{ padding: '6px 8px' }}>File</th>
-                  <th style={{ padding: '6px 8px' }}>Field / Section</th>
-                  <th style={{ padding: '6px 8px' }}>Difference</th>
-                </tr>
-              </thead>
-              <tbody>
-                {state.report.changes.map((c, i) => {
-                  const sevColor = c.severity === 'critical' ? '#f44336'
-                    : c.severity === 'warning' ? '#ff9800'
-                    : '#2196f3';
-                  return (
-                    <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                      <td style={{ padding: '6px 8px' }}>
-                        <Chip
-                          label={c.severity || 'info'}
-                          size="small"
-                          style={{
-                            backgroundColor: sevColor,
-                            color: '#fff',
-                            fontWeight: 600,
-                            fontSize: '0.7rem',
-                          }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{c.file}</td>
-                      <td style={{ padding: '6px 8px' }}>{c.comparing}</td>
-                      <td style={{ padding: '6px 8px' }}>{c.difference}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </>
-      ) : null}
-      {reportLoaded && !state?.approved && canApprove && (
-        <Box className={classes.approveButton}>
-          <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginBottom: 4 }}>
-            Approving updates the baseline SHA to the latest commit.
-          </Typography>
+          {approvalNotes.map((note, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+              <TextField
+                fullWidth
+                variant="outlined"
+                size="small"
+                value={note.text}
+                onChange={(e) => {
+                  const next = [...approvalNotes];
+                  next[i] = { text: e.target.value };
+                  setApprovalNotes(next);
+                }}
+                placeholder="Note text..."
+              />
+              <IconButton
+                size="small"
+                onClick={() => setApprovalNotes(approvalNotes.filter((_, j) => j !== i))}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </div>
+          ))}
+          <Button
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={() => setApprovalNotes([...approvalNotes, { text: '' }])}
+            style={{ marginTop: 8 }}
+          >
+            Add Note
+          </Button>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
           <Button
             variant="contained"
-            size="small"
-            disabled={state?.approving}
             style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
-            onClick={() => onApprove(slug)}
+            onClick={handleApproveConfirm}
           >
-            {state?.approving ? <CircularProgress size={16} color="inherit" /> : 'Approve'}
+            Approve
           </Button>
-        </Box>
-      )}
-      {state?.approved && (
-        <Alert severity="success" className={classes.approveButton}>
-          Baseline updated to latest commit.
-        </Alert>
-      )}
-    </Box>
+        </DialogActions>
+      </Dialog>
+    </>
   );
-}
+};
 
 export function DriftDashboardPage() {
   const classes = useStyles();
@@ -208,7 +314,7 @@ export function DriftDashboardPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [rowStates, setRowStates] = useState<Record<string, DriftRowState>>({});
 
-  const client = createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi });
+  const client = useMemo(() => createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi }), [centralApiUrl, discoveryApi, fetchApi, identityApi]);
 
   const { value: workflows, loading, error } = useAsync(async () => {
     const all = await client.getWorkflows();
@@ -221,89 +327,92 @@ export function DriftDashboardPage() {
   }, []);
 
   const fetchDrift = useCallback(async (slug: string) => {
-    if (rowStates[slug]?.report || rowStates[slug]?.loading) return;
-
-    setRowStates(prev => ({ ...prev, [slug]: { loading: true } }));
+    setRowStates(prev => {
+      if (prev[slug]?.report || prev[slug]?.loading || prev[slug]?.fetched) return prev;
+      return { ...prev, [slug]: { loading: true, fetched: true } };
+    });
 
     try {
       const report = await client.fetchDriftReport(slug, 'semantic');
-      setRowStates(prev => ({ ...prev, [slug]: { loading: false, report } }));
+      setRowStates(prev => ({ ...prev, [slug]: { loading: false, report, fetched: true } }));
     } catch (e: any) {
       setRowStates(prev => ({
         ...prev,
-        [slug]: { loading: false, error: e.message || 'Failed to load drift report' },
+        [slug]: { loading: false, error: e.message || 'Failed to load drift report', fetched: true },
       }));
     }
-  }, [rowStates, client]);
+  }, [client]);
 
-  const handleApprove = useCallback(async (slug: string) => {
-    setRowStates(prev => ({
-      ...prev,
-      [slug]: { ...prev[slug], approving: true },
-    }));
+  const columns: TableColumn<WorkflowSummary>[] = useMemo(() => {
+    const cachedClasses = classes;
+    return [
+      {
+        title: 'Project ID',
+        field: 'projectId',
+        highlight: true,
+      },
+      {
+        title: 'Owner',
+        field: 'owner',
+      },
+      {
+        title: 'Type',
+        field: 'contentType',
+      },
+      {
+        title: 'Stage',
+        field: 'stage',
+        render: (row: WorkflowSummary) => (
+          <Chip
+            label={STAGE_LABELS[row.stage] || row.stage}
+            size="small"
+            className={cachedClasses.chip}
+          />
+        ),
+      },
+      {
+        title: 'Baseline SHA',
+        field: 'baselineSha',
+        render: (row: WorkflowSummary) =>
+          row.baselineSha ? row.baselineSha.substring(0, 8) : '—',
+      },
+      {
+        title: 'Last Updated',
+        field: 'lastUpdate',
+        render: (row: WorkflowSummary) =>
+          row.lastUpdate
+            ? new Date(row.lastUpdate).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : '—',
+        defaultSort: 'desc' as const,
+      },
+    ];
+  }, []);
 
-    try {
-      await client.approveDrift(slug);
-      setRowStates(prev => ({
-        ...prev,
-        [slug]: { ...prev[slug], approving: false, approved: true },
-      }));
-      setTimeout(() => handleRefresh(), 1500);
-    } catch (e: any) {
-      setRowStates(prev => ({
-        ...prev,
-        [slug]: { ...prev[slug], approving: false, error: e.message },
-      }));
-    }
-  }, [client, handleRefresh]);
-
-  const columns: TableColumn<WorkflowSummary>[] = [
-    {
-      title: 'Project ID',
-      field: 'projectId',
-      highlight: true,
-    },
-    {
-      title: 'Owner',
-      field: 'owner',
-    },
-    {
-      title: 'Type',
-      field: 'contentType',
-    },
-    {
-      title: 'Stage',
-      field: 'stage',
-      render: (row: WorkflowSummary) => (
-        <Chip
-          label={STAGE_LABELS[row.stage] || row.stage}
-          size="small"
-          className={classes.chip}
-        />
-      ),
-    },
-    {
-      title: 'Baseline SHA',
-      field: 'baselineSha',
-      render: (row: WorkflowSummary) =>
-        row.baselineSha ? row.baselineSha.substring(0, 8) : '—',
-    },
-    {
-      title: 'Last Updated',
-      field: 'lastUpdate',
-      render: (row: WorkflowSummary) =>
-        row.lastUpdate
-          ? new Date(row.lastUpdate).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : '—',
-      defaultSort: 'desc' as const,
-    },
-  ];
+  const detailPanelConfig = useMemo(() => {
+    const cachedClasses = classes;
+    const cachedClient = client;
+    return [
+      {
+        tooltip: 'Show drift details',
+        render: ({ rowData }: { rowData: WorkflowSummary }) => (
+          <DriftDetailPanel
+            slug={rowData.projectId}
+            state={rowStates[rowData.projectId]}
+            onFetch={fetchDrift}
+            client={cachedClient}
+            canApprove={isContentReviewer || isAdmin}
+            classes={cachedClasses}
+          />
+        ),
+      },
+    ];
+  }, [rowStates, fetchDrift, client, isContentReviewer, isAdmin]);
 
   return (
     <Page themeId="tool">
@@ -350,21 +459,7 @@ export function DriftDashboardPage() {
               fetchDrift(rowData.projectId);
             }
           }}
-          detailPanel={[
-            {
-              tooltip: 'Show drift details',
-              render: ({ rowData }) => (
-                <DriftDetailPanel
-                  slug={rowData.projectId}
-                  state={rowStates[rowData.projectId]}
-                  onFetch={fetchDrift}
-                  onApprove={handleApprove}
-                  canApprove={isContentReviewer || isAdmin}
-                  classes={classes}
-                />
-              ),
-            },
-          ]}
+          detailPanel={detailPanelConfig}
         />
       </Content>
     </Page>

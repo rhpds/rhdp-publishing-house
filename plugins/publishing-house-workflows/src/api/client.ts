@@ -1,5 +1,5 @@
 import { DiscoveryApi, FetchApi, IdentityApi } from '@backstage/core-plugin-api';
-import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult, ReviewMessage, TokenListResponse, RevokeResponse, RevokeAllResponse, TestingComment } from './types';
+import { ProcessInstance, WorkflowSummary, WorkflowStage, RejectionData, ValidationReport, DriftReport, DeleteProjectResult, ReviewMessage, TokenListResponse, RevokeResponse, RevokeAllResponse } from './types';
 import { deriveStage } from '../utils/stageMapping';
 
 const TOKEN_STORAGE_KEY = 'ph-central-token';
@@ -223,7 +223,7 @@ export function createPhWorkflowsClient(options: {
     workflowId: string,
     stage: WorkflowStage,
     projectId?: string,
-    auditData?: { user: string; commitSha?: string },
+    auditData?: { user: string; commitSha?: string; notes?: string[] },
   ): Promise<void> {
     const stagePathMap: Partial<Record<WorkflowStage, string>> = {
       content_review: 'content-review',
@@ -241,6 +241,7 @@ export function createPhWorkflowsClient(options: {
         method: 'POST',
         body: JSON.stringify({
           commit_sha: auditData?.commitSha ?? '',
+          notes: auditData?.notes ?? [],
         }),
       },
     );
@@ -338,10 +339,15 @@ export function createPhWorkflowsClient(options: {
 
   async function approveDrift(
     slug: string,
+    notes?: string[],
   ): Promise<{ slug: string; baselineSha: string; cleared: boolean }> {
     const response = await centralFetch(
       `/projects/${slug}/drift/approve`,
-      { method: 'POST' },
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: notes || [] }),
+      },
     );
 
     if (!response.ok) {
@@ -481,12 +487,12 @@ export function createPhWorkflowsClient(options: {
     return await response.json();
   }
 
-  async function postTestingComment(
-    epicKey: string,
+  async function addNote(
+    projectId: string,
     text: string,
-  ): Promise<{ posted: boolean; ticket_key: string }> {
+  ): Promise<{ slug: string; action: string }> {
     const response = await centralFetch(
-      `/jira/${epicKey}/comment`,
+      `/projects/${projectId}/notes`,
       {
         method: 'POST',
         body: JSON.stringify({ text }),
@@ -495,18 +501,8 @@ export function createPhWorkflowsClient(options: {
 
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      throw new Error(body.detail || `Post comment failed: ${response.status}`);
+      throw new Error(body.detail || `Add note failed: ${response.status}`);
     }
-
-    return await response.json();
-  }
-
-  async function getTestingComments(
-    epicKey: string,
-  ): Promise<{ comments: TestingComment[]; ticket_key: string }> {
-    const response = await centralFetch(`/jira/${epicKey}/comments`);
-
-    if (!response.ok) return { comments: [], ticket_key: '' };
 
     return await response.json();
   }
@@ -568,8 +564,7 @@ export function createPhWorkflowsClient(options: {
     searchTokens,
     revokeToken,
     revokeAllTokens,
-    postTestingComment,
-    getTestingComments,
+    addNote,
     completeTask,
   };
 }

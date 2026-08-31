@@ -495,7 +495,6 @@ async def submit_development(
     owner, groups = auth
     _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
     stage = None
-    drift_msg = "Design drift detected. Your submission has been referred for additional review."
 
     try:
         try:
@@ -549,8 +548,16 @@ async def submit_development(
             if drift_result.has_drift:
                 _patch_workflow_data(wf_uuid, {"hasDrift": True}, settings=settings)
                 logger.info("development: drift detected for %s, set hasDrift", project_slug)
+
+                # Build detailed drift message
+                detailed_msg = "Design drift detected.\n\nChanges:\n"
+                for i, change in enumerate(drift_result.changes[:5], 1):
+                    detailed_msg += f"{i}. {change.comparing}: {change.difference}\n"
+                if len(drift_result.changes) > 5:
+                    detailed_msg += f"\n...and {len(drift_result.changes) - 5} more change(s)"
+
                 return JSONResponse(status_code=422, content=DevelopmentResponse(
-                    status=422, stage=stage, error=drift_msg,
+                    status=422, stage=stage, error=detailed_msg,
                 ).model_dump())
             elif wd.get("hasDrift"):
                 _patch_workflow_data(wf_uuid, {"hasDrift": False}, settings=settings)
@@ -618,7 +625,6 @@ async def submit_testing(
     allowed = GROUP_BITS["rhdp-operations"] | GROUP_BITS["rhdp-administrators"]
     _require_group(groups, allowed, "rhdp-operations or rhdp-administrators")
     stage = None
-    drift_msg = "Design drift detected. Your submission has been referred for additional review."
 
     try:
         try:
@@ -669,8 +675,16 @@ async def submit_testing(
             if drift_result.has_drift:
                 _patch_workflow_data(wf_uuid, {"hasDrift": True}, settings=settings)
                 logger.info("testing: drift detected for %s, set hasDrift", project_slug)
+
+                # Build detailed drift message
+                detailed_msg = "Design drift detected.\n\nChanges:\n"
+                for i, change in enumerate(drift_result.changes[:5], 1):
+                    detailed_msg += f"{i}. {change.comparing}: {change.difference}\n"
+                if len(drift_result.changes) > 5:
+                    detailed_msg += f"\n...and {len(drift_result.changes) - 5} more change(s)"
+
                 return JSONResponse(status_code=422, content=TestingResponse(
-                    status=422, stage=stage, error=drift_msg,
+                    status=422, stage=stage, error=detailed_msg,
                 ).model_dump())
             elif wd.get("hasDrift"):
                 _patch_workflow_data(wf_uuid, {"hasDrift": False}, settings=settings)
@@ -718,6 +732,7 @@ async def submit_testing(
 
 class ApproveRequest(BaseModel):
     commit_sha: str = ""
+    notes: list = []
 
 
 class RejectRequest(BaseModel):
@@ -788,16 +803,59 @@ async def approve_content_review(
         raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
     _require_stage(wf_uuid, ["content_review"])
 
+    settings = get_settings()
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    # If approval notes provided, add them to workflow
+    if body.notes and len(body.notes) > 0:
+        query = """
+          query GetWorkflow($id: String!) {
+            ProcessInstances(where: { id: { equal: $id } }) {
+              id
+              variables
+            }
+          }
+        """
+        graphql_payload = json.dumps({"query": query, "variables": {"id": wf_uuid}}).encode()
+        graphql_req = urllib.request.Request(
+            f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+            data=graphql_payload,
+            headers={"Content-Type": "application/json"},
+        )
+
+        with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+            result = json.loads(resp.read().decode())
+            instances = result.get("data", {}).get("ProcessInstances", [])
+            if instances:
+                variables = instances[0].get("variables", {})
+                workflowdata = variables.get("workflowdata", {})
+                existing_notes = workflowdata.get("notes", [])
+            else:
+                existing_notes = []
+
+        approval_notes = [
+            {
+                "text": note,
+                "user": owner,
+                "stage": "content_review",
+                "timestamp": timestamp,
+                "type": "info"
+            }
+            for note in body.notes if note.strip()
+        ]
+        if approval_notes:
+            updated_notes = existing_notes + approval_notes
+            _patch_workflow_data(wf_uuid, {"notes": updated_notes}, settings=settings)
+
     _send_cloud_event("ph.content-review.complete", slug, {
         "user": owner,
         "stage": "content_review",
         "action": "approved",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": timestamp,
         "commitSha": body.commit_sha,
     })
 
     epic_key = wd.get("epic_key", "")
-    settings = get_settings()
     if epic_key and settings.jira_url:
         from .jira import notify_reviewers_bg
         asyncio.get_event_loop().run_in_executor(
@@ -824,11 +882,55 @@ async def reject_content_review(
     _require_stage(wf_uuid, ["content_review"])
 
     reasons = [{**r, "id": str(uuid.uuid4()), "resolved": False} for r in body.reasons]
+    timestamp = datetime.now(timezone.utc).isoformat()
+    reviewer = body.reviewer_name or owner
+
+    # Get FRESH notes via direct GraphQL query (same as add_note)
+    settings = get_settings()
+    query = """
+      query GetWorkflow($id: String!) {
+        ProcessInstances(where: { id: { equal: $id } }) {
+          id
+          variables
+        }
+      }
+    """
+    graphql_payload = json.dumps({"query": query, "variables": {"id": wf_uuid}}).encode()
+    graphql_req = urllib.request.Request(
+        f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+        data=graphql_payload,
+        headers={"Content-Type": "application/json"},
+    )
+
+    with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+        result = json.loads(resp.read().decode())
+        instances = result.get("data", {}).get("ProcessInstances", [])
+        if instances:
+            variables = instances[0].get("variables", {})
+            workflowdata = variables.get("workflowdata", {})
+            existing_notes = workflowdata.get("notes", [])
+        else:
+            existing_notes = []
+
+    rejection_notes = [
+        {
+            "text": r["text"],
+            "user": reviewer,
+            "stage": "content_review",
+            "timestamp": timestamp,
+            "type": "rejection"
+        }
+        for r in body.reasons
+    ]
+    updated_notes = existing_notes + rejection_notes
+    _patch_workflow_data(wf_uuid, {"notes": updated_notes}, settings=settings)
+
+    # Send CloudEvent to trigger state transition
     _send_cloud_event("ph.content-review.rejected", slug, {
-        "user": body.reviewer_name or owner,
+        "user": reviewer,
         "stage": "content_review",
         "action": "rejected",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": timestamp,
         "commitSha": body.commit_sha,
         "reasons": reasons,
     })
@@ -852,11 +954,55 @@ async def approve_infra_review(
         raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
     _require_stage(wf_uuid, ["infra_review"])
 
+    settings = get_settings()
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    # If approval notes provided, add them to workflow
+    if body.notes and len(body.notes) > 0:
+        query = """
+          query GetWorkflow($id: String!) {
+            ProcessInstances(where: { id: { equal: $id } }) {
+              id
+              variables
+            }
+          }
+        """
+        graphql_payload = json.dumps({"query": query, "variables": {"id": wf_uuid}}).encode()
+        graphql_req = urllib.request.Request(
+            f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+            data=graphql_payload,
+            headers={"Content-Type": "application/json"},
+        )
+
+        with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+            result = json.loads(resp.read().decode())
+            instances = result.get("data", {}).get("ProcessInstances", [])
+            if instances:
+                variables = instances[0].get("variables", {})
+                workflowdata = variables.get("workflowdata", {})
+                existing_notes = workflowdata.get("notes", [])
+            else:
+                existing_notes = []
+
+        approval_notes = [
+            {
+                "text": note,
+                "user": owner,
+                "stage": "infra_review",
+                "timestamp": timestamp,
+                "type": "info"
+            }
+            for note in body.notes if note.strip()
+        ]
+        if approval_notes:
+            updated_notes = existing_notes + approval_notes
+            _patch_workflow_data(wf_uuid, {"notes": updated_notes}, settings=settings)
+
     _send_cloud_event("ph.infra-review.complete", slug, {
         "user": owner,
         "stage": "infra_review",
         "action": "approved",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": timestamp,
         "commitSha": body.commit_sha,
     })
     return {"slug": slug, "action": "approved", "stage": "infra_review"}
@@ -878,15 +1024,136 @@ async def reject_infra_review(
     _require_stage(wf_uuid, ["infra_review"])
 
     reasons = [{**r, "id": str(uuid.uuid4()), "resolved": False} for r in body.reasons]
+    timestamp = datetime.now(timezone.utc).isoformat()
+    reviewer = body.reviewer_name or owner
+
+    # Get FRESH notes via direct GraphQL query (same as add_note)
+    settings = get_settings()
+    query = """
+      query GetWorkflow($id: String!) {
+        ProcessInstances(where: { id: { equal: $id } }) {
+          id
+          variables
+        }
+      }
+    """
+    graphql_payload = json.dumps({"query": query, "variables": {"id": wf_uuid}}).encode()
+    graphql_req = urllib.request.Request(
+        f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+        data=graphql_payload,
+        headers={"Content-Type": "application/json"},
+    )
+
+    with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+        result = json.loads(resp.read().decode())
+        instances = result.get("data", {}).get("ProcessInstances", [])
+        if instances:
+            variables = instances[0].get("variables", {})
+            workflowdata = variables.get("workflowdata", {})
+            existing_notes = workflowdata.get("notes", [])
+        else:
+            existing_notes = []
+
+    rejection_notes = [
+        {
+            "text": r["text"],
+            "user": reviewer,
+            "stage": "infra_review",
+            "timestamp": timestamp,
+            "type": "rejection"
+        }
+        for r in body.reasons
+    ]
+    updated_notes = existing_notes + rejection_notes
+    _patch_workflow_data(wf_uuid, {"notes": updated_notes}, settings=settings)
+
+    # Send CloudEvent to trigger state transition
     _send_cloud_event("ph.infra-review.rejected", slug, {
-        "user": body.reviewer_name or owner,
+        "user": reviewer,
         "stage": "infra_review",
         "action": "rejected",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": timestamp,
         "commitSha": body.commit_sha,
         "reasons": reasons,
     })
     return {"slug": slug, "action": "rejected", "stage": "infra_review"}
+
+
+# ── Add Note ───────────────────────────────────────────────────────────────
+
+class AddNoteRequest(BaseModel):
+    text: str
+
+
+@router.post("/{slug}/notes")
+async def add_note(
+    slug: str,
+    body: AddNoteRequest,
+    auth: tuple[str, int] = Depends(_require_auth),
+):
+    owner, groups = auth
+    _require_group(groups, ALL_GROUPS_MASK, "any RHDP group")
+
+    wd = _get_workflow_data(slug)
+    wf_uuid = wd.get("workflow_id", "")
+    if not wf_uuid:
+        raise HTTPException(status_code=404, detail=f"No workflow found for {slug}")
+
+    # Get current stage from workflow
+    stage = _get_workflow_state(wf_uuid).get("stage", "unknown")
+
+    # Get current workflow data
+    query = """
+      query GetWorkflow($id: String!) {
+        ProcessInstances(where: { id: { equal: $id } }) {
+          id
+          variables
+        }
+      }
+    """
+    settings = get_settings()
+    graphql_payload = json.dumps({"query": query, "variables": {"id": wf_uuid}}).encode()
+    graphql_req = urllib.request.Request(
+        f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+        data=graphql_payload,
+        headers={"Content-Type": "application/json"},
+    )
+
+    try:
+        with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+            result = json.loads(resp.read().decode())
+            instances = result.get("data", {}).get("ProcessInstances", [])
+            if not instances:
+                raise HTTPException(status_code=404, detail=f"Workflow {wf_uuid} not found")
+
+            variables = instances[0].get("variables", {})
+            workflowdata = variables.get("workflowdata", {})
+            notes = workflowdata.get("notes", [])
+
+            # Add new note
+            new_note = {
+                "user": owner,
+                "text": body.text,
+                "type": "info",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "stage": stage,
+            }
+            notes.append(new_note)
+
+            # Update workflow data using helper
+            _patch_workflow_data(wf_uuid, {"notes": notes}, settings=settings)
+
+    except HTTPException:
+        raise
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode(errors="replace")
+        logger.warning("Note add failed for %s: %s %s", slug, e.code, body_text[:500])
+        raise HTTPException(status_code=502, detail=f"Failed to update workflow: {e.code}")
+    except Exception as e:
+        logger.warning("Note add failed for %s: %s", slug, e)
+        raise HTTPException(status_code=502, detail=f"Failed to update workflow: {e}")
+
+    return {"slug": slug, "action": "note_added"}
 
 
 # ── Jira CI Ticket Helpers ─────────────────────────────────────────────────
@@ -953,6 +1220,7 @@ async def submit_env_setup(
 @router.post("/{slug}/drift/approve")
 async def approve_drift(
     slug: str,
+    body: ApproveRequest,
     auth: tuple[str, int] = Depends(_require_auth),
 ):
     owner, groups = auth
@@ -976,13 +1244,56 @@ async def approve_drift(
     if not head_sha:
         raise HTTPException(status_code=502, detail="Failed to fetch HEAD SHA from GitHub")
 
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    # If approval notes provided, add them to workflow
+    if body.notes and len(body.notes) > 0:
+        query = """
+          query GetWorkflow($id: String!) {
+            ProcessInstances(where: { id: { equal: $id } }) {
+              id
+              variables
+            }
+          }
+        """
+        graphql_payload = json.dumps({"query": query, "variables": {"id": wd["workflow_id"]}}).encode()
+        graphql_req = urllib.request.Request(
+            f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+            data=graphql_payload,
+            headers={"Content-Type": "application/json"},
+        )
+
+        with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+            result = json.loads(resp.read().decode())
+            instances = result.get("data", {}).get("ProcessInstances", [])
+            if instances:
+                variables = instances[0].get("variables", {})
+                workflowdata = variables.get("workflowdata", {})
+                existing_notes = workflowdata.get("notes", [])
+            else:
+                existing_notes = []
+
+        approval_notes = [
+            {
+                "text": note,
+                "user": owner,
+                "stage": "drift_review",
+                "timestamp": timestamp,
+                "type": "info"
+            }
+            for note in body.notes if note.strip()
+        ]
+        if approval_notes:
+            updated_notes = existing_notes + approval_notes
+            _patch_workflow_data(wd["workflow_id"], {"notes": updated_notes}, settings=settings)
+
     from .drift import _get_review_history
     from ..services.drift import drift_cache_evict
     history = _get_review_history(wd["workflow_id"], settings=settings)
     history.append({
         "stage": "DriftReview",
         "action": "approved",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": timestamp,
         "user": owner,
         "commitSha": head_sha,
     })
