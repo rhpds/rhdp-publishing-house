@@ -217,6 +217,7 @@ export function DriftDashboardPage() {
   const [approvalNotesDialogOpen, setApprovalNotesDialogOpen] = useState(false);
   const [approvalNotes, setApprovalNotes] = useState<Array<{ text: string }>>([]);
   const [pendingApprovalSlug, setPendingApprovalSlug] = useState<string | null>(null);
+  const [approvedSlugs, setApprovedSlugs] = useState<Set<string>>(new Set());
 
   const client = createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi });
 
@@ -228,6 +229,7 @@ export function DriftDashboardPage() {
   const handleRefresh = useCallback(() => {
     setRefreshKey(k => k + 1);
     setRowStates({});
+    setApprovedSlugs(new Set());
   }, []);
 
   const fetchDrift = useCallback(async (slug: string) => {
@@ -271,14 +273,17 @@ export function DriftDashboardPage() {
         ...prev,
         [slug]: { ...prev[slug], approving: false, approved: true },
       }));
-      setTimeout(() => handleRefresh(), 1500);
+      // Remove from drift queue after a brief delay to show success state
+      setTimeout(() => {
+        setApprovedSlugs(prev => new Set(prev).add(slug));
+      }, 1500);
     } catch (e: any) {
       setRowStates(prev => ({
         ...prev,
         [slug]: { ...prev[slug], approving: false, error: e.message },
       }));
     }
-  }, [pendingApprovalSlug, approvalNotes, client, handleRefresh]);
+  }, [pendingApprovalSlug, approvalNotes, client]);
 
   const columns: TableColumn<WorkflowSummary>[] = [
     {
@@ -350,7 +355,7 @@ export function DriftDashboardPage() {
             padding: 'dense',
           }}
           columns={columns}
-          data={workflows ?? []}
+          data={(workflows ?? []).filter(w => !approvedSlugs.has(w.projectId))}
           isLoading={loading}
           emptyContent={
             error ? (
