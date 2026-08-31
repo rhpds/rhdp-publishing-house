@@ -178,21 +178,22 @@ const DriftDetailPanel = ({
   slug,
   state,
   onFetch,
-  onApprove,
+  client,
   canApprove,
-  approvingSlug,
-  approvedSlugs,
   classes,
 }: {
   slug: string;
   state: DriftRowState | undefined;
   onFetch: (slug: string) => void;
-  onApprove: (slug: string) => void;
+  client: ReturnType<typeof createPhWorkflowsClient>;
   canApprove: boolean;
-  approvingSlug: string | null;
-  approvedSlugs: Set<string>;
   classes: ReturnType<typeof useStyles>;
 }) => {
+  const [approving, setApproving] = useState(false);
+  const [approved, setApproved] = useState(false);
+  const [approvalNotes, setApprovalNotes] = useState<Array<{ text: string }>>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   useEffect(() => {
     if (!state?.fetched && !state?.loading) {
       onFetch(slug);
@@ -200,38 +201,105 @@ const DriftDetailPanel = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, state?.fetched, state?.loading]);
 
-  const reportLoaded = state && !state.loading && !state.error && state.report;
-  const isApproving = approvingSlug === slug;
-  const isApproved = approvedSlugs.has(slug);
+  const handleApproveClick = useCallback(() => {
+    setApprovalNotes([]);
+    setDialogOpen(true);
+  }, []);
+
+  const handleApproveConfirm = useCallback(async () => {
+    setDialogOpen(false);
+    setApproving(true);
+    try {
+      const notes = approvalNotes.length > 0 ? approvalNotes.map(n => n.text).filter(t => t.trim()) : undefined;
+      await client.approveDrift(slug, notes);
+      setApproving(false);
+      setApproved(true);
+    } catch (e: any) {
+      setApproving(false);
+    }
+  }, [slug, approvalNotes, client]);
+
+  const isLoading = !state || state.loading;
 
   return (
-    <Box className={classes.driftDetails}>
-      {/* Drift messages - never re-renders after load */}
-      <DriftMessagesDisplay state={state} classes={classes} />
+    <>
+      <Box className={classes.driftDetails}>
+        {/* Drift messages - never re-renders after load */}
+        <DriftMessagesDisplay state={state} classes={classes} />
 
-      {/* Approve section - separate from messages, can re-render independently */}
-      {reportLoaded && !isApproved && canApprove && (
-        <Box className={classes.approveButton}>
-          <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginBottom: 4 }}>
-            Approving updates the baseline SHA to the latest commit.
+        {/* Approve section - always visible, disabled while loading */}
+        {!approved && canApprove && (
+          <Box className={classes.approveButton}>
+            <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginBottom: 4 }}>
+              Approving updates the baseline SHA to the latest commit.
+            </Typography>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={isLoading || approving}
+              style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
+              onClick={handleApproveClick}
+            >
+              {approving ? <CircularProgress size={16} color="inherit" /> : 'Approve'}
+            </Button>
+          </Box>
+        )}
+        {approved && (
+          <Alert severity="success" className={classes.approveButton}>
+            Baseline updated to latest commit.
+          </Alert>
+        )}
+      </Box>
+
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Approve Drift with Notes</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary" gutterBottom style={{ marginBottom: 16 }}>
+            Add notes about this drift approval (optional). These will be visible in the Notes tab.
           </Typography>
+          {approvalNotes.map((note, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+              <TextField
+                fullWidth
+                variant="outlined"
+                size="small"
+                value={note.text}
+                onChange={(e) => {
+                  const next = [...approvalNotes];
+                  next[i] = { text: e.target.value };
+                  setApprovalNotes(next);
+                }}
+                placeholder="Note text..."
+              />
+              <IconButton
+                size="small"
+                onClick={() => setApprovalNotes(approvalNotes.filter((_, j) => j !== i))}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </div>
+          ))}
+          <Button
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={() => setApprovalNotes([...approvalNotes, { text: '' }])}
+            style={{ marginTop: 8 }}
+          >
+            Add Note
+          </Button>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
           <Button
             variant="contained"
-            size="small"
-            disabled={isApproving}
             style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
-            onClick={() => onApprove(slug)}
+            onClick={handleApproveConfirm}
           >
-            {isApproving ? <CircularProgress size={16} color="inherit" /> : 'Approve'}
+            Approve
           </Button>
-        </Box>
-      )}
-      {isApproved && (
-        <Alert severity="success" className={classes.approveButton}>
-          Baseline updated to latest commit.
-        </Alert>
-      )}
-    </Box>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
 
@@ -245,11 +313,6 @@ export function DriftDashboardPage() {
   const { isContentReviewer, isAdmin } = useUserGroups();
   const [refreshKey, setRefreshKey] = useState(0);
   const [rowStates, setRowStates] = useState<Record<string, DriftRowState>>({});
-  const [approvalNotesDialogOpen, setApprovalNotesDialogOpen] = useState(false);
-  const [approvalNotes, setApprovalNotes] = useState<Array<{ text: string }>>([]);
-  const [pendingApprovalSlug, setPendingApprovalSlug] = useState<string | null>(null);
-  const [approvingSlug, setApprovingSlug] = useState<string | null>(null);
-  const [approvedSlugs, setApprovedSlugs] = useState<Set<string>>(new Set());
 
   const client = useMemo(() => createPhWorkflowsClient({ centralApiUrl, discoveryApi, fetchApi, identityApi }), [centralApiUrl, discoveryApi, fetchApi, identityApi]);
 
@@ -261,8 +324,6 @@ export function DriftDashboardPage() {
   const handleRefresh = useCallback(() => {
     setRefreshKey(k => k + 1);
     setRowStates({});
-    setApprovingSlug(null);
-    setApprovedSlugs(new Set());
   }, []);
 
   const fetchDrift = useCallback(async (slug: string) => {
@@ -281,37 +342,6 @@ export function DriftDashboardPage() {
       }));
     }
   }, [client]);
-
-  const handleApprove = useCallback((slug: string) => {
-    setPendingApprovalSlug(slug);
-    setApprovalNotes([]);
-    setApprovalNotesDialogOpen(true);
-  }, []);
-
-  const handleApproveConfirm = useCallback(async () => {
-    if (!pendingApprovalSlug) return;
-
-    const slug = pendingApprovalSlug;
-    setApprovalNotesDialogOpen(false);
-    setPendingApprovalSlug(null);
-    setApprovingSlug(slug);
-
-    try {
-      const notes = approvalNotes.length > 0 ? approvalNotes.map(n => n.text).filter(t => t.trim()) : undefined;
-      await client.approveDrift(slug, notes);
-      setApprovingSlug(null);
-      // Remove from drift queue after a brief delay
-      setTimeout(() => {
-        setApprovedSlugs(prev => new Set(prev).add(slug));
-      }, 1500);
-    } catch (e: any) {
-      setApprovingSlug(null);
-      setRowStates(prev => ({
-        ...prev,
-        [slug]: { ...prev[slug], error: e.message },
-      }));
-    }
-  }, [pendingApprovalSlug, approvalNotes, client]);
 
   const columns: TableColumn<WorkflowSummary>[] = useMemo(() => {
     const cachedClasses = classes;
@@ -366,6 +396,7 @@ export function DriftDashboardPage() {
 
   const detailPanelConfig = useMemo(() => {
     const cachedClasses = classes;
+    const cachedClient = client;
     return [
       {
         tooltip: 'Show drift details',
@@ -374,16 +405,14 @@ export function DriftDashboardPage() {
             slug={rowData.projectId}
             state={rowStates[rowData.projectId]}
             onFetch={fetchDrift}
-            onApprove={handleApprove}
+            client={cachedClient}
             canApprove={isContentReviewer || isAdmin}
-            approvingSlug={approvingSlug}
-            approvedSlugs={approvedSlugs}
             classes={cachedClasses}
           />
         ),
       },
     ];
-  }, [rowStates, fetchDrift, handleApprove, isContentReviewer, isAdmin, approvingSlug, approvedSlugs]);
+  }, [rowStates, fetchDrift, client, isContentReviewer, isAdmin]);
 
   return (
     <Page themeId="tool">
@@ -407,7 +436,7 @@ export function DriftDashboardPage() {
             padding: 'dense',
           }}
           columns={columns}
-          data={(workflows ?? []).filter(w => !approvedSlugs.has(w.projectId))}
+          data={workflows ?? []}
           isLoading={loading}
           emptyContent={
             error ? (
@@ -433,55 +462,6 @@ export function DriftDashboardPage() {
           detailPanel={detailPanelConfig}
         />
       </Content>
-
-      <Dialog open={approvalNotesDialogOpen} onClose={() => setApprovalNotesDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Approve Drift with Notes</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="textSecondary" gutterBottom style={{ marginBottom: 16 }}>
-            Add notes about this drift approval (optional). These will be visible in the Notes tab.
-          </Typography>
-          {approvalNotes.map((note, i) => (
-            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                size="small"
-                value={note.text}
-                onChange={(e) => {
-                  const next = [...approvalNotes];
-                  next[i] = { text: e.target.value };
-                  setApprovalNotes(next);
-                }}
-                placeholder="Note text..."
-              />
-              <IconButton
-                size="small"
-                onClick={() => setApprovalNotes(approvalNotes.filter((_, j) => j !== i))}
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </div>
-          ))}
-          <Button
-            size="small"
-            startIcon={<AddIcon />}
-            onClick={() => setApprovalNotes([...approvalNotes, { text: '' }])}
-            style={{ marginTop: 8 }}
-          >
-            Add Note
-          </Button>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setApprovalNotesDialogOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
-            onClick={handleApproveConfirm}
-          >
-            Approve
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Page>
   );
 }
