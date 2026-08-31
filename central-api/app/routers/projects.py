@@ -1220,6 +1220,7 @@ async def submit_env_setup(
 @router.post("/{slug}/drift/approve")
 async def approve_drift(
     slug: str,
+    body: ApproveRequest,
     auth: tuple[str, int] = Depends(_require_auth),
 ):
     owner, groups = auth
@@ -1243,13 +1244,56 @@ async def approve_drift(
     if not head_sha:
         raise HTTPException(status_code=502, detail="Failed to fetch HEAD SHA from GitHub")
 
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    # If approval notes provided, add them to workflow
+    if body.notes and len(body.notes) > 0:
+        query = """
+          query GetWorkflow($id: String!) {
+            ProcessInstances(where: { id: { equal: $id } }) {
+              id
+              variables
+            }
+          }
+        """
+        graphql_payload = json.dumps({"query": query, "variables": {"id": wd["workflow_id"]}}).encode()
+        graphql_req = urllib.request.Request(
+            f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+            data=graphql_payload,
+            headers={"Content-Type": "application/json"},
+        )
+
+        with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+            result = json.loads(resp.read().decode())
+            instances = result.get("data", {}).get("ProcessInstances", [])
+            if instances:
+                variables = instances[0].get("variables", {})
+                workflowdata = variables.get("workflowdata", {})
+                existing_notes = workflowdata.get("notes", [])
+            else:
+                existing_notes = []
+
+        approval_notes = [
+            {
+                "text": note,
+                "user": owner,
+                "stage": "drift_review",
+                "timestamp": timestamp,
+                "type": "info"
+            }
+            for note in body.notes if note.strip()
+        ]
+        if approval_notes:
+            updated_notes = existing_notes + approval_notes
+            _patch_workflow_data(wd["workflow_id"], {"notes": updated_notes}, settings=settings)
+
     from .drift import _get_review_history
     from ..services.drift import drift_cache_evict
     history = _get_review_history(wd["workflow_id"], settings=settings)
     history.append({
         "stage": "DriftReview",
         "action": "approved",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": timestamp,
         "user": owner,
         "commitSha": head_sha,
     })

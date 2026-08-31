@@ -339,10 +339,15 @@ export function createPhWorkflowsClient(options: {
 
   async function approveDrift(
     slug: string,
+    notes?: string[],
   ): Promise<{ slug: string; baselineSha: string; cleared: boolean }> {
     const response = await centralFetch(
       `/projects/${slug}/drift/approve`,
-      { method: 'POST' },
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: notes || [] }),
+      },
     );
 
     if (!response.ok) {
