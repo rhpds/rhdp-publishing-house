@@ -284,7 +284,7 @@ export function DriftDashboardPage() {
     }
   }, [pendingApprovalSlug, approvalNotes, client]);
 
-  const columns: TableColumn<WorkflowSummary>[] = [
+  const columns: TableColumn<WorkflowSummary>[] = useMemo(() => [
     {
       title: 'Project ID',
       field: 'projectId',
@@ -330,7 +330,25 @@ export function DriftDashboardPage() {
           : '—',
       defaultSort: 'desc' as const,
     },
-  ];
+  ], [classes]);
+
+  const detailPanelConfig = useMemo(() => [
+    {
+      tooltip: 'Show drift details',
+      render: ({ rowData }: { rowData: WorkflowSummary }) => (
+        <DriftDetailPanel
+          slug={rowData.projectId}
+          state={rowStates[rowData.projectId]}
+          onFetch={fetchDrift}
+          onApprove={handleApprove}
+          canApprove={isContentReviewer || isAdmin}
+          approvingSlug={approvingSlug}
+          approvedSlugs={approvedSlugs}
+          classes={classes}
+        />
+      ),
+    },
+  ], [rowStates, fetchDrift, handleApprove, isContentReviewer, isAdmin, approvingSlug, approvedSlugs, classes]);
 
   return (
     <Page themeId="tool">
@@ -377,23 +395,7 @@ export function DriftDashboardPage() {
               fetchDrift(rowData.projectId);
             }
           }}
-          detailPanel={[
-            {
-              tooltip: 'Show drift details',
-              render: ({ rowData }) => (
-                <DriftDetailPanel
-                  slug={rowData.projectId}
-                  state={rowStates[rowData.projectId]}
-                  onFetch={fetchDrift}
-                  onApprove={handleApprove}
-                  canApprove={isContentReviewer || isAdmin}
-                  approvingSlug={approvingSlug}
-                  approvedSlugs={approvedSlugs}
-                  classes={classes}
-                />
-              ),
-            },
-          ]}
+          detailPanel={detailPanelConfig}
         />
       </Content>
 
