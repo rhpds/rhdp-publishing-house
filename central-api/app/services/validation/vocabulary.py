@@ -56,7 +56,7 @@ def run_checks(spec_data: dict, policy: dict) -> list[CheckResult]:
         ))
 
     # H-04: Cloud provider in vocabulary
-    valid_cloud_providers = [c.lower() for c in policy.get("valid_cloud_providers", ["cnv", "aws", "troshka"])]
+    valid_cloud_providers = [c.lower() for c in policy.get("valid_cloud_providers", ["cnv", "aws"])]
     cloud_provider = spec.get("environment", {}).get("cloud_provider", "")
     if cloud_provider:
         if cloud_provider.lower() in valid_cloud_providers:

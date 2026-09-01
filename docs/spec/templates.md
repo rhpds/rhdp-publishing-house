@@ -155,7 +155,7 @@ spec:
   environment:
     platform: ""              # ocp | rhel-vms
     topology: ""              # shared-cluster | per-student | cnv-pool
-    cloud_provider: cnv       # cnv | aws | troshka
+    cloud_provider: cnv       # cnv | aws
     max_concurrent_users: null
     ocp_version: ""           # e.g. 4.20 (ocp only)
     cluster_type: ""          # sno | multinode (ocp only)
