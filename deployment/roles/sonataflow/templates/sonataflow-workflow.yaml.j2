@@ -495,6 +495,13 @@ spec:
           value: "true"
         - name: KIE_FLYWAY_ENABLED
           value: "true"
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
   resources:
     configMaps:
       - configMap:

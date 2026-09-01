@@ -4,6 +4,21 @@
     state: present
     definition: "{{ lookup('template', 'namespace.yaml.j2') | from_yaml }}"
 
+# --- Backstop resource governance for the app namespace ---
+# Ensures any container deployed without an explicit resources block (e.g. a
+# future regression like GPTEINFRA-17835) still gets sane defaults instead of
+# being fully unconstrained, and caps total namespace consumption.
+
+- name: Create LimitRange defaults for {{ app_namespace }}
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'limitrange-app-namespace.yaml.j2') | from_yaml }}"
+
+- name: Create ResourceQuota for {{ app_namespace }}
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'resourcequota-app-namespace.yaml.j2') | from_yaml }}"
+
 - name: Create RHDH operator subscription in openshift-operators
   kubernetes.core.k8s:
     state: present

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: publishing-house-quota
+  namespace: "{{ app_namespace }}"
+spec:
+  hard:
+    requests.cpu: "6"
+    requests.memory: 8Gi
+    limits.cpu: "16"
+    limits.memory: 16Gi

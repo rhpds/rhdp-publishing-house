@@ -5,6 +5,13 @@ metadata:
   namespace: "{{ keycloak_namespace }}"
 spec:
   instances: {{ keycloak_instances }}
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1700Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
   db:
     vendor: postgres
     host: keycloak-db
