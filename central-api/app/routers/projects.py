@@ -1367,6 +1367,61 @@ async def start_workflow(
 # ── Project Deletion ─────────────────────────────────────────────────────────
 
 
+class UpdateTagsRequest(BaseModel):
+    tags: list[str]
+
+
+@router.patch("/{slug}/tags")
+async def update_tags(
+    slug: str,
+    body: UpdateTagsRequest,
+    auth: tuple[str, int] = Depends(_require_auth),
+):
+    """Update project tags.
+
+    Tags are stored in SonataFlow workflowdata and persisted to PostgreSQL.
+    RBAC: developers, content-reviewers, and admins only.
+    """
+    owner, groups = auth
+
+    # Require content-developers, content-review, OR admins
+    allowed_groups = (
+        GROUP_BITS["rhdp-content-developers"] |
+        GROUP_BITS["rhdp-content-review"] |
+        GROUP_BITS["rhdp-administrators"]
+    )
+    _require_group(groups, allowed_groups, "rhdp-content-developers, rhdp-content-review, or rhdp-administrators")
+
+    # Validate tag count
+    if len(body.tags) > 10:
+        raise HTTPException(status_code=400, detail="Maximum 10 tags allowed")
+
+    # Validate each tag
+    for tag in body.tags:
+        if not tag or not tag.strip():
+            raise HTTPException(status_code=400, detail="Tags cannot be empty")
+        if len(tag) > 30:
+            raise HTTPException(status_code=400, detail=f"Tag '{tag}' exceeds 30 characters")
+
+    # Remove duplicates and sort
+    unique_tags = sorted(list(set(body.tags)))
+
+    # Get workflow ID from project slug
+    wd = _get_workflow_data(slug)
+    workflow_id = wd.get("workflow_id")
+
+    if not workflow_id:
+        raise HTTPException(status_code=404, detail=f"No active workflow found for project '{slug}'")
+
+    # Update SonataFlow workflow data with new tags
+    # This merges tags into workflowdata and persists to PostgreSQL
+    _patch_workflow_data(workflow_id, {"tags": unique_tags})
+
+    logger.info("Updated tags for project %s (workflow %s) by %s: %s", slug, workflow_id, owner, unique_tags)
+
+    return {"slug": slug, "tags": unique_tags, "workflow_id": workflow_id}
+
+
 @router.delete("/{project_slug}", response_model=DeleteProjectResponse)
 async def delete_project(
     project_slug: str,

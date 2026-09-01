@@ -86,6 +86,7 @@ const STATUS_ICONS: Record<CheckStatus, string> = {
 import { WorkflowProgress } from './WorkflowProgress';
 import { RejectionDialog } from './RejectionDialog';
 import { MessageDialog } from './MessageDialog';
+import { TagEditor } from './TagEditor';
 
 const useStyles = makeStyles(theme => ({
   linkButtons: {
@@ -556,13 +557,14 @@ export function WorkflowDetailPage() {
               </Grid>
               <Grid item xs={12}>
                 <Typography className={classes.label}>Tags</Typography>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 16 }}>
-                  {summary.tags.length > 0
-                    ? summary.tags.map(tag => (
-                        <Chip key={tag} label={tag} size="small" variant="outlined" />
-                      ))
-                    : <Typography className={classes.value}>—</Typography>}
-                </div>
+                <TagEditor
+                  initialTags={summary.tags}
+                  canEdit={isContentDeveloper || isContentReviewer || isAdmin}
+                  onSave={async (tags) => {
+                    await client.updateTags(summary.projectId, tags);
+                    setRefreshKey(k => k + 1); // Refresh to show updated tags
+                  }}
+                />
               </Grid>
             </Grid>
           </InfoCard>
@@ -1401,7 +1403,7 @@ export function WorkflowDetailPage() {
               }}
               disabled={approvingStage !== null}
             >
-              Approve
+              Submit
             </Button>
           </DialogActions>
         </Dialog>

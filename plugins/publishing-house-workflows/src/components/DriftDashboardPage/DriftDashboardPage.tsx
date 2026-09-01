@@ -178,6 +178,7 @@ const DriftDetailPanel = ({
   slug,
   state,
   onFetch,
+  onRefresh,
   client,
   canApprove,
   classes,
@@ -185,6 +186,7 @@ const DriftDetailPanel = ({
   slug: string;
   state: DriftRowState | undefined;
   onFetch: (slug: string) => void;
+  onRefresh: () => void;
   client: ReturnType<typeof createPhWorkflowsClient>;
   canApprove: boolean;
   classes: ReturnType<typeof useStyles>;
@@ -214,10 +216,12 @@ const DriftDetailPanel = ({
       await client.approveDrift(slug, notes);
       setApproving(false);
       setApproved(true);
+      // Refresh the drift list to remove this workflow (hasDrift is now false)
+      onRefresh();
     } catch (e: any) {
       setApproving(false);
     }
-  }, [slug, approvalNotes, client]);
+  }, [slug, approvalNotes, client, onRefresh]);
 
   const isLoading = !state || state.loading;
 
@@ -295,7 +299,7 @@ const DriftDetailPanel = ({
             style={{ backgroundColor: '#4caf50', color: '#fff', fontWeight: 600 }}
             onClick={handleApproveConfirm}
           >
-            Approve
+            Submit
           </Button>
         </DialogActions>
       </Dialog>
@@ -405,6 +409,7 @@ export function DriftDashboardPage() {
             slug={rowData.projectId}
             state={rowStates[rowData.projectId]}
             onFetch={fetchDrift}
+            onRefresh={handleRefresh}
             client={cachedClient}
             canApprove={isContentReviewer || isAdmin}
             classes={cachedClasses}
@@ -412,7 +417,7 @@ export function DriftDashboardPage() {
         ),
       },
     ];
-  }, [rowStates, fetchDrift, client, isContentReviewer, isAdmin]);
+  }, [rowStates, fetchDrift, handleRefresh, client, isContentReviewer, isAdmin]);
 
   return (
     <Page themeId="tool">

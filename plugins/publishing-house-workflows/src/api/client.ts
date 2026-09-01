@@ -544,6 +544,26 @@ export function createPhWorkflowsClient(options: {
     return body;
   }
 
+  async function updateTags(
+    slug: string,
+    tags: string[],
+  ): Promise<{ slug: string; tags: string[]; workflow_id: string }> {
+    const response = await centralFetch(
+      `/projects/${slug}/tags`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ tags }),
+      },
+    );
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || `Update tags failed: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
   return {
     getWorkflows,
     getWorkflow,
@@ -566,5 +586,6 @@ export function createPhWorkflowsClient(options: {
     revokeAllTokens,
     addNote,
     completeTask,
+    updateTags,
   };
 }
