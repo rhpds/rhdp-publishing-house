@@ -102,11 +102,15 @@ The GitHub template repository that the scaffolder clones from. Contains the ful
 
 ### Scaffold Patterns
 
-| Pattern | showroom_type | UI Bundle | Extras |
-|---|---|---|---|
-| `agd-open` | classic | rhdp_showroom_theme v2.0.3 | podman-compose.yaml |
-| `agd-guided` | guided | nookbag-bundle v0.0.3 | runtime-automation (solve/validate per module) |
-| `zt-guided` | guided (zero_touch) | nookbag-bundle v0.0.3 | runtime-automation, setup-automation, config (instances/networks/firewall) |
+| Pattern | showroom_type | UI Bundle | site.yml extensions | Extras |
+|---|---|---|---|---|
+| `agd-open` | classic | rhdp_showroom_theme v2.0.3 | mermaid + tabs | podman-compose.yaml |
+| `agd-guided` | guided | nookbag-bundle v0.0.3 | mermaid + tabs | runtime-automation (solve/validate per module) |
+| `zt-guided` | guided (zero_touch) | nookbag-bundle v0.0.3 | **none** | runtime-automation, setup-automation, config (instances/networks/firewall) |
+
+`zt-guided`'s `site.yml` omits the `@sntke/antora-mermaid-extension` / `@andrew-jones/antora-tabs-extension`
+block — Project Zero infra doesn't support these extensions yet. Authors can add the block back
+manually once it's supported; scaffolding just doesn't add it by default.
 
 ### Automation Scaffolds (optional `--automation` flag)
 
@@ -115,6 +119,26 @@ The GitHub template repository that the scaffolder clones from. Contains the ful
 | `ansible/` | Starter Ansible collection with galaxy.yml, example role |
 | `gitops/bootstrap-infra/` | Helm chart with test namespace |
 | `gitops/bootstrap-tenant/` | Per-user namespace + RBAC (only if `--topology shared-cluster`) |
+
+### Migration Overlay (optional `--migration` flag)
+
+For projects with `project.intake_type: migration`, `content/`, `runtime-automation/`,
+`setup-automation/`, `config/`, and `ui-config.yml` already contain real content imported from
+the source repo before `scaffold.py` ever runs. Passing `--migration`:
+
+- Never overwrites a file that already exists — `common/` and the pattern dir are only used to
+  fill in genuinely missing files (e.g. `content/modules/ROOT/pages/index.adoc`), and
+  `runtime-automation/`, `setup-automation/`, `config/` are never wiped/recreated.
+- Afterward, overlays `.scaffolds/<pattern>-migration/` on top (if it exists), always
+  overwriting. Today only `zt-guided-migration/` exists, and it replaces the generic
+  ansible-playbook-per-module `qa-automation/` with a version that drives the legacy
+  `runtime-automation/<module>/{solve,validation}-<host>.sh` shell scripts a migrated repo
+  already ships.
+
+This flag is set by `config-helper` (in `rhdp-publishing-house-skills`), which also runs an
+alignment step *before* calling `scaffold.py` to rename the already-imported content pages,
+`runtime-automation/` dirs, and `ui-config.yml` module names to match the `module-NN-<slug>`
+outlines intake generated in `publishing-house/spec/modules/`.
 
 ---
 
