@@ -174,7 +174,7 @@ spec:
           input: |
             . + {
               latestAudit: null,
-              reviewHistory: ((.reviewHistory // []) + [{stage: "intake", action: "started", timestamp: (now | tostring), user: (.ssoEmail // "system"), commitSha: (.auditTrailSha // "")}])
+              reviewHistory: ((.reviewHistory // []) + [{stage: "intake", action: "started", timestamp: (now | tostring), user: "system", commitSha: (.auditTrailSha // "")}])
             }
           output: |
             . + {

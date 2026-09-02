@@ -198,7 +198,7 @@ export function RejectionDialog({
           disabled={reasons.length === 0 || submitting}
           startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
-          {submitting ? 'Rejecting...' : 'Confirm Rejection'}
+          {submitting ? 'Submitting...' : 'Submit'}
         </Button>
       </DialogActions>
     </Dialog>
