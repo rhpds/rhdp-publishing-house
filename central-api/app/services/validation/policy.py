@@ -58,6 +58,10 @@ _FALLBACK_POLICY = {
         "key takeaways",
     ],
     "products": [],
+    "initiative_jira_keys": {
+        "rh1_2027": "RHDPCD-2029",
+        "summit_2027": "RHDPCD-2030",
+    },
     "provisioning_time_estimates": {
         "shared-cluster": 5,
         "per-student": 25,

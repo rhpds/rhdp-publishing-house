@@ -691,6 +691,12 @@ def create_epic(
         if jira_user and jira_user["accountId"]:
             assignee = {"accountId": jira_user["accountId"]}
 
+    # Resolve initiative to Jira parent key
+    from ..services.validation.policy import load_policy
+    initiative_slug = workflow_data.get("initiativeKey", "none")
+    initiative_map = load_policy().get("initiative_jira_keys", {})
+    parent_key = initiative_map.get(initiative_slug)
+
     # Build Jira issue fields
     jira_fields: dict = {
         "project": {"key": settings.jira_project_key},
@@ -700,6 +706,8 @@ def create_epic(
         "assignee": assignee,
         "description": description_adf,
     }
+    if parent_key:
+        jira_fields["parent"] = {"key": parent_key}
 
     # Create epic
     req = urllib.request.Request(
