@@ -61,6 +61,10 @@ _FALLBACK_POLICY = {
     "initiative_jira_keys": {
         "rh1_2027": "RHDPCD-2029",
         "summit_2027": "RHDPCD-2030",
+        "content_dev_labs": "RHDPCD-2031",
+        "content_dev_blogs": "RHDPCD-2032",
+        "content_dev_interactive": "RHDPCD-2033",
+        "_default": "RHDPCD-2031",
     },
     "provisioning_time_estimates": {
         "shared-cluster": 5,

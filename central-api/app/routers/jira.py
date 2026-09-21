@@ -695,7 +695,7 @@ def create_epic(
     from ..services.validation.policy import load_policy
     initiative_slug = workflow_data.get("initiativeKey", "none")
     initiative_map = load_policy().get("initiative_jira_keys", {})
-    parent_key = initiative_map.get(initiative_slug)
+    parent_key = initiative_map.get(initiative_slug) or initiative_map.get("_default")
 
     # Build Jira issue fields
     jira_fields: dict = {
