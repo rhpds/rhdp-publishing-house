@@ -200,7 +200,6 @@ spec:
       required:
         - initiative_key
         - platform
-        - showroom_type
       properties:
         initiative_key:
           title: Initiative
@@ -247,17 +246,6 @@ spec:
                     - "RHEL 10"
                   default: "9"
                   ui:help: Which RHEL version does your lab require?
-                showroom_type:
-                  title: Showroom Type
-                  type: string
-                  enum:
-                    - classic
-                    - zero_touch
-                  enumNames:
-                    - Classic (standard Showroom)
-                    - Zero Touch (embedded automation)
-                  default: classic
-                  ui:help: Classic = standard Showroom lab. Zero Touch = embedded runtime/setup automation.
             - properties:
                 platform:
                   const: openshift
@@ -301,18 +289,6 @@ spec:
                   default: sno
                   ui:help: Single node for simple labs, multinode for production-like environments
 
-                showroom_type:
-                  title: Showroom Type
-                  type: string
-                  enum:
-                    - classic
-                    - zero_touch
-                  enumNames:
-                    - Classic (standard Showroom)
-                    - Zero Touch (embedded automation)
-                  default: classic
-                  ui:help: Classic = standard Showroom lab. Zero Touch = embedded runtime/setup automation.
-
   steps:
     # Step 1: Check if project name is already taken
     - id: check-catalog
@@ -354,7 +330,7 @@ spec:
           clusterType: ${{ parameters.cluster_type or 'sno' }}
           ocpVersion: ${{ parameters.ocp_version or '4.21' }}
           rhelVersion: ${{ parameters.rhel_version or '9' }}
-          showroomType: ${{ parameters.showroom_type }}
+          showroomType: ''
           initiativeKey: ${{ parameters.initiative_key }}
           teamMembers: ${{ parameters.github_users }}
           tags: ${{ parameters.tags }}

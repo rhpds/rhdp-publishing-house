@@ -249,7 +249,7 @@ export function WorkflowDetailPage() {
         clusterType: wd.clusterType || 'sno',
         ocpVersion: wd.ocpVersion || '4.21',
         automationType: wd.automationType || 'ansible',
-        showroomType: wd.showroomType || 'classic',
+        showroomType: wd.showroomType || '',
         initiativeKey: wd.initiativeKey || 'rh1_2027',
         tags: wd.tags || [],
       });
@@ -385,6 +385,17 @@ export function WorkflowDetailPage() {
 
   const handlePreIntakeReviewAction = async (action: 'approved' | 'cancelled') => {
     if (!result) return;
+
+    // Validate required fields for approval
+    if (action === 'approved' && !preIntakeReviewFields.showroomType) {
+      setSnackbar({
+        open: true,
+        severity: 'error',
+        message: 'Showroom Type is required. Please select Classic or Zero Touch.',
+      });
+      return;
+    }
+
     setPreIntakeReviewAction(action);
     try {
       if (action === 'cancelled') {
@@ -750,7 +761,24 @@ export function WorkflowDetailPage() {
                   )}
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <DetailField label="Showroom Type" value={wd?.showroomType === 'zero_touch' ? 'Zero Touch' : 'Classic'} />
+                  {summary.stage === 'pre_intake_review' ? (
+                    <>
+                      <Typography className={classes.label}>Showroom Type *</Typography>
+                      <FormControl fullWidth variant="outlined" size="small">
+                        <Select
+                          value={preIntakeReviewFields.showroomType || wd?.showroomType || ''}
+                          onChange={(e) => setPreIntakeReviewFields({ ...preIntakeReviewFields, showroomType: e.target.value as string })}
+                          displayEmpty
+                        >
+                          <MenuItem value="" disabled>Select showroom type</MenuItem>
+                          <MenuItem value="classic">Classic</MenuItem>
+                          <MenuItem value="zero_touch">Zero Touch</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </>
+                  ) : (
+                    <DetailField label="Showroom Type" value={wd?.showroomType === 'zero_touch' ? 'Zero Touch' : (wd?.showroomType === 'classic' ? 'Classic' : '—')} />
+                  )}
                 </Grid>
                 <Grid item xs={12} md={6}>
                   {summary.stage === 'pre_intake_review' ? (
