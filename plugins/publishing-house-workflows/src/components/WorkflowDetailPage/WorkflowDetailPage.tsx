@@ -393,6 +393,20 @@ export function WorkflowDetailPage() {
       return;
     }
 
+    // Validate GPU justification when AI-related and cannot use MaaS
+    const aiRelated = preIntakeReviewFields.aiRelated !== undefined ? preIntakeReviewFields.aiRelated : wd?.aiRelated;
+    const canUseMaas = preIntakeReviewFields.canUseMaas !== undefined ? preIntakeReviewFields.canUseMaas : wd?.canUseMaas;
+    const gpuJustification = preIntakeReviewFields.gpuJustification ?? wd?.gpuJustification ?? '';
+
+    if (action === 'approved' && aiRelated && !canUseMaas && !gpuJustification.trim()) {
+      setSnackbar({
+        open: true,
+        severity: 'error',
+        message: 'GPU Justification is required when MaaS cannot be used.',
+      });
+      return;
+    }
+
     setPreIntakeReviewAction(action);
     try {
       if (action === 'cancelled') {
