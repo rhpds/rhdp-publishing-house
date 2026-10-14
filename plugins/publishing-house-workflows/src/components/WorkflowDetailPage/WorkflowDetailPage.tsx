@@ -104,7 +104,6 @@ const STATUS_ICONS: Record<CheckStatus, string> = {
 };
 import { WorkflowProgress } from './WorkflowProgress';
 import { RejectionDialog } from './RejectionDialog';
-import { MessageDialog } from './MessageDialog';
 import { TagEditor } from './TagEditor';
 
 const useStyles = makeStyles(theme => ({
@@ -266,8 +265,6 @@ export function WorkflowDetailPage() {
     message: string;
   }>({ open: false, severity: 'success', message: '' });
   const [reasonsPopover, setReasonsPopover] = useState<{ anchorEl: HTMLElement | null; reasons: { id: number; text: string }[] }>({ anchorEl: null, reasons: [] });
-  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
-  const [sendingMessage, setSendingMessage] = useState(false);
   const [approvalNotes, setApprovalNotes] = useState<Array<{ text: string }>>([]);
   const [approvalNotesDialogOpen, setApprovalNotesDialogOpen] = useState(false);
   const [stagingAgnosticvUrls, setStagingAgnosticvUrls] = useState<string[]>(['']);
@@ -438,20 +435,6 @@ export function WorkflowDetailPage() {
     }
   };
 
-  const handleSendMessage = async (text: string) => {
-    if (!result) return;
-    setSendingMessage(true);
-    try {
-      await client.sendMessage(result.summary.id, text, result.summary.stage);
-      setMessageDialogOpen(false);
-      setSnackbar({ open: true, severity: 'success', message: 'Message sent to author.' });
-    } catch (err: any) {
-      setSnackbar({ open: true, severity: 'error', message: `Send failed: ${err.message}` });
-    } finally {
-      setSendingMessage(false);
-    }
-  };
-
   const handleStagingSubmit = async () => {
     const filteredAgv = stagingAgnosticvUrls.map(u => u.trim()).filter(Boolean);
     const filteredCi = stagingCiUrls.map(u => u.trim()).filter(Boolean);
@@ -550,7 +533,6 @@ export function WorkflowDetailPage() {
   const canReview = (summary.stage === 'content_review' && (isContentReviewer || isAdmin))
     || (summary.stage === 'infra_review' && (isInfraReviewer || isAdmin));
   const canStaging = summary.stage === 'env_setup' && (isContentDeveloper || isAdmin);
-  const canMessage = isContentReviewer || isInfraReviewer;
   const testingStages: WorkflowStage[] = ['testing', 'published'];
   const hasTestingTab = testingStages.includes(summary.stage);
   const canPostTestingComment = isOperations && summary.stage === 'testing';
@@ -1114,18 +1096,6 @@ export function WorkflowDetailPage() {
                       {preIntakeReviewAction === 'cancelled' ? 'Cancelling...' : 'Cancel'}
                     </Button>
                   </>
-                )}
-
-                {/* Message button at the end */}
-                {canMessage && (
-                  <Button
-                    variant="contained"
-                    style={{ backgroundColor: '#0099FF', color: '#fff', fontWeight: 600 }}
-                    size="large"
-                    onClick={() => setMessageDialogOpen(true)}
-                  >
-                    Message
-                  </Button>
                 )}
               </div>
             </InfoCard>
@@ -1893,15 +1863,6 @@ export function WorkflowDetailPage() {
           submitting={submittingRejection}
           onConfirm={handleRejectionConfirm}
           onCancel={handleRejectionCancel}
-        />
-
-        <MessageDialog
-          open={messageDialogOpen}
-          stage={summary.stage}
-          senderName={currentUserEmail}
-          submitting={sendingMessage}
-          onConfirm={handleSendMessage}
-          onCancel={() => setMessageDialogOpen(false)}
         />
 
         <Dialog open={approvalNotesDialogOpen} onClose={() => setApprovalNotesDialogOpen(false)} maxWidth="sm" fullWidth>
