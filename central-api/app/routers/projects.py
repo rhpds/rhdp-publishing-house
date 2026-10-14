@@ -119,7 +119,7 @@ class StartWorkflowRequest(BaseModel):
     ocpVersion: str = "4.21"
     rhelVersion: str = "9"
     showroomType: str = "classic"
-    initiativeKey: str = "none"
+    initiativeKey: str = "rhdp_catalog"
     teamMembers: list[dict] = []
     tags: list[str] = []
     intakeType: str = "new"
@@ -1294,7 +1294,7 @@ async def _create_catalog_background(body: CreateCatalogRequest, settings):
                 "project_description": wf_data.get("projectDescription", ""),
                 "content_type": wf_data.get("contentType", "lab"),
                 "deployment_mode": "rhdp-published",
-                "initiative_key": wf_data.get("initiativeKey", "none"),
+                "initiative_key": wf_data.get("initiativeKey", "rhdp_catalog"),
                 "showroom_type": wf_data.get("showroomType", "classic"),
                 "intake_type": wf_data.get("intakeType", "new"),
                 "automation_type": "",  # Captured during intake Phase 5, not from template

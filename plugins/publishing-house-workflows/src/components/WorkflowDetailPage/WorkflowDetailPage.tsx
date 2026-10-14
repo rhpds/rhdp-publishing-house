@@ -250,7 +250,7 @@ export function WorkflowDetailPage() {
         ocpVersion: wd.ocpVersion || '4.21',
         automationType: wd.automationType || 'ansible',
         showroomType: wd.showroomType || '',
-        initiativeKey: wd.initiativeKey || 'rh1_2027',
+        initiativeKey: wd.initiativeKey || 'rhdp_catalog',
         tags: wd.tags || [],
       });
     }

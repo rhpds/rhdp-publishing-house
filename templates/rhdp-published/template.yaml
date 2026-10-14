@@ -205,14 +205,14 @@ spec:
           title: Initiative
           type: string
           enum:
-            - none
+            - rhdp_catalog
             - rh1_2027
             - summit_2027
           enumNames:
-            - None
+            - RHDP Catalog
             - RH1 2027
             - Summit 2027
-          default: none
+          default: rhdp_catalog
           ui:help: Which initiative is this content for?
 
         platform:
