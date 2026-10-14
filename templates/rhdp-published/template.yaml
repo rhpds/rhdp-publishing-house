@@ -32,7 +32,7 @@ spec:
           ui:help: This will be the display name in the catalog
 
         project_description:
-          title: Description / Abstract
+          title: Description
           type: string
           description: What is this asset and why is it needed? High-level but clear.
           ui:widget: textarea
@@ -141,6 +141,8 @@ spec:
                           type: boolean
                           default: false
                           ui:help: Check if this content should be accessible to Red Hat partners
+                      required:
+                        - gpu_justification
 
     - title: Project Setup
       required:
