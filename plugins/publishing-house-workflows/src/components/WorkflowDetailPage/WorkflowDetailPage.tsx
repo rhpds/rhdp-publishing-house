@@ -1817,7 +1817,7 @@ export function WorkflowDetailPage() {
                           <td style={{ padding: '8px 12px' }}>{module.title || '—'}</td>
                           <td style={{ padding: '8px 12px' }}>{module.duration_min || '—'}</td>
                           <td style={{ padding: '8px 12px' }}>
-                            <FormControl variant="outlined" size="small" fullWidth disabled={!canEditModules}>
+                            <FormControl variant="outlined" size="small" fullWidth disabled={!canEditModules || currentStatus === 'complete'}>
                               <Select
                                 value={currentStatus}
                                 onChange={(e) => handleModuleStatusChange(module.id, e.target.value as string)}
@@ -1853,7 +1853,7 @@ export function WorkflowDetailPage() {
                   <td style={{ padding: '8px 12px' }}>Ansible or GitOps</td>
                   <td style={{ padding: '8px 12px' }}></td>
                   <td style={{ padding: '8px 12px' }}>
-                    <FormControl variant="outlined" size="small" fullWidth disabled={!canEditModules}>
+                    <FormControl variant="outlined" size="small" fullWidth disabled={!canEditModules || automationStatus === 'complete'}>
                       <Select
                         value={automationStatus}
                         onChange={(e) => handleAutomationStatusChange(e.target.value as string)}
