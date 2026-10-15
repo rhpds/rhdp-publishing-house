@@ -228,6 +228,12 @@ export function WorkflowDetailPage() {
   useEffect(() => {
     if (!result || !STAGES_WITH_DEVELOPMENT_TAB.includes(result.summary.stage)) return;
 
+    // Skip fetch if we just updated (prevents overwriting with stale data)
+    if (skipNextFetch) {
+      setSkipNextFetch(false);
+      return;
+    }
+
     const fetchModules = async () => {
       try {
         const specData = await client.getSpecData(result.summary.id);
@@ -243,7 +249,9 @@ export function WorkflowDetailPage() {
         setInitialModuleStatuses(statuses);
 
         // Fetch automation status
-        const autoStatus = specData?.spec?.development?.automation?.status || 'not_started';
+        const development = specData?.spec?.development || {};
+        const automation = development?.automation || {};
+        const autoStatus = automation?.status || 'not_started';
         setAutomationStatus(autoStatus);
         setInitialAutomationStatus(autoStatus);
       } catch (error) {
@@ -252,7 +260,7 @@ export function WorkflowDetailPage() {
     };
 
     fetchModules();
-  }, [result, client]);
+  }, [result, client, skipNextFetch]);
 
   const handleModuleStatusChange = (moduleId: string, newStatus: string) => {
     setModuleStatuses(prev => ({ ...prev, [moduleId]: newStatus }));
@@ -297,43 +305,52 @@ export function WorkflowDetailPage() {
           severity: 'error',
           message: `Some updates failed: ${errors.join('; ')}`,
         });
+        setUpdatingStatuses(false);
       } else {
-        // Wait a moment for GitHub to process the commit, then refetch everything
-        setTimeout(async () => {
-          try {
-            // Refetch workflow data (includes notes)
-            setRefreshKey(k => k + 1);
+        // Wait for GitHub to process the commit, then refetch everything
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
-            // Refetch spec data to confirm updates
-            const specData = await client.getSpecData(result.summary.id);
-            const fetchedModules = specData?.spec?.modules || [];
-            const statuses: Record<string, string> = {};
-            fetchedModules.forEach((mod: any) => {
-              if (mod.id && mod.status) {
-                statuses[mod.id] = mod.status;
-              }
-            });
-            setModuleStatuses(statuses);
-            setInitialModuleStatuses(statuses);
+        try {
+          // Refetch spec data to confirm updates
+          const specData = await client.getSpecData(result.summary.id);
+          console.log('Refetched spec data:', specData);
 
-            const autoStatus = specData?.spec?.development?.automation?.status || 'not_started';
-            setAutomationStatus(autoStatus);
-            setInitialAutomationStatus(autoStatus);
+          const fetchedModules = specData?.spec?.modules || [];
+          const statuses: Record<string, string> = {};
+          fetchedModules.forEach((mod: any) => {
+            if (mod.id && mod.status) {
+              statuses[mod.id] = mod.status;
+            }
+          });
+          setModuleStatuses(statuses);
+          setInitialModuleStatuses(statuses);
 
-            setSnackbar({
-              open: true,
-              severity: 'success',
-              message: 'Development statuses updated successfully',
-            });
-          } catch (error) {
-            console.error('Failed to refetch after update:', error);
-            setSnackbar({
-              open: true,
-              severity: 'success',
-              message: 'Statuses updated (refresh to see latest)',
-            });
-          }
-        }, 1500);
+          const development = specData?.spec?.development || {};
+          const automation = development?.automation || {};
+          const autoStatus = automation?.status || 'not_started';
+          console.log('Automation object:', automation, 'Status:', autoStatus);
+          setAutomationStatus(autoStatus);
+          setInitialAutomationStatus(autoStatus);
+
+          // Refetch workflow data (includes notes) but skip the next automatic spec fetch
+          setSkipNextFetch(true);
+          setRefreshKey(k => k + 1);
+
+          setSnackbar({
+            open: true,
+            severity: 'success',
+            message: 'Development statuses updated successfully',
+          });
+        } catch (error) {
+          console.error('Failed to refetch after update:', error);
+          setSnackbar({
+            open: true,
+            severity: 'warning',
+            message: 'Statuses updated - please refresh to see changes',
+          });
+        } finally {
+          setUpdatingStatuses(false);
+        }
       }
     } catch (error) {
       setSnackbar({
@@ -341,7 +358,6 @@ export function WorkflowDetailPage() {
         severity: 'error',
         message: `Failed to update statuses: ${error}`,
       });
-    } finally {
       setUpdatingStatuses(false);
     }
   };
@@ -413,6 +429,7 @@ export function WorkflowDetailPage() {
   const [initialModuleStatuses, setInitialModuleStatuses] = useState<Record<string, string>>({});
   const [initialAutomationStatus, setInitialAutomationStatus] = useState<string>('not_started');
   const [updatingStatuses, setUpdatingStatuses] = useState(false);
+  const [skipNextFetch, setSkipNextFetch] = useState(false);
 
   const handleApprove = async (stage: WorkflowStage) => {
     if (!result) return;
