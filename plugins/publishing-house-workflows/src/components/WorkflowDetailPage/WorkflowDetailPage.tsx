@@ -248,8 +248,8 @@ export function WorkflowDetailPage() {
         setModuleStatuses(statuses);
         setInitialModuleStatuses(statuses);
 
-        // Fetch automation status
-        const development = specData?.spec?.development || {};
+        // Fetch automation status (development is at root level, not under spec)
+        const development = specData?.development || {};
         const automation = development?.automation || {};
         const autoStatus = automation?.status || 'not_started';
         setAutomationStatus(autoStatus);
@@ -325,10 +325,11 @@ export function WorkflowDetailPage() {
           setModuleStatuses(statuses);
           setInitialModuleStatuses(statuses);
 
-          const development = specData?.spec?.development || {};
+          // development is at root level, not under spec
+          const development = specData?.development || {};
           const automation = development?.automation || {};
           const autoStatus = automation?.status || 'not_started';
-          console.log('Automation object:', automation, 'Status:', autoStatus);
+          console.log('Refetched - Development:', development, 'Automation:', automation, 'Status:', autoStatus);
           setAutomationStatus(autoStatus);
           setInitialAutomationStatus(autoStatus);
 

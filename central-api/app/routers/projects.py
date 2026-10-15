@@ -466,7 +466,10 @@ async def get_spec_data(workflow_id: str, auth: tuple[str, int] = Depends(_requi
             raise HTTPException(status_code=404, detail="spec.yaml not found")
 
         spec_data = yaml.safe_load(spec_raw)
-        return {"spec": spec_data.get("spec", {})}
+        return {
+            "spec": spec_data.get("spec", {}),
+            "development": spec_data.get("development", {})
+        }
     except Exception as e:
         logger.error(f"Failed to fetch spec.yaml for {workflow_id}: {e}")
         raise HTTPException(status_code=502, detail=f"Failed to fetch spec.yaml: {e}")
