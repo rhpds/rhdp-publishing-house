@@ -298,15 +298,42 @@ export function WorkflowDetailPage() {
           message: `Some updates failed: ${errors.join('; ')}`,
         });
       } else {
-        // Refresh to get latest state
-        setInitialModuleStatuses(moduleStatuses);
-        setInitialAutomationStatus(automationStatus);
+        // Wait a moment for GitHub to process the commit, then refetch everything
+        setTimeout(async () => {
+          try {
+            // Refetch workflow data (includes notes)
+            setRefreshKey(k => k + 1);
 
-        setSnackbar({
-          open: true,
-          severity: 'success',
-          message: 'Development statuses updated successfully',
-        });
+            // Refetch spec data to confirm updates
+            const specData = await client.getSpecData(result.summary.id);
+            const fetchedModules = specData?.spec?.modules || [];
+            const statuses: Record<string, string> = {};
+            fetchedModules.forEach((mod: any) => {
+              if (mod.id && mod.status) {
+                statuses[mod.id] = mod.status;
+              }
+            });
+            setModuleStatuses(statuses);
+            setInitialModuleStatuses(statuses);
+
+            const autoStatus = specData?.spec?.development?.automation?.status || 'not_started';
+            setAutomationStatus(autoStatus);
+            setInitialAutomationStatus(autoStatus);
+
+            setSnackbar({
+              open: true,
+              severity: 'success',
+              message: 'Development statuses updated successfully',
+            });
+          } catch (error) {
+            console.error('Failed to refetch after update:', error);
+            setSnackbar({
+              open: true,
+              severity: 'success',
+              message: 'Statuses updated (refresh to see latest)',
+            });
+          }
+        }, 1500);
       }
     } catch (error) {
       setSnackbar({
