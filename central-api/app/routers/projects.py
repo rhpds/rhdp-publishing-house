@@ -531,6 +531,54 @@ async def update_module_status(
             branch="main"
         )
 
+        # Get the new commit SHA
+        new_sha = await github.get_head_sha(repo_url, "main")
+        commit_short = new_sha[:7] if new_sha else "unknown"
+
+        # Add note to workflow
+        try:
+            stage = workflow.get("stage", "development")
+            note_text = f"Updated {module_id} status to {status} (commit: {commit_short})"
+
+            # Get current notes
+            query = """
+              query GetWorkflow($id: String!) {
+                ProcessInstances(where: { id: { equal: $id } }) {
+                  id
+                  variables
+                }
+              }
+            """
+            graphql_payload = json.dumps({"query": query, "variables": {"id": workflow_id}}).encode()
+            graphql_req = urllib.request.Request(
+                f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+                data=graphql_payload,
+                headers={"Content-Type": "application/json"},
+            )
+
+            with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+                result = json.loads(resp.read().decode())
+                instances = result.get("data", {}).get("ProcessInstances", [])
+                if instances:
+                    variables = instances[0].get("variables", {})
+                    workflowdata = variables.get("workflowdata", {})
+                    notes = workflowdata.get("notes", [])
+
+                    # Add new note
+                    new_note = {
+                        "user": _owner,
+                        "text": note_text,
+                        "type": "info",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "stage": stage,
+                    }
+                    notes.append(new_note)
+
+                    # Update workflow data
+                    _patch_workflow_data(workflow_id, {"notes": notes}, settings=settings)
+        except Exception as e:
+            logger.warning(f"Failed to add note for module status update: {e}")
+
         logger.info(f"Updated {module_id} status to {status} for workflow {workflow_id}")
         return {"success": True, "module_id": module_id, "status": status}
 
@@ -594,6 +642,54 @@ async def update_automation_status(
             message=commit_message,
             branch="main"
         )
+
+        # Get the new commit SHA
+        new_sha = await github.get_head_sha(repo_url, "main")
+        commit_short = new_sha[:7] if new_sha else "unknown"
+
+        # Add note to workflow
+        try:
+            stage = workflow.get("stage", "development")
+            note_text = f"Updated automation status to {status} (commit: {commit_short})"
+
+            # Get current notes
+            query = """
+              query GetWorkflow($id: String!) {
+                ProcessInstances(where: { id: { equal: $id } }) {
+                  id
+                  variables
+                }
+              }
+            """
+            graphql_payload = json.dumps({"query": query, "variables": {"id": workflow_id}}).encode()
+            graphql_req = urllib.request.Request(
+                f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+                data=graphql_payload,
+                headers={"Content-Type": "application/json"},
+            )
+
+            with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+                result = json.loads(resp.read().decode())
+                instances = result.get("data", {}).get("ProcessInstances", [])
+                if instances:
+                    variables = instances[0].get("variables", {})
+                    workflowdata = variables.get("workflowdata", {})
+                    notes = workflowdata.get("notes", [])
+
+                    # Add new note
+                    new_note = {
+                        "user": _owner,
+                        "text": note_text,
+                        "type": "info",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "stage": stage,
+                    }
+                    notes.append(new_note)
+
+                    # Update workflow data
+                    _patch_workflow_data(workflow_id, {"notes": notes}, settings=settings)
+        except Exception as e:
+            logger.warning(f"Failed to add note for automation status update: {e}")
 
         logger.info(f"Updated automation status to {status} for workflow {workflow_id}")
         return {"success": True, "status": status}
