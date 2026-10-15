@@ -11,5 +11,5 @@ kubernetes==31.0.0
 python-jose[cryptography]==3.3.0
 python-keycloak==4.2.2
 psycopg2-binary==2.9.10
-jinja2==3.1.4
+jinja2==3.1.6
 
