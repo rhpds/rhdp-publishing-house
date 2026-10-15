@@ -249,8 +249,34 @@ export function WorkflowDetailPage() {
   }, [result, client]);
 
   const handleModuleStatusChange = async (moduleId: string, newStatus: string) => {
-    // TODO: Implement module status update when backend endpoint is ready
-    console.log(`Status change requested for ${moduleId}: ${newStatus}`);
+    if (!result) return;
+
+    try {
+      // Optimistically update UI
+      setModuleStatuses(prev => ({ ...prev, [moduleId]: newStatus }));
+
+      // Call API to update in spec.yaml
+      await client.updateModuleStatus(result.summary.id, moduleId, newStatus);
+
+      setSnackbar({
+        open: true,
+        severity: 'success',
+        message: `Module ${moduleId} status updated to ${newStatus}`,
+      });
+    } catch (error) {
+      // Revert on error
+      setModuleStatuses(prev => {
+        const reverted = { ...prev };
+        delete reverted[moduleId];
+        return reverted;
+      });
+
+      setSnackbar({
+        open: true,
+        severity: 'error',
+        message: `Failed to update module status: ${error}`,
+      });
+    }
   };
 
   // Initialize pre-intake review fields from workflow data

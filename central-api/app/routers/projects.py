@@ -472,6 +472,75 @@ async def get_spec_data(workflow_id: str, auth: tuple[str, int] = Depends(_requi
         raise HTTPException(status_code=502, detail=f"Failed to fetch spec.yaml: {e}")
 
 
+@router.patch("/{workflow_id}/modules/{module_id}/status")
+async def update_module_status(
+    workflow_id: str,
+    module_id: str,
+    status: str = Body(..., embed=True),
+    auth: tuple[str, int] = Depends(_require_auth)
+):
+    """Update a module's status in spec.yaml and commit to repository."""
+    _owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
+
+    if status not in ["not_started", "in_progress", "complete"]:
+        raise HTTPException(status_code=400, detail="Invalid status. Must be: not_started, in_progress, or complete")
+
+    settings = get_settings()
+    if not settings.github_token:
+        raise HTTPException(status_code=500, detail="GITHUB_TOKEN not configured")
+
+    workflow = _get_workflow_data(workflow_id, minimal=False)
+    repo_url = workflow.get("repoUrl")
+    if not repo_url:
+        raise HTTPException(status_code=404, detail="Repository URL not found in workflow")
+
+    from ..services.github import GitHubService
+    github = GitHubService(token=settings.github_token)
+
+    try:
+        # Fetch current spec.yaml
+        spec_raw = await github.get_file_content(repo_url, "publishing-house/spec.yaml", "main")
+        if not spec_raw:
+            raise HTTPException(status_code=404, detail="spec.yaml not found")
+
+        spec_data = yaml.safe_load(spec_raw)
+        modules = spec_data.get("spec", {}).get("modules", [])
+
+        # Find and update the module
+        module_found = False
+        for module in modules:
+            if module.get("id") == module_id:
+                module["status"] = status
+                module_found = True
+                break
+
+        if not module_found:
+            raise HTTPException(status_code=404, detail=f"Module {module_id} not found in spec.yaml")
+
+        # Write updated spec.yaml back
+        updated_yaml = yaml.dump(spec_data, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+        commit_message = f"feat: update {module_id} status to {status}\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+        await github.update_file(
+            repo_url=repo_url,
+            file_path="publishing-house/spec.yaml",
+            content=updated_yaml,
+            message=commit_message,
+            branch="main"
+        )
+
+        logger.info(f"Updated {module_id} status to {status} for workflow {workflow_id}")
+        return {"success": True, "module_id": module_id, "status": status}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update module status for {workflow_id}: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to update module status: {e}")
+
+
 _STATE_MAP = {
     "preintakereview": "pre_intake_review",
     "preintakereviewdecision": "pre_intake_review",
