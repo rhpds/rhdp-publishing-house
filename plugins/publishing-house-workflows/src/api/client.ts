@@ -569,6 +569,24 @@ export function createPhWorkflowsClient(options: {
     return await response.json();
   }
 
+  async function updateAutomationStatus(
+    workflowId: string,
+    status: string,
+  ): Promise<{ success: boolean; status: string }> {
+    const response = await centralFetch(`/projects/${workflowId}/automation/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || `Update automation status failed: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
   return {
     getWorkflows,
     getWorkflow,
@@ -592,5 +610,6 @@ export function createPhWorkflowsClient(options: {
     updateTags,
     getSpecData,
     updateModuleStatus,
+    updateAutomationStatus,
   };
 }

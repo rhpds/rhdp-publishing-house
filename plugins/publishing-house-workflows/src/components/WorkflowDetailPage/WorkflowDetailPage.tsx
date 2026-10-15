@@ -240,6 +240,12 @@ export function WorkflowDetailPage() {
           }
         });
         setModuleStatuses(statuses);
+        setInitialModuleStatuses(statuses);
+
+        // Fetch automation status
+        const autoStatus = specData?.spec?.development?.automation?.status || 'not_started';
+        setAutomationStatus(autoStatus);
+        setInitialAutomationStatus(autoStatus);
       } catch (error) {
         console.error('Failed to fetch module data:', error);
       }
@@ -248,35 +254,77 @@ export function WorkflowDetailPage() {
     fetchModules();
   }, [result, client]);
 
-  const handleModuleStatusChange = async (moduleId: string, newStatus: string) => {
+  const handleModuleStatusChange = (moduleId: string, newStatus: string) => {
+    setModuleStatuses(prev => ({ ...prev, [moduleId]: newStatus }));
+  };
+
+  const handleAutomationStatusChange = (newStatus: string) => {
+    setAutomationStatus(newStatus);
+  };
+
+  const handleUpdateAllStatuses = async () => {
     if (!result) return;
 
+    setUpdatingStatuses(true);
+    const errors: string[] = [];
+
     try {
-      // Optimistically update UI
-      setModuleStatuses(prev => ({ ...prev, [moduleId]: newStatus }));
+      // Update changed module statuses
+      const moduleUpdates = Object.entries(moduleStatuses).filter(
+        ([moduleId, status]) => initialModuleStatuses[moduleId] !== status
+      );
 
-      // Call API to update in spec.yaml
-      await client.updateModuleStatus(result.summary.id, moduleId, newStatus);
+      for (const [moduleId, status] of moduleUpdates) {
+        try {
+          await client.updateModuleStatus(result.summary.id, moduleId, status);
+        } catch (error) {
+          errors.push(`Failed to update ${moduleId}: ${error}`);
+        }
+      }
 
-      setSnackbar({
-        open: true,
-        severity: 'success',
-        message: `Module ${moduleId} status updated to ${newStatus}`,
-      });
+      // Update automation status if changed
+      if (automationStatus !== initialAutomationStatus) {
+        try {
+          await client.updateAutomationStatus(result.summary.id, automationStatus);
+        } catch (error) {
+          errors.push(`Failed to update automation status: ${error}`);
+        }
+      }
+
+      if (errors.length > 0) {
+        setSnackbar({
+          open: true,
+          severity: 'error',
+          message: `Some updates failed: ${errors.join('; ')}`,
+        });
+      } else {
+        // Refresh to get latest state
+        setInitialModuleStatuses(moduleStatuses);
+        setInitialAutomationStatus(automationStatus);
+
+        setSnackbar({
+          open: true,
+          severity: 'success',
+          message: 'Development statuses updated successfully',
+        });
+      }
     } catch (error) {
-      // Revert on error
-      setModuleStatuses(prev => {
-        const reverted = { ...prev };
-        delete reverted[moduleId];
-        return reverted;
-      });
-
       setSnackbar({
         open: true,
         severity: 'error',
-        message: `Failed to update module status: ${error}`,
+        message: `Failed to update statuses: ${error}`,
       });
+    } finally {
+      setUpdatingStatuses(false);
     }
+  };
+
+  const hasStatusChanges = () => {
+    const moduleChanged = Object.entries(moduleStatuses).some(
+      ([moduleId, status]) => initialModuleStatuses[moduleId] !== status
+    );
+    const automationChanged = automationStatus !== initialAutomationStatus;
+    return moduleChanged || automationChanged;
   };
 
   // Initialize pre-intake review fields from workflow data
@@ -334,6 +382,10 @@ export function WorkflowDetailPage() {
   const [cancelConfirmDialogOpen, setCancelConfirmDialogOpen] = useState(false);
   const [moduleStatuses, setModuleStatuses] = useState<Record<string, string>>({});
   const [modules, setModules] = useState<any[]>([]);
+  const [automationStatus, setAutomationStatus] = useState<string>('not_started');
+  const [initialModuleStatuses, setInitialModuleStatuses] = useState<Record<string, string>>({});
+  const [initialAutomationStatus, setInitialAutomationStatus] = useState<string>('not_started');
+  const [updatingStatuses, setUpdatingStatuses] = useState(false);
 
   const handleApprove = async (stage: WorkflowStage) => {
     if (!result) return;
@@ -1683,9 +1735,34 @@ export function WorkflowDetailPage() {
         )}
 
         {hasDevTab && activeTab === devTabIndex && (
-          <InfoCard title="Module Development Progress">
+          <InfoCard title="Development Progress">
             <Typography variant="body2" style={{ marginBottom: 16, color: '#757575' }}>
-              Track the development status of each module. Update status as you complete writing each module.
+              Track the development status. Make your changes, then click Update to commit to the repository.
+            </Typography>
+
+            {/* Automation Section */}
+            <div style={{ marginBottom: 32 }}>
+              <Typography variant="h6" style={{ marginBottom: 12, fontSize: '1rem', fontWeight: 600 }}>
+                Automation
+              </Typography>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <Typography variant="body2" style={{ minWidth: 100 }}>Status:</Typography>
+                <FormControl variant="outlined" size="small" style={{ minWidth: 150 }} disabled={!canEditModules}>
+                  <Select
+                    value={automationStatus}
+                    onChange={(e) => handleAutomationStatusChange(e.target.value as string)}
+                  >
+                    <MenuItem value="not_started">Not Started</MenuItem>
+                    <MenuItem value="in_progress">In Progress</MenuItem>
+                    <MenuItem value="complete">Complete</MenuItem>
+                  </Select>
+                </FormControl>
+              </div>
+            </div>
+
+            {/* Modules Section */}
+            <Typography variant="h6" style={{ marginBottom: 12, fontSize: '1rem', fontWeight: 600 }}>
+              Modules
             </Typography>
             {(() => {
               if (modules.length === 0) {
@@ -1735,10 +1812,25 @@ export function WorkflowDetailPage() {
                 </table>
               );
             })()}
+
+            {/* Update Button */}
             {canEditModules && (
-              <Typography variant="caption" style={{ display: 'block', marginTop: 16, color: '#757575' }}>
-                Status changes are committed directly to the repository.
-              </Typography>
+              <div style={{ marginTop: 24, display: 'flex', alignItems: 'center', gap: 16 }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleUpdateAllStatuses}
+                  disabled={!hasStatusChanges() || updatingStatuses}
+                  startIcon={updatingStatuses ? <CircularProgress size={16} color="inherit" /> : undefined}
+                >
+                  {updatingStatuses ? 'Updating...' : 'Update'}
+                </Button>
+                {hasStatusChanges() && (
+                  <Typography variant="caption" style={{ color: '#757575' }}>
+                    You have unsaved changes
+                  </Typography>
+                )}
+              </div>
             )}
           </InfoCard>
         )}
