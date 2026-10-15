@@ -585,8 +585,7 @@ async def update_module_status(
         # Close Jira ticket if status is complete
         if status == "complete":
             try:
-                wd = workflow.get("workflowdata", {})
-                epic_key = wd.get("epic_key", "")
+                epic_key = workflow.get("epic_key", "")
                 if epic_key and settings.jira_url:
                     from .jira import _find_task_by_label, _transition_to_done
                     task = _find_task_by_label(epic_key, f"ph:{module_id}", settings)
@@ -712,8 +711,7 @@ async def update_automation_status(
         # Close Jira ticket if status is complete
         if status == "complete":
             try:
-                wd = workflow.get("workflowdata", {})
-                epic_key = wd.get("epic_key", "")
+                epic_key = workflow.get("epic_key", "")
                 if epic_key and settings.jira_url:
                     from .jira import _find_task_by_label, _transition_to_done
                     task = _find_task_by_label(epic_key, "ph:write-automation", settings)

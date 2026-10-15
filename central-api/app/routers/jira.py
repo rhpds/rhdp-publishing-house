@@ -875,6 +875,99 @@ def update_epic(
     else:
         logger.info("jira: skipping Dev CI task for zero_touch showroom type")
 
+    # Create Write Automation task
+    automation_fields = {
+        "project": {"key": settings.jira_project_key},
+        "summary": "[PH] Write Automation",
+        "issuetype": {"name": "Task"},
+        "parent": {"key": epic_key},
+        "labels": ["publishing-house", "ph:write-automation"],
+        "assignee": None,
+        STORY_POINTS_FIELD: float(POINTS["write-automation"]),
+        "description": {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text",
+                 "text": "Write automation (Ansible playbooks or Terraform) to deploy the demo environment. "
+                         "This task will be closed automatically when development.automation.status is set to complete."}]},
+            ],
+        },
+    }
+    try:
+        automation_req = urllib.request.Request(
+            f"{settings.jira_url}/rest/api/3/issue",
+            data=json.dumps({"fields": automation_fields}).encode(),
+            headers=_jira_headers(settings),
+            method="POST",
+        )
+        with urllib.request.urlopen(automation_req, context=_SSL_CTX, timeout=10):
+            logger.info("jira: created Write Automation task under epic %s", epic_key)
+    except Exception as e:
+        logger.warning("jira: Write Automation task creation failed for epic %s: %s", epic_key, e)
+
+    # Create Write Health Check task
+    health_check_fields = {
+        "project": {"key": settings.jira_project_key},
+        "summary": "[PH] Write Health Check",
+        "issuetype": {"name": "Task"},
+        "parent": {"key": epic_key},
+        "labels": ["publishing-house", "ph:write-health-check"],
+        "assignee": None,
+        STORY_POINTS_FIELD: float(POINTS["write-health-check"]),
+        "description": {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text",
+                 "text": "Write health check script to verify the demo environment is working correctly. "
+                         "This task will be closed automatically when development.healthCheck.status is set to complete."}]},
+            ],
+        },
+    }
+    try:
+        health_check_req = urllib.request.Request(
+            f"{settings.jira_url}/rest/api/3/issue",
+            data=json.dumps({"fields": health_check_fields}).encode(),
+            headers=_jira_headers(settings),
+            method="POST",
+        )
+        with urllib.request.urlopen(health_check_req, context=_SSL_CTX, timeout=10):
+            logger.info("jira: created Write Health Check task under epic %s", epic_key)
+    except Exception as e:
+        logger.warning("jira: Write Health Check task creation failed for epic %s: %s", epic_key, e)
+
+    # Create Write E2E Tests task
+    e2e_fields = {
+        "project": {"key": settings.jira_project_key},
+        "summary": "[PH] Write E2E Tests",
+        "issuetype": {"name": "Task"},
+        "parent": {"key": epic_key},
+        "labels": ["publishing-house", "ph:write-e2e-tests"],
+        "assignee": None,
+        STORY_POINTS_FIELD: float(POINTS["write-e2e-tests"]),
+        "description": {
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text",
+                 "text": "Write end-to-end tests to verify the entire demo workflow. "
+                         "This task will be closed automatically when development.e2e.status is set to complete."}]},
+            ],
+        },
+    }
+    try:
+        e2e_req = urllib.request.Request(
+            f"{settings.jira_url}/rest/api/3/issue",
+            data=json.dumps({"fields": e2e_fields}).encode(),
+            headers=_jira_headers(settings),
+            method="POST",
+        )
+        with urllib.request.urlopen(e2e_req, context=_SSL_CTX, timeout=10):
+            logger.info("jira: created Write E2E Tests task under epic %s", epic_key)
+    except Exception as e:
+        logger.warning("jira: Write E2E Tests task creation failed for epic %s: %s", epic_key, e)
+
     jira_url = f"{settings.jira_url}/browse/{epic_key}"
     return UpdateEpicResponse(epic_key=epic_key, jira_url=jira_url)
 
