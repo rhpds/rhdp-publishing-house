@@ -231,9 +231,10 @@ export function WorkflowDetailPage() {
     const fetchModules = async () => {
       try {
         const specData = await client.getSpecData(result.summary.id);
-        const modules = specData?.spec?.modules || [];
+        const fetchedModules = specData?.spec?.modules || [];
+        setModules(fetchedModules);
         const statuses: Record<string, string> = {};
-        modules.forEach((mod: any) => {
+        fetchedModules.forEach((mod: any) => {
           if (mod.id && mod.status) {
             statuses[mod.id] = mod.status;
           }
@@ -306,6 +307,7 @@ export function WorkflowDetailPage() {
   const [submittingNote, setSubmittingNote] = useState(false);
   const [cancelConfirmDialogOpen, setCancelConfirmDialogOpen] = useState(false);
   const [moduleStatuses, setModuleStatuses] = useState<Record<string, string>>({});
+  const [modules, setModules] = useState<any[]>([]);
 
   const handleApprove = async (stage: WorkflowStage) => {
     if (!result) return;
@@ -1660,9 +1662,6 @@ export function WorkflowDetailPage() {
               Track the development status of each module. Update status as you complete writing each module.
             </Typography>
             {(() => {
-              const specData = (validationReport as any)?.spec_data;
-              const modules = specData?.spec?.modules || [];
-
               if (modules.length === 0) {
                 return (
                   <Typography variant="body2" style={{ color: '#757575', fontStyle: 'italic' }}>
