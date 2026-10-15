@@ -1803,8 +1803,8 @@ export function WorkflowDetailPage() {
               <tbody>
                 <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>automation</td>
-                  <td style={{ padding: '8px 12px' }}>Ansible & GitOps</td>
-                  <td style={{ padding: '8px 12px' }}>—</td>
+                  <td style={{ padding: '8px 12px' }}>Ansible or GitOps</td>
+                  <td style={{ padding: '8px 12px' }}></td>
                   <td style={{ padding: '8px 12px' }}>
                     <FormControl variant="outlined" size="small" fullWidth disabled={!canEditModules}>
                       <Select

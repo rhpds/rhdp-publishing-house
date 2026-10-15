@@ -301,3 +301,68 @@ class GitHubService:
         except Exception as e:
             logger.error(f"Error updating catalog-info.yaml: {e}")
             return False
+
+    async def update_file(
+        self,
+        repo_url: str,
+        file_path: str,
+        content: str,
+        message: str,
+        branch: str = "main"
+    ) -> bool:
+        """
+        Update a file in the repository.
+
+        Args:
+            repo_url: GitHub repository URL
+            file_path: Path to file in repo
+            content: New file content (plain text)
+            message: Commit message
+            branch: Branch name
+
+        Returns:
+            True if update succeeded, False otherwise
+        """
+        try:
+            owner, repo = self.parse_repo_url(repo_url)
+
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                # Get current file to get its SHA
+                response = await client.get(
+                    f"{self.api_base}/repos/{owner}/{repo}/contents/{file_path}",
+                    headers=self.headers,
+                    params={"ref": branch}
+                )
+
+                if response.status_code != 200:
+                    logger.error(f"File {file_path} not found in {owner}/{repo}")
+                    return False
+
+                file_data = response.json()
+                sha = file_data["sha"]
+
+                # Encode content to base64
+                encoded_content = base64.b64encode(content.encode("utf-8")).decode("utf-8")
+
+                # Commit update
+                update_response = await client.put(
+                    f"{self.api_base}/repos/{owner}/{repo}/contents/{file_path}",
+                    headers=self.headers,
+                    json={
+                        "message": message,
+                        "content": encoded_content,
+                        "sha": sha,
+                        "branch": branch
+                    }
+                )
+
+                if update_response.status_code == 200:
+                    logger.info(f"Updated {file_path} in {owner}/{repo}")
+                    return True
+                else:
+                    logger.error(f"Failed to update {file_path}: {update_response.status_code}")
+                    return False
+
+        except Exception as e:
+            logger.error(f"Error updating {file_path}: {e}")
+            return False
