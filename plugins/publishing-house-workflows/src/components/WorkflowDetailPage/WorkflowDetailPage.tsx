@@ -1740,41 +1740,18 @@ export function WorkflowDetailPage() {
               Track the development status. Make your changes, then click Update to commit to the repository.
             </Typography>
 
-            {/* Automation Section */}
-            <div style={{ marginBottom: 32 }}>
-              <Typography variant="h6" style={{ marginBottom: 12, fontSize: '1rem', fontWeight: 600 }}>
-                Automation
-              </Typography>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <Typography variant="body2" style={{ minWidth: 100 }}>Status:</Typography>
-                <FormControl variant="outlined" size="small" style={{ minWidth: 150 }} disabled={!canEditModules}>
-                  <Select
-                    value={automationStatus}
-                    onChange={(e) => handleAutomationStatusChange(e.target.value as string)}
-                  >
-                    <MenuItem value="not_started">Not Started</MenuItem>
-                    <MenuItem value="in_progress">In Progress</MenuItem>
-                    <MenuItem value="complete">Complete</MenuItem>
-                  </Select>
-                </FormControl>
-              </div>
-            </div>
-
             {/* Modules Section */}
-            <Typography variant="h6" style={{ marginBottom: 12, fontSize: '1rem', fontWeight: 600 }}>
-              Modules
-            </Typography>
             {(() => {
               if (modules.length === 0) {
                 return (
-                  <Typography variant="body2" style={{ color: '#757575', fontStyle: 'italic' }}>
+                  <Typography variant="body2" style={{ color: '#757575', fontStyle: 'italic', marginBottom: 24 }}>
                     No modules defined in spec.yaml yet.
                   </Typography>
                 );
               }
 
               return (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', marginBottom: 24 }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
                       <th style={{ padding: '8px 12px' }}>Module ID</th>
@@ -1812,6 +1789,38 @@ export function WorkflowDetailPage() {
                 </table>
               );
             })()}
+
+            {/* Automation Section */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+                  <th style={{ padding: '8px 12px' }}>Workstream</th>
+                  <th style={{ padding: '8px 12px' }}>Description</th>
+                  <th style={{ padding: '8px 12px' }}></th>
+                  <th style={{ padding: '8px 12px' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>automation</td>
+                  <td style={{ padding: '8px 12px' }}>Ansible & GitOps</td>
+                  <td style={{ padding: '8px 12px' }}>—</td>
+                  <td style={{ padding: '8px 12px' }}>
+                    <FormControl variant="outlined" size="small" fullWidth disabled={!canEditModules}>
+                      <Select
+                        value={automationStatus}
+                        onChange={(e) => handleAutomationStatusChange(e.target.value as string)}
+                        style={{ minWidth: 150 }}
+                      >
+                        <MenuItem value="not_started">Not Started</MenuItem>
+                        <MenuItem value="in_progress">In Progress</MenuItem>
+                        <MenuItem value="complete">Complete</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
 
             {/* Update Button */}
             {canEditModules && (
