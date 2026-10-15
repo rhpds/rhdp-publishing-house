@@ -238,9 +238,6 @@ def _format_onboarded_epic(fields: dict) -> tuple[str, dict]:
 
     content.append(_build_adf_heading(2, "Technical Details"))
     tech_lines = [
-        _build_adf_text("Automation Type: ", strong=True),
-        _build_adf_text(fields.get("automationType", "ansible")),
-        {"type": "hardBreak"},
         _build_adf_text("AI Requirements: ", strong=True),
         _build_adf_text(ai_req),
         {"type": "hardBreak"},
@@ -480,14 +477,6 @@ def _create_proforma_form(epic_key: str, epic_type: str, fields: dict, settings:
                 "type": "paragraph",
                 "required": False,
                 "value": fields.get("salesPlayTdp", "")
-            },
-            {
-                "id": "automation_type",
-                "label": "How will you automate?",
-                "type": "radio",
-                "required": True,
-                "options": ["ansible", "gitops", "both"],
-                "value": fields.get("automationType", "ansible")
             },
             {
                 "id": "ai_related",

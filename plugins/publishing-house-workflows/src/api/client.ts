@@ -537,6 +537,19 @@ export function createPhWorkflowsClient(options: {
     return await response.json();
   }
 
+  async function getSpecData(
+    workflowId: string,
+  ): Promise<{ spec: any }> {
+    const response = await centralFetch(`/projects/${workflowId}/spec`);
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || `Fetch spec data failed: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
   return {
     getWorkflows,
     getWorkflow,
@@ -558,5 +571,6 @@ export function createPhWorkflowsClient(options: {
     addNote,
     completeTask,
     updateTags,
+    getSpecData,
   };
 }

@@ -437,6 +437,41 @@ def get_workflow_data_by_slug(slug: str, minimal: bool = False, auth: tuple[str,
     return _get_workflow_data(workflow_id, minimal=minimal)
 
 
+@router.get("/{workflow_id}/spec")
+async def get_spec_data(workflow_id: str, auth: tuple[str, int] = Depends(_require_auth)):
+    """Fetch spec.yaml data from the project's GitHub repository.
+
+    Returns the parsed spec.yaml content for displaying modules, etc.
+    """
+    _owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
+
+    settings = get_settings()
+    if not settings.github_token:
+        raise HTTPException(status_code=500, detail="GITHUB_TOKEN not configured")
+
+    # Get workflow data to find repo_url
+    workflow = _get_workflow_data(workflow_id, minimal=False)
+    repo_url = workflow.get("repoUrl")
+    if not repo_url:
+        raise HTTPException(status_code=404, detail="Repository URL not found in workflow")
+
+    # Fetch spec.yaml from GitHub
+    from ..services.github import GitHubService
+    github = GitHubService(token=settings.github_token)
+
+    try:
+        spec_raw = await github.get_file_content(repo_url, "publishing-house/spec.yaml", "main")
+        if not spec_raw:
+            raise HTTPException(status_code=404, detail="spec.yaml not found")
+
+        spec_data = yaml.safe_load(spec_raw)
+        return {"spec": spec_data.get("spec", {})}
+    except Exception as e:
+        logger.error(f"Failed to fetch spec.yaml for {workflow_id}: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to fetch spec.yaml: {e}")
+
+
 _STATE_MAP = {
     "preintakereview": "pre_intake_review",
     "preintakereviewdecision": "pre_intake_review",
@@ -1297,7 +1332,6 @@ async def _create_catalog_background(body: CreateCatalogRequest, settings):
                 "initiative_key": wf_data.get("initiativeKey", "rhdp_catalog"),
                 "showroom_type": wf_data.get("showroomType", "classic"),
                 "intake_type": wf_data.get("intakeType", "new"),
-                "automation_type": "",  # Captured during intake Phase 5, not from template
                 "platform": wf_data.get("platform", "ocp"),
                 "cloud_provider": wf_data.get("cloudProvider", "cnv"),
                 "cluster_type": wf_data.get("clusterType", "sno"),

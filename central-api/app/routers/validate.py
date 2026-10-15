@@ -59,6 +59,7 @@ async def validate_spec(
     try:
         result = await run_validation(github, body.repo_url, body.branch, stage)
     except Exception as e:
+        logger.error(f"Validation failed for {slug} stage={stage}: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=f"Validation failed: {e}")
 
     if not result.passed:

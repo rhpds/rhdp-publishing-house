@@ -136,43 +136,26 @@ def run_checks(
                 field="content/modules/ROOT/pages/",
             ))
 
-    # J-07: development.automation children must all be "complete"
+    # J-07: development.automation.status must be "complete"
     dev = spec_data.get("development", {})
-    automation = dev.get("automation", {})
-    automation_type = spec_data.get("project", {}).get("automation_type", "")
-    expected_children = []
-    if automation_type in ("gitops", "both"):
-        expected_children.append("gitops")
-    if automation_type in ("ansible", "both"):
-        expected_children.append("ansible")
+    automation = dev.get("automation") or {}
+    automation_status = automation.get("status", "") if isinstance(automation, dict) else ""
 
-    if not expected_children:
+    if automation_status == "complete":
         results.append(CheckResult(
-            check_id="J-07", group="J", status=CheckStatus.SKIP,
-            message="No automation_type set in project",
-            field="development.automation",
+            check_id="J-07", group="J", status=CheckStatus.PASS,
+            message="Automation status is complete",
+            field="development.automation.status",
         ))
     else:
-        incomplete = []
-        for child in expected_children:
-            child_status = automation.get(child, {}).get("status", "")
-            if child_status != "complete":
-                incomplete.append(f"{child} ({child_status or 'not set'})")
-        if incomplete:
-            results.append(CheckResult(
-                check_id="J-07", group="J", status=CheckStatus.FAIL,
-                message=f"Automation not complete: {', '.join(incomplete)}",
-                field="development.automation",
-            ))
-        else:
-            results.append(CheckResult(
-                check_id="J-07", group="J", status=CheckStatus.PASS,
-                message=f"All automation children complete: {', '.join(expected_children)}",
-                field="development.automation",
-            ))
+        results.append(CheckResult(
+            check_id="J-07", group="J", status=CheckStatus.FAIL,
+            message=f"Automation status is '{automation_status or 'not set'}', expected 'complete'",
+            field="development.automation.status",
+        ))
 
     # J-08: development.e2e.status must be "complete"
-    e2e_status = dev.get("e2e", {}).get("status", "")
+    e2e_status = (dev.get("e2e") or {}).get("status", "")
     if e2e_status == "complete":
         results.append(CheckResult(
             check_id="J-08", group="J", status=CheckStatus.PASS,
@@ -187,7 +170,7 @@ def run_checks(
         ))
 
     # J-09: development.healthCheck.status must be "complete"
-    hc_status = dev.get("healthCheck", {}).get("status", "")
+    hc_status = (dev.get("healthCheck") or {}).get("status", "")
     if hc_status == "complete":
         results.append(CheckResult(
             check_id="J-09", group="J", status=CheckStatus.PASS,

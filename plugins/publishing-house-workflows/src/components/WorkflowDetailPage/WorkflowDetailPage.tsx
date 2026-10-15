@@ -62,6 +62,7 @@ const STAGES_WITH_REVIEW_TAB: WorkflowStage[] = [
   'content_review', 'infra_review', 'env_setup', 'development', 'testing', 'published',
 ];
 const PRE_INTAKE_STAGES: WorkflowStage[] = ['pre_intake_review'];
+const STAGES_WITH_DEVELOPMENT_TAB: WorkflowStage[] = ['development', 'testing', 'published'];
 
 // Expected next stages after approval/completion (matches workflow transitions)
 // Some stages can transition to multiple targets depending on decision
@@ -223,6 +224,34 @@ export function WorkflowDetailPage() {
     }
   }, [result, fetchReport]);
 
+  // Fetch module statuses from spec data
+  useEffect(() => {
+    if (!result || !STAGES_WITH_DEVELOPMENT_TAB.includes(result.summary.stage)) return;
+
+    const fetchModules = async () => {
+      try {
+        const specData = await client.getSpecData(result.summary.id);
+        const modules = specData?.spec?.modules || [];
+        const statuses: Record<string, string> = {};
+        modules.forEach((mod: any) => {
+          if (mod.id && mod.status) {
+            statuses[mod.id] = mod.status;
+          }
+        });
+        setModuleStatuses(statuses);
+      } catch (error) {
+        console.error('Failed to fetch module data:', error);
+      }
+    };
+
+    fetchModules();
+  }, [result, client]);
+
+  const handleModuleStatusChange = async (moduleId: string, newStatus: string) => {
+    // TODO: Implement module status update when backend endpoint is ready
+    console.log(`Status change requested for ${moduleId}: ${newStatus}`);
+  };
+
   // Initialize pre-intake review fields from workflow data
   useEffect(() => {
     if (!result) return;
@@ -247,7 +276,6 @@ export function WorkflowDetailPage() {
         cloudProvider: wd.cloudProvider || 'cnv',
         clusterType: wd.clusterType || 'sno',
         ocpVersion: wd.ocpVersion || '4.21',
-        automationType: wd.automationType || 'ansible',
         showroomType: wd.showroomType || '',
         initiativeKey: wd.initiativeKey || 'rhdp_catalog',
         tags: wd.tags || [],
@@ -277,6 +305,7 @@ export function WorkflowDetailPage() {
   const [addNoteText, setAddNoteText] = useState('');
   const [submittingNote, setSubmittingNote] = useState(false);
   const [cancelConfirmDialogOpen, setCancelConfirmDialogOpen] = useState(false);
+  const [moduleStatuses, setModuleStatuses] = useState<Record<string, string>>({});
 
   const handleApprove = async (stage: WorkflowStage) => {
     if (!result) return;
@@ -543,18 +572,21 @@ export function WorkflowDetailPage() {
   const hasReviewTab = STAGES_WITH_REVIEW_TAB.includes(summary.stage);
   const isPreIntakeReviewStage = PRE_INTAKE_STAGES.includes(summary.stage);
   const hasStagingTab = summary.stage === 'env_setup' || Boolean(wd?.agnosticvUrls?.length) || Boolean(wd?.ciUrls?.length);
+  const hasDevTab = STAGES_WITH_DEVELOPMENT_TAB.includes(summary.stage);
   const canPreIntakeReview = summary.stage === 'pre_intake_review' && (isContentReviewer || isInfraReviewer || isAdmin);
   const canReview = (summary.stage === 'content_review' && (isContentReviewer || isAdmin))
     || (summary.stage === 'infra_review' && (isInfraReviewer || isAdmin));
   const canStaging = summary.stage === 'env_setup' && (isContentDeveloper || isAdmin);
+  const canEditModules = summary.stage === 'development' && (isContentDeveloper || isAdmin);
   const testingStages: WorkflowStage[] = ['testing', 'published'];
   const hasTestingTab = testingStages.includes(summary.stage);
   const canPostTestingComment = isOperations && summary.stage === 'testing';
   const canCompleteTesting = isOperations || isAdmin;
   const stagingTabIndex = hasReviewTab ? 2 : 1;
-  const testingTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0);
-  const timelineTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0) + (hasTestingTab ? 1 : 0);
-  const notesTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0) + (hasTestingTab ? 1 : 0) + 1;
+  const devTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0);
+  const testingTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0) + (hasDevTab ? 1 : 0);
+  const timelineTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0) + (hasDevTab ? 1 : 0) + (hasTestingTab ? 1 : 0);
+  const notesTabIndex = 1 + (hasReviewTab ? 1 : 0) + (hasStagingTab ? 1 : 0) + (hasDevTab ? 1 : 0) + (hasTestingTab ? 1 : 0) + 1;
 
   return (
     <Page themeId="tool">
@@ -647,6 +679,7 @@ export function WorkflowDetailPage() {
           <Tab label="Intake" />
           {hasReviewTab && <Tab label="Review" />}
           {hasStagingTab && <Tab label="Env Setup" />}
+          {hasDevTab && <Tab label="Development" />}
           {hasTestingTab && <Tab label="Testing" />}
           <Tab label="Timeline" />
           <Tab label="Notes" />
@@ -831,24 +864,6 @@ export function WorkflowDetailPage() {
                     </>
                   ) : (
                     <DetailField label="OCP Version" value={wd?.ocpVersion || '—'} />
-                  )}
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  {summary.stage === 'pre_intake_review' ? (
-                    <>
-                      <Typography className={classes.label}>Automation Type</Typography>
-                      <FormControl fullWidth variant="outlined" size="small">
-                        <Select
-                          value={preIntakeReviewFields.automationType || wd?.automationType || 'ansible'}
-                          onChange={(e) => setPreIntakeReviewFields({ ...preIntakeReviewFields, automationType: e.target.value as string })}
-                        >
-                          <MenuItem value="ansible">Ansible</MenuItem>
-                          <MenuItem value="terraform">Terraform</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </>
-                  ) : (
-                    <DetailField label="Automation Type" value={wd?.automationType || '—'} />
                   )}
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -1619,6 +1634,70 @@ export function WorkflowDetailPage() {
                   </div>
                 )}
               </>
+            )}
+          </InfoCard>
+        )}
+
+        {hasDevTab && activeTab === devTabIndex && (
+          <InfoCard title="Module Development Progress">
+            <Typography variant="body2" style={{ marginBottom: 16, color: '#757575' }}>
+              Track the development status of each module. Update status as you complete writing each module.
+            </Typography>
+            {(() => {
+              const specData = (validationReport as any)?.spec_data;
+              const modules = specData?.spec?.modules || [];
+
+              if (modules.length === 0) {
+                return (
+                  <Typography variant="body2" style={{ color: '#757575', fontStyle: 'italic' }}>
+                    No modules defined in spec.yaml yet.
+                  </Typography>
+                );
+              }
+
+              return (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+                      <th style={{ padding: '8px 12px' }}>Module ID</th>
+                      <th style={{ padding: '8px 12px' }}>Title</th>
+                      <th style={{ padding: '8px 12px' }}>Duration (min)</th>
+                      <th style={{ padding: '8px 12px' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modules.map((module: any, i: number) => {
+                      const currentStatus = moduleStatuses[module.id] || module.status || 'not_started';
+
+                      return (
+                        <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                          <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>{module.id}</td>
+                          <td style={{ padding: '8px 12px' }}>{module.title || '—'}</td>
+                          <td style={{ padding: '8px 12px' }}>{module.duration_min || '—'}</td>
+                          <td style={{ padding: '8px 12px' }}>
+                            <FormControl variant="outlined" size="small" fullWidth disabled={!canEditModules}>
+                              <Select
+                                value={currentStatus}
+                                onChange={(e) => handleModuleStatusChange(module.id, e.target.value as string)}
+                                style={{ minWidth: 150 }}
+                              >
+                                <MenuItem value="not_started">Not Started</MenuItem>
+                                <MenuItem value="in_progress">In Progress</MenuItem>
+                                <MenuItem value="complete">Complete</MenuItem>
+                              </Select>
+                            </FormControl>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              );
+            })()}
+            {canEditModules && (
+              <Typography variant="caption" style={{ display: 'block', marginTop: 16, color: '#757575' }}>
+                Status changes are committed directly to the repository.
+              </Typography>
             )}
           </InfoCard>
         )}

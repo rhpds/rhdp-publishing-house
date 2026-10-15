@@ -13,7 +13,6 @@ project:
   initiative_key: "${{ values.initiative_key }}"
   showroom_type: "${{ values.showroom_type }}"
   intake_type: "${{ values.intake_type }}"
-  automation_type: "${{ values.automation_type }}"
   description: "${{ values.project_description | replace('\r', '') | replace('\n', ' ') | replace('\t', ' ') | replace('\\', '\\\\') | replace('"', '\\"') }}"
   # content_reviewer_email and infra_reviewer_email are assigned by the RHDP team — not set by the author
   jira_ticket: ""
@@ -60,14 +59,7 @@ spec:
 
 development:
   automation:
-{%- if values.automation_type == 'gitops' or values.automation_type == 'both' %}
-    gitops:
-      status: not_started
-{%- endif %}
-{%- if values.automation_type == 'ansible' or values.automation_type == 'both' %}
-    ansible:
-      status: not_started
-{%- endif %}
+    status: not_started
   e2e:
     status: not_started
   healthCheck:
