@@ -867,7 +867,23 @@ export function WorkflowDetailPage() {
                   )}
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <DetailField label="Initiative" value={wd?.initiativeKey || '—'} />
+                  {summary.stage === 'pre_intake_review' ? (
+                    <>
+                      <Typography className={classes.label}>Initiative</Typography>
+                      <FormControl fullWidth variant="outlined" size="small">
+                        <Select
+                          value={preIntakeReviewFields.initiativeKey || wd?.initiativeKey || 'rhdp_catalog'}
+                          onChange={(e) => setPreIntakeReviewFields({ ...preIntakeReviewFields, initiativeKey: e.target.value as string })}
+                        >
+                          <MenuItem value="rhdp_catalog">RHDP Catalog</MenuItem>
+                          <MenuItem value="rh1_2027">RH1 2027</MenuItem>
+                          <MenuItem value="summit_2027">Summit 2027</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </>
+                  ) : (
+                    <DetailField label="Initiative" value={wd?.initiativeKey || '—'} />
+                  )}
                 </Grid>
                 <Grid item xs={12}>
                   <Grid container spacing={2}>
