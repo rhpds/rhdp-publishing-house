@@ -165,6 +165,15 @@ export function WorkflowDetailPage() {
   const [driftReport, setDriftReport] = useState<DriftReport | null>(null);
   const [driftLoading, setDriftLoading] = useState(false);
 
+  // Development tab state
+  const [moduleStatuses, setModuleStatuses] = useState<Record<string, string>>({});
+  const [modules, setModules] = useState<any[]>([]);
+  const [automationStatus, setAutomationStatus] = useState<string>('not_started');
+  const [initialModuleStatuses, setInitialModuleStatuses] = useState<Record<string, string>>({});
+  const [initialAutomationStatus, setInitialAutomationStatus] = useState<string>('not_started');
+  const [updatingStatuses, setUpdatingStatuses] = useState(false);
+  const [skipNextFetch, setSkipNextFetch] = useState(false);
+
   useEffect(() => {
     identityApi.getProfileInfo().then(profile => {
       if (profile.email) setCurrentUserEmail(profile.email);
@@ -424,13 +433,6 @@ export function WorkflowDetailPage() {
   const [addNoteText, setAddNoteText] = useState('');
   const [submittingNote, setSubmittingNote] = useState(false);
   const [cancelConfirmDialogOpen, setCancelConfirmDialogOpen] = useState(false);
-  const [moduleStatuses, setModuleStatuses] = useState<Record<string, string>>({});
-  const [modules, setModules] = useState<any[]>([]);
-  const [automationStatus, setAutomationStatus] = useState<string>('not_started');
-  const [initialModuleStatuses, setInitialModuleStatuses] = useState<Record<string, string>>({});
-  const [initialAutomationStatus, setInitialAutomationStatus] = useState<string>('not_started');
-  const [updatingStatuses, setUpdatingStatuses] = useState(false);
-  const [skipNextFetch, setSkipNextFetch] = useState(false);
 
   const handleApprove = async (stage: WorkflowStage) => {
     if (!result) return;
