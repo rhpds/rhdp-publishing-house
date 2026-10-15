@@ -17,7 +17,7 @@ import yaml
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Security, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Header, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from ..auth.groups import GROUP_BITS, ALL_GROUPS_MASK, decode_signed_key
