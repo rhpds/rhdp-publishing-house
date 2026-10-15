@@ -1811,13 +1811,14 @@ export function WorkflowDetailPage() {
                     {modules.map((module: any, i: number) => {
                       const currentStatus = moduleStatuses[module.id] || module.status || 'not_started';
 
+                      const isCompleteInSpec = initialModuleStatuses[module.id] === 'complete';
                       return (
                         <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                           <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>{module.id}</td>
                           <td style={{ padding: '8px 12px' }}>{module.title || '—'}</td>
                           <td style={{ padding: '8px 12px' }}>{module.duration_min || '—'}</td>
                           <td style={{ padding: '8px 12px' }}>
-                            <FormControl variant="outlined" size="small" fullWidth disabled={!canEditModules || currentStatus === 'complete'}>
+                            <FormControl variant="outlined" size="small" fullWidth disabled={!canEditModules || isCompleteInSpec}>
                               <Select
                                 value={currentStatus}
                                 onChange={(e) => handleModuleStatusChange(module.id, e.target.value as string)}
@@ -1853,7 +1854,7 @@ export function WorkflowDetailPage() {
                   <td style={{ padding: '8px 12px' }}>Ansible or GitOps</td>
                   <td style={{ padding: '8px 12px' }}></td>
                   <td style={{ padding: '8px 12px' }}>
-                    <FormControl variant="outlined" size="small" fullWidth disabled={!canEditModules || automationStatus === 'complete'}>
+                    <FormControl variant="outlined" size="small" fullWidth disabled={!canEditModules || initialAutomationStatus === 'complete'}>
                       <Select
                         value={automationStatus}
                         onChange={(e) => handleAutomationStatusChange(e.target.value as string)}
