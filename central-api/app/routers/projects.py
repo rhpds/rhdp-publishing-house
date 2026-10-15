@@ -575,9 +575,9 @@ async def update_automation_status(
         spec_data = yaml.safe_load(spec_raw)
 
         # Update development.automation.status
-        if "development" not in spec_data:
+        if "development" not in spec_data or spec_data["development"] is None:
             spec_data["development"] = {}
-        if "automation" not in spec_data["development"]:
+        if "automation" not in spec_data["development"] or spec_data["development"]["automation"] is None:
             spec_data["development"]["automation"] = {}
 
         spec_data["development"]["automation"]["status"] = status
