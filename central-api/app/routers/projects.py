@@ -582,6 +582,21 @@ async def update_module_status(
         except Exception as e:
             logger.warning(f"Failed to add note for module status update: {e}")
 
+        # Close Jira ticket if status is complete
+        if status == "complete":
+            try:
+                wd = workflow.get("workflowdata", {})
+                epic_key = wd.get("epic_key", "")
+                if epic_key and settings.jira_url:
+                    from .jira import _find_task_by_label, _transition_to_done
+                    task = _find_task_by_label(epic_key, f"ph:{module_id}", settings)
+                    if task and task.get("status", "").lower() != "done":
+                        closed = _transition_to_done(task["key"], settings)
+                        if closed:
+                            logger.info(f"Closed Jira ticket {task['key']} for {module_id}")
+            except Exception as e:
+                logger.warning(f"Failed to close Jira ticket for {module_id}: {e}")
+
         logger.info(f"Updated {module_id} status to {status} for workflow {workflow_id}")
         return {"success": True, "module_id": module_id, "status": status}
 
@@ -693,6 +708,21 @@ async def update_automation_status(
                     _patch_workflow_data(workflow_id, {"notes": notes}, settings=settings)
         except Exception as e:
             logger.warning(f"Failed to add note for automation status update: {e}")
+
+        # Close Jira ticket if status is complete
+        if status == "complete":
+            try:
+                wd = workflow.get("workflowdata", {})
+                epic_key = wd.get("epic_key", "")
+                if epic_key and settings.jira_url:
+                    from .jira import _find_task_by_label, _transition_to_done
+                    task = _find_task_by_label(epic_key, "ph:write-automation", settings)
+                    if task and task.get("status", "").lower() != "done":
+                        closed = _transition_to_done(task["key"], settings)
+                        if closed:
+                            logger.info(f"Closed Jira ticket {task['key']} for write-automation")
+            except Exception as e:
+                logger.warning(f"Failed to close Jira ticket for write-automation: {e}")
 
         logger.info(f"Updated automation status to {status} for workflow {workflow_id}")
         return {"success": True, "status": status}
