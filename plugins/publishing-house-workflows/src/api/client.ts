@@ -555,7 +555,7 @@ export function createPhWorkflowsClient(options: {
     moduleId: string,
     status: string,
   ): Promise<{ success: boolean; module_id: string; status: string }> {
-    const response = await centralFetch(`/projects/${workflowId}/modules/${moduleId}/status`, {
+    const response = await centralFetch(`/projects/${workflowId}/development/modules/${moduleId}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
@@ -573,7 +573,7 @@ export function createPhWorkflowsClient(options: {
     workflowId: string,
     status: string,
   ): Promise<{ success: boolean; status: string }> {
-    const response = await centralFetch(`/projects/${workflowId}/automation/status`, {
+    const response = await centralFetch(`/projects/${workflowId}/development/automation/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),

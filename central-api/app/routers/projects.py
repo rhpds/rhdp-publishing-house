@@ -472,7 +472,7 @@ async def get_spec_data(workflow_id: str, auth: tuple[str, int] = Depends(_requi
         raise HTTPException(status_code=502, detail=f"Failed to fetch spec.yaml: {e}")
 
 
-@router.patch("/{workflow_id}/modules/{module_id}/status")
+@router.patch("/{workflow_id}/development/modules/{module_id}/status")
 async def update_module_status(
     workflow_id: str,
     module_id: str,
@@ -541,7 +541,7 @@ async def update_module_status(
         raise HTTPException(status_code=502, detail=f"Failed to update module status: {e}")
 
 
-@router.patch("/{workflow_id}/automation/status")
+@router.patch("/{workflow_id}/development/automation/status")
 async def update_automation_status(
     workflow_id: str,
     status: str = Body(..., embed=True),
