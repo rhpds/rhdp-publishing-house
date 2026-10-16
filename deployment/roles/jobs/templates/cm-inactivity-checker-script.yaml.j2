@@ -284,7 +284,6 @@ data:
         checked = 0
         stale = 0
         alerted = 0
-        errors = 0
 
         for inst in instances:
             slug = inst.get("businessKey", "")
@@ -332,25 +331,16 @@ data:
                         alerted += 1
                         print(f"  [{slug}] ALERTED — commented on {epic_key}")
                     except Exception as e:
-                        errors += 1
                         print(f"  [{slug}] ERROR posting Jira comment: {e}", file=sys.stderr)
                 else:
                     days_ago = (datetime.now(timezone.utc) - last_commit).days
                     print(f"  [{slug}] active — last commit {days_ago} day(s) ago")
 
             except Exception as e:
-                # Don't treat 404 as a fatal error - repo may be deleted or private
-                error_msg = str(e)
-                if "404" in error_msg or "Not Found" in error_msg:
-                    print(f"  [{slug}] SKIP — repository not accessible (404)")
-                    continue
-
-                errors += 1
+                # Log error and continue processing other projects
                 print(f"  [{slug}] ERROR checking GitHub: {e}", file=sys.stderr)
 
-        print(f"\n=== Summary: checked={checked} stale={stale} alerted={alerted} errors={errors} ===")
-        if errors:
-            sys.exit(1)
+        print(f"\n=== Summary: checked={checked} stale={stale} alerted={alerted} ===")
 
 
     if __name__ == "__main__":
