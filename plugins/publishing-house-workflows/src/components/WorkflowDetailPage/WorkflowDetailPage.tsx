@@ -169,8 +169,12 @@ export function WorkflowDetailPage() {
   const [moduleStatuses, setModuleStatuses] = useState<Record<string, string>>({});
   const [modules, setModules] = useState<any[]>([]);
   const [automationStatus, setAutomationStatus] = useState<string>('not_started');
+  const [e2eStatus, setE2eStatus] = useState<string>('not_started');
+  const [healthCheckStatus, setHealthCheckStatus] = useState<string>('not_started');
   const [initialModuleStatuses, setInitialModuleStatuses] = useState<Record<string, string>>({});
   const [initialAutomationStatus, setInitialAutomationStatus] = useState<string>('not_started');
+  const [initialE2eStatus, setInitialE2eStatus] = useState<string>('not_started');
+  const [initialHealthCheckStatus, setInitialHealthCheckStatus] = useState<string>('not_started');
   const [updatingStatuses, setUpdatingStatuses] = useState(false);
   const [skipNextFetch, setSkipNextFetch] = useState(false);
 
@@ -263,6 +267,17 @@ export function WorkflowDetailPage() {
         const autoStatus = automation?.status || 'not_started';
         setAutomationStatus(autoStatus);
         setInitialAutomationStatus(autoStatus);
+
+        // Fetch e2e and healthCheck statuses
+        const e2e = development?.e2e || {};
+        const e2eStatusValue = e2e?.status || 'not_started';
+        setE2eStatus(e2eStatusValue);
+        setInitialE2eStatus(e2eStatusValue);
+
+        const healthCheck = development?.healthCheck || {};
+        const healthCheckStatusValue = healthCheck?.status || 'not_started';
+        setHealthCheckStatus(healthCheckStatusValue);
+        setInitialHealthCheckStatus(healthCheckStatusValue);
       } catch (error) {
         console.error('Failed to fetch module data:', error);
       }
@@ -277,6 +292,14 @@ export function WorkflowDetailPage() {
 
   const handleAutomationStatusChange = (newStatus: string) => {
     setAutomationStatus(newStatus);
+  };
+
+  const handleE2eStatusChange = (newStatus: string) => {
+    setE2eStatus(newStatus);
+  };
+
+  const handleHealthCheckStatusChange = (newStatus: string) => {
+    setHealthCheckStatus(newStatus);
   };
 
   const handleUpdateAllStatuses = async () => {
@@ -305,6 +328,24 @@ export function WorkflowDetailPage() {
           await client.updateAutomationStatus(result.summary.id, automationStatus);
         } catch (error) {
           errors.push(`Failed to update automation status: ${error}`);
+        }
+      }
+
+      // Update e2e status if changed
+      if (e2eStatus !== initialE2eStatus) {
+        try {
+          await client.updateE2eStatus(result.summary.id, e2eStatus);
+        } catch (error) {
+          errors.push(`Failed to update e2e status: ${error}`);
+        }
+      }
+
+      // Update healthCheck status if changed
+      if (healthCheckStatus !== initialHealthCheckStatus) {
+        try {
+          await client.updateHealthCheckStatus(result.summary.id, healthCheckStatus);
+        } catch (error) {
+          errors.push(`Failed to update healthCheck status: ${error}`);
         }
       }
 
@@ -342,6 +383,16 @@ export function WorkflowDetailPage() {
           setAutomationStatus(autoStatus);
           setInitialAutomationStatus(autoStatus);
 
+          const e2e = development?.e2e || {};
+          const e2eStatusValue = e2e?.status || 'not_started';
+          setE2eStatus(e2eStatusValue);
+          setInitialE2eStatus(e2eStatusValue);
+
+          const healthCheck = development?.healthCheck || {};
+          const healthCheckStatusValue = healthCheck?.status || 'not_started';
+          setHealthCheckStatus(healthCheckStatusValue);
+          setInitialHealthCheckStatus(healthCheckStatusValue);
+
           // Refetch workflow data (includes notes) but skip the next automatic spec fetch
           setSkipNextFetch(true);
           setRefreshKey(k => k + 1);
@@ -377,7 +428,9 @@ export function WorkflowDetailPage() {
       ([moduleId, status]) => initialModuleStatuses[moduleId] !== status
     );
     const automationChanged = automationStatus !== initialAutomationStatus;
-    return moduleChanged || automationChanged;
+    const e2eChanged = e2eStatus !== initialE2eStatus;
+    const healthCheckChanged = healthCheckStatus !== initialHealthCheckStatus;
+    return moduleChanged || automationChanged || e2eChanged || healthCheckChanged;
   };
 
   // Initialize pre-intake review fields from workflow data
@@ -1817,12 +1870,12 @@ export function WorkflowDetailPage() {
                           <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>{module.id}</td>
                           <td style={{ padding: '8px 12px' }}>{module.title || '—'}</td>
                           <td style={{ padding: '8px 12px' }}>{module.duration_min || '—'}</td>
-                          <td style={{ padding: '8px 12px' }}>
-                            <FormControl variant="outlined" size="small" fullWidth disabled={!canEditModules || isCompleteInSpec}>
+                          <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                            <FormControl variant="outlined" size="small" disabled={!canEditModules || isCompleteInSpec}>
                               <Select
                                 value={currentStatus}
                                 onChange={(e) => handleModuleStatusChange(module.id, e.target.value as string)}
-                                style={{ minWidth: 150 }}
+                                style={{ width: 150 }}
                               >
                                 <MenuItem value="not_started">Not Started</MenuItem>
                                 <MenuItem value="in_progress">In Progress</MenuItem>
@@ -1839,7 +1892,7 @@ export function WorkflowDetailPage() {
             })()}
 
             {/* Automation Section */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', marginBottom: 24 }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
                   <th style={{ padding: '8px 12px' }}>Workstream</th>
@@ -1853,12 +1906,62 @@ export function WorkflowDetailPage() {
                   <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>automation</td>
                   <td style={{ padding: '8px 12px' }}>Ansible or GitOps</td>
                   <td style={{ padding: '8px 12px' }}></td>
-                  <td style={{ padding: '8px 12px' }}>
-                    <FormControl variant="outlined" size="small" fullWidth disabled={!canEditModules || initialAutomationStatus === 'complete'}>
+                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                    <FormControl variant="outlined" size="small" disabled={!canEditModules || initialAutomationStatus === 'complete'}>
                       <Select
                         value={automationStatus}
                         onChange={(e) => handleAutomationStatusChange(e.target.value as string)}
-                        style={{ minWidth: 150 }}
+                        style={{ width: 150 }}
+                      >
+                        <MenuItem value="not_started">Not Started</MenuItem>
+                        <MenuItem value="in_progress">In Progress</MenuItem>
+                        <MenuItem value="complete">Complete</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Testing Section */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+                  <th style={{ padding: '8px 12px' }}>Testing</th>
+                  <th style={{ padding: '8px 12px' }}>Description</th>
+                  <th style={{ padding: '8px 12px' }}></th>
+                  <th style={{ padding: '8px 12px' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>e2e</td>
+                  <td style={{ padding: '8px 12px' }}>End-to-end tests</td>
+                  <td style={{ padding: '8px 12px' }}></td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                    <FormControl variant="outlined" size="small" disabled={!canEditModules || initialE2eStatus === 'complete'}>
+                      <Select
+                        value={e2eStatus}
+                        onChange={(e) => handleE2eStatusChange(e.target.value as string)}
+                        style={{ width: 150 }}
+                      >
+                        <MenuItem value="not_started">Not Started</MenuItem>
+                        <MenuItem value="in_progress">In Progress</MenuItem>
+                        <MenuItem value="complete">Complete</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>healthCheck</td>
+                  <td style={{ padding: '8px 12px' }}>Health check playbook</td>
+                  <td style={{ padding: '8px 12px' }}></td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                    <FormControl variant="outlined" size="small" disabled={!canEditModules || initialHealthCheckStatus === 'complete'}>
+                      <Select
+                        value={healthCheckStatus}
+                        onChange={(e) => handleHealthCheckStatusChange(e.target.value as string)}
+                        style={{ width: 150 }}
                       >
                         <MenuItem value="not_started">Not Started</MenuItem>
                         <MenuItem value="in_progress">In Progress</MenuItem>

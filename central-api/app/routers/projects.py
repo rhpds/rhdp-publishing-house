@@ -732,6 +732,254 @@ async def update_automation_status(
         raise HTTPException(status_code=502, detail=f"Failed to update automation status: {e}")
 
 
+@router.patch("/{workflow_id}/development/e2e/status")
+async def update_e2e_status(
+    workflow_id: str,
+    status: str = Body(..., embed=True),
+    auth: tuple[str, int] = Depends(_require_auth)
+):
+    """Update development.e2e.status in spec.yaml and commit to repository."""
+    _owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
+
+    if status not in ["not_started", "in_progress", "complete"]:
+        raise HTTPException(status_code=400, detail="Invalid status. Must be: not_started, in_progress, or complete")
+
+    settings = get_settings()
+    if not settings.github_token:
+        raise HTTPException(status_code=500, detail="GITHUB_TOKEN not configured")
+
+    workflow = _get_workflow_data(workflow_id, minimal=False)
+    repo_url = workflow.get("repoUrl")
+    if not repo_url:
+        raise HTTPException(status_code=404, detail="Repository URL not found in workflow")
+
+    from ..services.github import GitHubService
+    github = GitHubService(token=settings.github_token)
+
+    try:
+        # Fetch current spec.yaml
+        spec_raw = await github.get_file_content(repo_url, "publishing-house/spec.yaml", "main")
+        if not spec_raw:
+            raise HTTPException(status_code=404, detail="spec.yaml not found")
+
+        spec_data = yaml.safe_load(spec_raw)
+
+        # Update development.e2e.status
+        if "development" not in spec_data or spec_data["development"] is None:
+            spec_data["development"] = {}
+        if "e2e" not in spec_data["development"] or spec_data["development"]["e2e"] is None:
+            spec_data["development"]["e2e"] = {}
+
+        spec_data["development"]["e2e"]["status"] = status
+
+        # Write updated spec.yaml back
+        updated_yaml = yaml.dump(spec_data, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+        commit_message = f"feat: update e2e status to {status}\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+        await github.update_file(
+            repo_url=repo_url,
+            file_path="publishing-house/spec.yaml",
+            content=updated_yaml,
+            message=commit_message,
+            branch="main"
+        )
+
+        # Get the new commit SHA
+        new_sha = await github.get_head_sha(repo_url, "main")
+        commit_short = new_sha[:7] if new_sha else "unknown"
+
+        # Add note to workflow
+        try:
+            stage = workflow.get("stage", "development")
+            note_text = f"Updated e2e status to {status} (commit: {commit_short})"
+
+            query = """
+            query GetProcessInstance($id: String!) {
+                ProcessInstances(where: { id: { equal: $id } }) {
+                    id variables
+                }
+            }
+            """
+            graphql_payload = json.dumps({"query": query, "variables": {"id": workflow_id}}).encode()
+            graphql_req = urllib.request.Request(
+                f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+                data=graphql_payload,
+                headers={"Content-Type": "application/json"},
+            )
+
+            with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+                result = json.loads(resp.read().decode())
+                instances = result.get("data", {}).get("ProcessInstances", [])
+                if instances:
+                    variables = instances[0].get("variables", {})
+                    workflowdata = variables.get("workflowdata", {})
+                    notes = workflowdata.get("notes", [])
+
+                    # Add new note
+                    new_note = {
+                        "user": _owner,
+                        "text": note_text,
+                        "type": "info",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "stage": stage,
+                    }
+                    notes.append(new_note)
+
+                    # Update workflow data
+                    _patch_workflow_data(workflow_id, {"notes": notes}, settings=settings)
+        except Exception as e:
+            logger.warning(f"Failed to add note for e2e status update: {e}")
+
+        # Close Jira ticket if status is complete
+        if status == "complete":
+            try:
+                epic_key = workflow.get("epic_key", "")
+                if epic_key and settings.jira_url:
+                    from .jira import _find_task_by_label, _transition_to_done
+                    task = _find_task_by_label(epic_key, "ph:write-e2e-tests", settings)
+                    if task and task.get("status", "").lower() != "done":
+                        closed = _transition_to_done(task["key"], settings)
+                        if closed:
+                            logger.info(f"Closed Jira ticket {task['key']} for write-e2e-tests")
+            except Exception as e:
+                logger.warning(f"Failed to close Jira ticket for write-e2e-tests: {e}")
+
+        logger.info(f"Updated e2e status to {status} for workflow {workflow_id}")
+        return {"success": True, "status": status}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update e2e status for {workflow_id}: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to update e2e status: {e}")
+
+
+@router.patch("/{workflow_id}/development/healthCheck/status")
+async def update_health_check_status(
+    workflow_id: str,
+    status: str = Body(..., embed=True),
+    auth: tuple[str, int] = Depends(_require_auth)
+):
+    """Update development.healthCheck.status in spec.yaml and commit to repository."""
+    _owner, groups = auth
+    _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
+
+    if status not in ["not_started", "in_progress", "complete"]:
+        raise HTTPException(status_code=400, detail="Invalid status. Must be: not_started, in_progress, or complete")
+
+    settings = get_settings()
+    if not settings.github_token:
+        raise HTTPException(status_code=500, detail="GITHUB_TOKEN not configured")
+
+    workflow = _get_workflow_data(workflow_id, minimal=False)
+    repo_url = workflow.get("repoUrl")
+    if not repo_url:
+        raise HTTPException(status_code=404, detail="Repository URL not found in workflow")
+
+    from ..services.github import GitHubService
+    github = GitHubService(token=settings.github_token)
+
+    try:
+        # Fetch current spec.yaml
+        spec_raw = await github.get_file_content(repo_url, "publishing-house/spec.yaml", "main")
+        if not spec_raw:
+            raise HTTPException(status_code=404, detail="spec.yaml not found")
+
+        spec_data = yaml.safe_load(spec_raw)
+
+        # Update development.healthCheck.status
+        if "development" not in spec_data or spec_data["development"] is None:
+            spec_data["development"] = {}
+        if "healthCheck" not in spec_data["development"] or spec_data["development"]["healthCheck"] is None:
+            spec_data["development"]["healthCheck"] = {}
+
+        spec_data["development"]["healthCheck"]["status"] = status
+
+        # Write updated spec.yaml back
+        updated_yaml = yaml.dump(spec_data, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+        commit_message = f"feat: update healthCheck status to {status}\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+        await github.update_file(
+            repo_url=repo_url,
+            file_path="publishing-house/spec.yaml",
+            content=updated_yaml,
+            message=commit_message,
+            branch="main"
+        )
+
+        # Get the new commit SHA
+        new_sha = await github.get_head_sha(repo_url, "main")
+        commit_short = new_sha[:7] if new_sha else "unknown"
+
+        # Add note to workflow
+        try:
+            stage = workflow.get("stage", "development")
+            note_text = f"Updated healthCheck status to {status} (commit: {commit_short})"
+
+            query = """
+            query GetProcessInstance($id: String!) {
+                ProcessInstances(where: { id: { equal: $id } }) {
+                    id variables
+                }
+            }
+            """
+            graphql_payload = json.dumps({"query": query, "variables": {"id": workflow_id}}).encode()
+            graphql_req = urllib.request.Request(
+                f"{settings.sonataflow_graphql_url.rstrip('/')}/graphql",
+                data=graphql_payload,
+                headers={"Content-Type": "application/json"},
+            )
+
+            with urllib.request.urlopen(graphql_req, context=_SSL_CTX, timeout=30) as resp:
+                result = json.loads(resp.read().decode())
+                instances = result.get("data", {}).get("ProcessInstances", [])
+                if instances:
+                    variables = instances[0].get("variables", {})
+                    workflowdata = variables.get("workflowdata", {})
+                    notes = workflowdata.get("notes", [])
+
+                    # Add new note
+                    new_note = {
+                        "user": _owner,
+                        "text": note_text,
+                        "type": "info",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "stage": stage,
+                    }
+                    notes.append(new_note)
+
+                    # Update workflow data
+                    _patch_workflow_data(workflow_id, {"notes": notes}, settings=settings)
+        except Exception as e:
+            logger.warning(f"Failed to add note for healthCheck status update: {e}")
+
+        # Close Jira ticket if status is complete
+        if status == "complete":
+            try:
+                epic_key = workflow.get("epic_key", "")
+                if epic_key and settings.jira_url:
+                    from .jira import _find_task_by_label, _transition_to_done
+                    task = _find_task_by_label(epic_key, "ph:write-health-check", settings)
+                    if task and task.get("status", "").lower() != "done":
+                        closed = _transition_to_done(task["key"], settings)
+                        if closed:
+                            logger.info(f"Closed Jira ticket {task['key']} for write-health-check")
+            except Exception as e:
+                logger.warning(f"Failed to close Jira ticket for write-health-check: {e}")
+
+        logger.info(f"Updated healthCheck status to {status} for workflow {workflow_id}")
+        return {"success": True, "status": status}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update healthCheck status for {workflow_id}: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to update healthCheck status: {e}")
+
+
 _STATE_MAP = {
     "preintakereview": "pre_intake_review",
     "preintakereviewdecision": "pre_intake_review",
