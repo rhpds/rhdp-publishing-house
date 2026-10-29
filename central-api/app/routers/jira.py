@@ -823,8 +823,11 @@ def update_epic(
             "version": 1,
             "content": [
                 {"type": "paragraph", "content": [{"type": "text",
-                 "text": "Testing phase tracker. Testers post comments here during testing. "
-                         "This task will be closed automatically when testing is marked complete."}]},
+                 "text": "Testing phase tracker. When the Publishing House workflow enters "
+                         "the Testing stage, this ticket gets the ready-for-testing label and "
+                         "a one-shot comment with a link back to Publishing House. Testers post "
+                         "checklist progress here. This task is closed automatically when "
+                         "testing is marked complete."}]},
             ],
         },
     }
@@ -1070,6 +1073,13 @@ POINTS = {
     "write-e2e-tests": 8,
     "testing": 3,
 }
+
+# Applied to the ph:testing task when the workflow enters Testing.
+# Used by Ops JQL filters (assignee + ready-for-testing) to find work that is
+# actually ready — not merely assigned ahead of the PH stage gate.
+READY_FOR_TESTING_LABEL = "ready-for-testing"
+# Distinctive phrase used for idempotent comment posting (one comment per ticket).
+READY_FOR_TESTING_MARKER = "Publishing House — ready for testing"
 
 FIXED_TASKS = [
     {"id": "write-automation", "summary": "[PH] Write Automation"},
@@ -1397,12 +1407,20 @@ async def sync_jira_tasks(
 
     asyncio.get_event_loop().run_in_executor(
         None, _sync_jira_tasks_bg, repo_url, epic_key, settings, body.status, slug,
+        body.workflow_id,
     )
     logger.info("jira sync: accepted for epic %s (status=%s) — running in background", epic_key, body.status)
     return SyncResponse(epic_key=epic_key)
 
 
-def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, status: str = "", slug: str = ""):
+def _sync_jira_tasks_bg(
+    repo_url: str,
+    epic_key: str,
+    settings: Settings,
+    status: str = "",
+    slug: str = "",
+    workflow_id: str = "",
+):
     """Background thread: sync Jira tasks from spec.yaml, design.md, and module outlines."""
     try:
         gh = GitHubService(token=settings.github_token)
@@ -1587,11 +1605,23 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, status
                     if _transition_to_done(task["key"], settings):
                         tasks_closed += 1
 
+        if status == "DevelopmentComplete":
+            testing_task = label_to_task.get("ph:testing")
+            if testing_task:
+                _mark_ready_for_testing(
+                    testing_task, epic_key, settings,
+                    workflow_id=workflow_id, slug=slug,
+                )
+
         if status == "TestingComplete":
             testing_task = label_to_task.get("ph:testing")
             if testing_task and testing_task["status"].lower() != "done":
                 if _transition_to_done(testing_task["key"], settings):
                     tasks_closed += 1
+            if testing_task:
+                _drop_issue_labels(
+                    testing_task["key"], [READY_FOR_TESTING_LABEL], settings,
+                )
 
         if status == "Published":
             if _transition_to_done(epic_key, settings):
@@ -1605,7 +1635,228 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, status
         logger.error("jira sync bg: failed for epic %s: %s", epic_key, e, exc_info=True)
 
 
-# ── Testing Comments ─────────────────────────────────────────────────────────
+# ── Ready for Testing (label + one-shot comment) ─────────────────────────────
+
+
+def _resolve_ph_portal_url(settings: Settings) -> str:
+    """Return the public Publishing House portal base URL, or '' if unknown."""
+    if settings.ph_portal_url:
+        return settings.ph_portal_url.rstrip("/")
+    try:
+        return settings._get_route_url("central-publishing-house").rstrip("/")
+    except Exception as e:
+        logger.warning("jira: could not resolve PH portal URL: %s", e)
+        return ""
+
+
+def _ph_workflow_url(settings: Settings, workflow_id: str = "") -> str:
+    """Link testers back into Publishing House Workflows."""
+    base = _resolve_ph_portal_url(settings)
+    if not base:
+        return ""
+    if workflow_id:
+        return f"{base}/publishing-house-workflows/{workflow_id}"
+    return f"{base}/publishing-house-workflows"
+
+
+def _get_issue_labels(ticket_key: str, settings: Settings) -> list[str]:
+    headers = _jira_headers(settings)
+    req = urllib.request.Request(
+        f"{settings.jira_url}/rest/api/3/issue/{ticket_key}?fields=labels",
+        headers=headers,
+    )
+    try:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
+            return json.loads(r.read().decode()).get("fields", {}).get("labels", []) or []
+    except Exception as e:
+        logger.warning("jira: failed to read labels for %s: %s", ticket_key, e)
+        return []
+
+
+def _set_issue_labels(ticket_key: str, labels: list[str], settings: Settings) -> bool:
+    headers = _jira_headers(settings)
+    req = urllib.request.Request(
+        f"{settings.jira_url}/rest/api/3/issue/{ticket_key}",
+        data=json.dumps({"fields": {"labels": labels}}).encode(),
+        headers=headers,
+        method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+            return True
+    except Exception as e:
+        logger.warning("jira: failed to set labels on %s: %s", ticket_key, e)
+        return False
+
+
+def _ensure_issue_labels(ticket_key: str, labels_to_add: list[str], settings: Settings) -> bool:
+    """Add labels if missing. Returns True when labels were changed."""
+    current = _get_issue_labels(ticket_key, settings)
+    merged = sorted(set(current) | set(labels_to_add))
+    if merged == sorted(current):
+        return False
+    ok = _set_issue_labels(ticket_key, merged, settings)
+    if ok:
+        logger.info("jira: added labels %s on %s", labels_to_add, ticket_key)
+    return ok
+
+
+def _drop_issue_labels(ticket_key: str, labels_to_drop: list[str], settings: Settings) -> bool:
+    """Remove labels if present. Returns True when labels were changed."""
+    current = _get_issue_labels(ticket_key, settings)
+    drop = set(labels_to_drop)
+    if not drop.intersection(current):
+        return False
+    remaining = sorted(set(current) - drop)
+    ok = _set_issue_labels(ticket_key, remaining, settings)
+    if ok:
+        logger.info("jira: removed labels %s from %s", labels_to_drop, ticket_key)
+    return ok
+
+
+def _comment_has_marker(ticket_key: str, marker: str, settings: Settings) -> bool:
+    for comment in _get_comments(ticket_key, settings):
+        if marker in (comment.get("text") or ""):
+            return True
+    return False
+
+
+def _post_ready_for_testing_comment(
+    ticket_key: str,
+    epic_key: str,
+    settings: Settings,
+    workflow_id: str = "",
+    slug: str = "",
+) -> bool:
+    """Post a single clear comment with a link back to Publishing House."""
+    ph_url = _ph_workflow_url(settings, workflow_id=workflow_id)
+    epic_browse = f"{settings.jira_url.rstrip('/')}/browse/{epic_key}" if settings.jira_url else epic_key
+
+    body_content: list[dict] = [
+        {
+            "type": "paragraph",
+            "content": [
+                {"type": "text", "text": READY_FOR_TESTING_MARKER, "marks": [{"type": "strong"}]},
+            ],
+        },
+        {
+            "type": "paragraph",
+            "content": [
+                {
+                    "type": "text",
+                    "text": (
+                        "Development is complete and the Publishing House workflow is now in "
+                        "the Testing stage. Ops can start the catalog-item testing checklist."
+                    ),
+                },
+            ],
+        },
+    ]
+
+    if slug:
+        body_content.append({
+            "type": "paragraph",
+            "content": [
+                {"type": "text", "text": "Project: "},
+                {"type": "text", "text": slug, "marks": [{"type": "code"}]},
+            ],
+        })
+
+    body_content.append({
+        "type": "paragraph",
+        "content": [
+            {"type": "text", "text": "Parent epic: "},
+            {
+                "type": "text",
+                "text": epic_key,
+                "marks": [{"type": "link", "attrs": {"href": epic_browse}}],
+            },
+        ],
+    })
+
+    if ph_url:
+        body_content.append({
+            "type": "paragraph",
+            "content": [
+                {"type": "text", "text": "Publishing House: "},
+                {
+                    "type": "text",
+                    "text": "Open workflow",
+                    "marks": [{"type": "link", "attrs": {"href": ph_url}}],
+                },
+                {
+                    "type": "text",
+                    "text": f" (or search Workflows for {epic_key}).",
+                },
+            ],
+        })
+    else:
+        body_content.append({
+            "type": "paragraph",
+            "content": [
+                {
+                    "type": "text",
+                    "text": (
+                        f"Open Publishing House → Workflows and search for {epic_key} "
+                        "to confirm stage = Testing."
+                    ),
+                },
+            ],
+        })
+
+    headers = _jira_headers(settings)
+    req = urllib.request.Request(
+        f"{settings.jira_url}/rest/api/3/issue/{ticket_key}/comment",
+        data=json.dumps({
+            "body": {"type": "doc", "version": 1, "content": body_content},
+        }).encode(),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10):
+            logger.info("jira: posted ready-for-testing comment on %s", ticket_key)
+            return True
+    except Exception as e:
+        logger.warning("jira: failed to post ready-for-testing comment on %s: %s", ticket_key, e)
+        return False
+
+
+def _mark_ready_for_testing(
+    testing_task: dict,
+    epic_key: str,
+    settings: Settings,
+    workflow_id: str = "",
+    slug: str = "",
+) -> None:
+    """Idempotent: label + one comment when a lab enters the Testing stage."""
+    ticket_key = testing_task.get("key") or ""
+    if not ticket_key:
+        return
+
+    try:
+        existing_labels = testing_task.get("labels") or []
+        if READY_FOR_TESTING_LABEL not in existing_labels:
+            _ensure_issue_labels(ticket_key, [READY_FOR_TESTING_LABEL], settings)
+        else:
+            logger.info("jira: %s already has %s", ticket_key, READY_FOR_TESTING_LABEL)
+
+        if _comment_has_marker(ticket_key, READY_FOR_TESTING_MARKER, settings):
+            logger.info(
+                "jira: ready-for-testing comment already on %s — skipping (not spammy)",
+                ticket_key,
+            )
+            return
+
+        _post_ready_for_testing_comment(
+            ticket_key, epic_key, settings,
+            workflow_id=workflow_id, slug=slug,
+        )
+    except Exception as e:
+        logger.error(
+            "jira: ready-for-testing notify failed for %s: %s",
+            ticket_key, e, exc_info=True,
+        )
 
 
 # ── Task Complete ────────────────────────────────────────────────────────────

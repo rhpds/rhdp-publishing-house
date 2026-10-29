@@ -11,6 +11,7 @@ data:
   SONATAFLOW_URL: "http://publishinghouseworkflow.{{ app_namespace }}.svc.cluster.local:80"
   SONATAFLOW_GRAPHQL_URL: "http://sonataflow-platform-data-index-service.{{ app_namespace }}.svc.cluster.local:80"
   CORS_ORIGINS: "https://central-publishing-house-{{ app_namespace }}.{{ ocp_apps_domain }}"
+  PH_PORTAL_URL: "https://central-publishing-house-{{ app_namespace }}.{{ ocp_apps_domain }}"
   OIDC_ISSUER_URL: "https://keycloak-keycloak.{{ keycloak_domain | default(ocp_apps_domain) }}/realms/publishing-house"
   OIDC_CLIENT_ID: "central-api"
   RHDH_INTERNAL_URL: "http://backstage-developer-hub.{{ app_namespace }}.svc.cluster.local"
