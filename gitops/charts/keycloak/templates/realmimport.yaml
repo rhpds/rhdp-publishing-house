@@ -186,6 +186,15 @@ spec:
     realm: publishing-house
     registrationAllowed: false
     resetPasswordAllowed: true
+    groups:
+    - name: rhdp-administrators
+      path: /rhdp-administrators
+    - name: rhdp-developers
+      path: /rhdp-developers
+    - name: rhdp-content-review
+      path: /rhdp-content-review
+    - name: rhdp-infra-review
+      path: /rhdp-infra-review
     roles:
       realm:
       - composite: true
