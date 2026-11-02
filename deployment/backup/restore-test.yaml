@@ -1,9 +1,0 @@
-apiVersion: velero.io/v1
-kind: Restore
-metadata:
-  name: publishing-house-restore-test
-  namespace: openshift-adp
-spec:
-  backupName: publishing-house-backup
-  namespaceMapping:
-    publishing-house: publishing-house-restore-test
