@@ -23,6 +23,9 @@ spec:
       selfHeal: false
     syncOptions:
       - CreateNamespace=false
+      # Required so sync honors ignoreDifferences and does NOT overwrite the
+      # secret helm parameters patched onto child Applications on the cluster.
+      - RespectIgnoreDifferences=true
   # Secret helm parameters are patched onto the child Applications on the cluster
   # (never committed). Ignore them here so app-of-apps syncs don't wipe them.
   ignoreDifferences:
