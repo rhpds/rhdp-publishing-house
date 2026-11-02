@@ -1,0 +1,163 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: central-api
+    component: backend
+  name: central-api
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '5'
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: central-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: '2026-09-19T09:27:07+10:00'
+      creationTimestamp: null
+      labels:
+        app: central-api
+    spec:
+      containers:
+      - env:
+        - name: PH_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: api-key
+              name: publishing-house-credentials
+        - name: LITELLM_API_URL
+          valueFrom:
+            secretKeyRef:
+              key: litellm-url
+              name: publishing-house-credentials
+        - name: LITELLM_MASTER_KEY
+          valueFrom:
+            secretKeyRef:
+              key: litellm-api-key
+              name: publishing-house-credentials
+        - name: JIRA_URL
+          valueFrom:
+            secretKeyRef:
+              key: jira-url
+              name: publishing-house-credentials
+        - name: JIRA_EMAIL
+          valueFrom:
+            secretKeyRef:
+              key: jira-email
+              name: publishing-house-credentials
+        - name: JIRA_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: jira-api-token
+              name: publishing-house-credentials
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: github-token
+              name: publishing-house-credentials
+        - name: PH_INTERNAL_AI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: ph-internal-ai-api-key
+              name: publishing-house-credentials
+        - name: RCARS_URL
+          valueFrom:
+            secretKeyRef:
+              key: rcars-url
+              name: publishing-house-credentials
+        - name: RCARS_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: rcars-api-key
+              name: publishing-house-credentials
+        - name: RHDH_SERVICE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: RHDH_SERVICE_TOKEN
+              name: ph-developer-hub-env
+        - name: SONATAFLOW_DB_HOST
+          value: sonataflow-postgresql.publishing-house.svc.cluster.local
+        - name: SONATAFLOW_DB_PORT
+          value: '5432'
+        - name: SONATAFLOW_DB_NAME
+          value: sonataflow
+        - name: SONATAFLOW_DB_USER
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: sonataflow-postgresql-svcbind
+        - name: SONATAFLOW_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: sonataflow-postgresql-svcbind
+        envFrom:
+        - configMapRef:
+            name: central-api-config
+        image: {{ .Values.centralApi.image }}:{{ .Values.centralApi.tag }}
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /api/v1/health
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: api
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /api/v1/health
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: 500m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 512Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/ph-policy
+          name: validation-policy
+          readOnly: true
+        - mountPath: /data
+          name: data
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: central-api
+      serviceAccountName: central-api
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: ph-validation-policy
+        name: validation-policy
+      - name: data
+        persistentVolumeClaim:
+          claimName: central-api-data

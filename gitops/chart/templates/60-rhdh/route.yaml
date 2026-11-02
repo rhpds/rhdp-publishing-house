@@ -1,0 +1,20 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  annotations:
+    openshift.io/host.generated: 'true'
+    argocd.argoproj.io/sync-wave: '6'
+  name: central-publishing-house
+  namespace: publishing-house
+spec:
+  host: central-publishing-house-publishing-house.{{ .Values.appsDomain }}
+  port:
+    targetPort: http-backend
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: backstage-developer-hub
+    weight: 100
+  wildcardPolicy: None

@@ -1,0 +1,52 @@
+apiVersion: v1
+data:
+  policy.yaml: "ocp_version_minimum: \"4.20\"\n\nvalid_content_types:\n  - lab\n \
+    \ - demo\n\nvalid_audiences:\n  - beginner\n  - intermediate\n  - advanced\n\n\
+    valid_topologies:\n  - shared-cluster\n  - per-student\n  - cnv-pool\n\nvalid_cloud_providers:\n\
+    \  - cnv\n  - aws\n  - azure\n  - aro\n  - rosa\n  - gcp\n  - google\n\nvalid_cluster_types:\n\
+    \  - sno\n  - multinode\n\nvalid_showroom_types:\n  - showroom\n  - instructions\n\
+    \naction_verbs_valid:\n  - configure\n  - deploy\n  - create\n  - implement\n\
+    \  - troubleshoot\n  - monitor\n  - scale\n  - install\n  - build\n  - integrate\n\
+    \  - automate\n  - manage\n  - observe\n  - migrate\n  - secure\n  - provision\n\
+    \  - verify\n  - demonstrate\n  - explore\n  - analyze\n\naction_verbs_rejected:\n\
+    \  - understand\n  - learn\n  - know\n  - be familiar with\n  - appreciate\n \
+    \ - become aware\n  - realize\n  - recognize\n\nai_keywords:\n  - ai\n  - rhoai\n\
+    \  - openshift ai\n  - maas\n  - granite\n  - instructlab\n  - ollama\n  - llm\n\
+    \  - inference\n  - model serving\n  - generative\n\nvague_egress_terms:\n  -\
+    \ internet\n  - any public ip\n  - any ip\n  - anywhere\n  - cloud\n  - external\n\
+    \nrequired_design_sections:\n  - overview\n  - target audience\n  - prerequisites\n\
+    \  - learning objectives\n  - content type\n  - products & technologies\n  - module\
+    \ map\n  - difficulty level\n  - environment\n  - infrastructure requirements\n\
+    \  - assessment strategy\n\nconditional_required_sections:\n  - assessment strategy\n\
+    \nrequired_outline_sections:\n  - brief overview\n  - audience and time\n  - learning\
+    \ objectives\n  - lab structure\n  - key takeaways\n\nproducts:\n  - name: Red\
+    \ Hat OpenShift Container Platform\n    aliases:\n      - OpenShift\n      - OCP\n\
+    \  - name: Red Hat Ansible Automation Platform\n    aliases:\n      - AAP\n  \
+    \    - Ansible\n  - name: Red Hat OpenShift AI\n    aliases:\n      - RHOAI\n\
+    \      - OpenShift AI\n  - name: Red Hat Advanced Cluster Security\n    aliases:\n\
+    \      - RHACS\n      - ACS\n  - name: Red Hat Developer Hub\n    aliases:\n \
+    \     - RHDH\n      - Developer Hub\n  - name: Red Hat Quay\n    aliases:\n  \
+    \    - Quay\n  - name: Red Hat OpenShift GitOps\n    aliases:\n      - GitOps\n\
+    \      - ArgoCD\n  - name: Red Hat OpenShift Pipelines\n    aliases:\n      -\
+    \ Pipelines\n      - Tekton\n  - name: Red Hat OpenShift Virtualization\n    aliases:\n\
+    \      - OpenShift Virtualization\n      - CNV\n  - name: Red Hat OpenShift Data\
+    \ Foundation\n    aliases:\n      - ODF\n  - name: Red Hat OpenShift Service Mesh\n\
+    \    aliases:\n      - Service Mesh\n      - Istio\n  - name: Red Hat OpenShift\
+    \ Serverless\n    aliases:\n      - Serverless\n      - Knative\n  - name: Red\
+    \ Hat Enterprise Linux\n    aliases:\n      - RHEL\n  - name: Red Hat build of\
+    \ Keycloak\n    aliases:\n      - Keycloak\n      - RHSSO\n      - SSO\n  - name:\
+    \ Red Hat Trusted Profile Analyzer\n    aliases:\n      - TPA\n  - name: Red Hat\
+    \ Trusted Artifact Signer\n    aliases:\n      - TAS\n      - RHTAS\n  - name:\
+    \ Red Hat Satellite\n    aliases:\n      - Satellite\n  - name: Red Hat Lightwell\n\
+    \    aliases:\n      - Lightwell\n      - Lightwell Network\n\nprovisioning_time_estimates:\n\
+    \  shared-cluster: 5\n  per-student: 25\n  cnv-pool: 20\n\ncost_hourly_rate_per_vcpu:\
+    \ 0.05\n"
+kind: ConfigMap
+metadata:
+  labels:
+    app: central-api
+    component: policy
+  name: ph-validation-policy
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '5'

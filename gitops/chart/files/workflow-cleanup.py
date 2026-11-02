@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""Cleanup completed and aborted SonataFlow process instances older than N days."""
+
+import json
+import os
+import ssl
+import sys
+import urllib.request
+
+CENTRAL_API_URL = os.environ["CENTRAL_API_URL"].rstrip("/")
+API_KEY = os.environ["PH_API_KEY"]
+CLEANUP_DAYS = int(os.environ.get("CLEANUP_DAYS", "7"))
+
+SSL_CTX = ssl.create_default_context()
+SSL_CTX.check_hostname = False
+SSL_CTX.verify_mode = ssl.CERT_NONE
+
+
+def main():
+    print("=== Workflow Cleanup Job ===")
+    print(f"Cleaning workflows older than {CLEANUP_DAYS} days")
+
+    url = f"{CENTRAL_API_URL}/api/v1/cleanup/completed?days={CLEANUP_DAYS}"
+    req = urllib.request.Request(url, method="POST", headers={
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json",
+    }, data=b"{}")
+
+    try:
+        with urllib.request.urlopen(req, context=SSL_CTX, timeout=120) as r:
+            result = json.loads(r.read().decode())
+    except Exception as e:
+        print(f"FAILED: {e}")
+        sys.exit(1)
+
+    print(f"  Completed found: {result.get('completed_found', 0)}")
+    print(f"  Aborted found:   {result.get('aborted_found', 0)}")
+    print(f"  Cleaned:         {result.get('workflows_cleaned', 0)}")
+    print(f"  LiteLLM keys:    {result.get('litellm_keys_deleted', 0)}")
+
+    errors = result.get("errors", [])
+    if errors:
+        for e in errors:
+            print(f"  ERROR: {e}")
+
+    print("=== Cleanup complete ===")
+
+
+if __name__ == "__main__":
+    main()

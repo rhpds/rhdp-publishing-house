@@ -1,0 +1,104 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    app: publishing-house
+    component: jobs
+  name: inactivity-checker
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '7'
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      creationTimestamp: null
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            app: publishing-house
+            job: inactivity-checker
+        spec:
+          containers:
+          - command:
+            - python
+            - /scripts/inactivity-checker.py
+            env:
+            - name: SONATAFLOW_GRAPHQL_URL
+              valueFrom:
+                configMapKeyRef:
+                  key: SONATAFLOW_GRAPHQL_URL
+                  name: central-api-config
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: github-token
+                  name: publishing-house-credentials
+            - name: JIRA_URL
+              valueFrom:
+                secretKeyRef:
+                  key: jira-url
+                  name: publishing-house-credentials
+            - name: JIRA_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  key: jira-email
+                  name: publishing-house-credentials
+            - name: JIRA_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: jira-api-token
+                  name: publishing-house-credentials
+            - name: RHDH_URL
+              valueFrom:
+                configMapKeyRef:
+                  key: RHDH_INTERNAL_URL
+                  name: central-api-config
+            - name: RHDH_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: RHDH_SERVICE_TOKEN
+                  name: ph-developer-hub-env
+            - name: REVIEW_GROUP
+              valueFrom:
+                configMapKeyRef:
+                  key: INACTIVITY_CHECKER__REVIEW_GROUP
+                  name: central-api-config
+            - name: INACTIVITY_DAYS
+              valueFrom:
+                configMapKeyRef:
+                  key: INACTIVITY_CHECKER__THRESHOLD_DAYS
+                  name: central-api-config
+            image: python:3.11-slim
+            imagePullPolicy: IfNotPresent
+            name: inactivity-checker
+            resources:
+              limits:
+                cpu: 200m
+                memory: 128Mi
+              requests:
+                cpu: 50m
+                memory: 64Mi
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /scripts
+              name: script
+              readOnly: true
+          dnsPolicy: ClusterFirst
+          restartPolicy: OnFailure
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - configMap:
+              defaultMode: 420
+              name: inactivity-checker-script
+            name: script
+  schedule: 0 7 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false

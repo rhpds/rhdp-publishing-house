@@ -1,0 +1,23 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  annotations:
+    haproxy.router.openshift.io/timeout: 120s
+    openshift.io/host.generated: 'true'
+    argocd.argoproj.io/sync-wave: '5'
+  labels:
+    app: central-api
+  name: central-api
+  namespace: publishing-house
+spec:
+  host: central-api-publishing-house.{{ .Values.appsDomain }}
+  port:
+    targetPort: http
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: central-api
+    weight: 100
+  wildcardPolicy: None

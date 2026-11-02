@@ -1,0 +1,51 @@
+apiVersion: v1
+data:
+  app-config.ph.yaml: "app:\n  baseUrl: ${BACKEND_URL}\n  title: Publishing House\
+    \ Developer Hub\n\nauth:\n  environment: production\n  providers:\n    oidc:\n\
+    \      production:\n        clientId: ${AUTH__OIDC__CLIENT__ID}\n        clientSecret:\
+    \ ${AUTH__OIDC__CLIENT__SECRET}\n        metadataUrl: ${AUTH__OIDC__METADATA__URL}\n\
+    \        prompt: auto\n        signIn:\n          resolvers:\n            - resolver:\
+    \ preferredUsernameMatchingUserEntityName\n              dangerouslyAllowSignInWithoutUserInCatalog:\
+    \ true\n  session:\n    secret:\n      $env: BACKEND_SECRET\n\nbackend:\n  auth:\n\
+    \    externalAccess:\n      - type: legacy\n        options:\n          subject:\
+    \ legacy-default-config\n          secret: ${BACKEND_SECRET}\n      - type: static\n\
+    \        options:\n          subject: catalog-automation\n          token: ${RHDH_SERVICE_TOKEN}\n\
+    \  baseUrl: ${BACKEND_URL}\n  cors:\n    origin: ${BACKEND_URL}\n  reading:\n\
+    \    allow:\n      - host: '*.{{ .Values.appsDomain }}'\n\
+    \      - host: raw.githubusercontent.com\n\ncatalog:\n  locations:\n    - target:\
+    \ ${PH__CATALOG__URL}\n      type: url\n      rules:\n        - allow:\n     \
+    \       - Location\n            - Template\n            - Component\n  providers:\n\
+    \    keycloakOrg:\n      default:\n        baseUrl: ${KEYCLOAK__BASE__URL}\n \
+    \       clientId: ${KEYCLOAK__CLIENT__ID}\n        clientSecret: ${KEYCLOAK__CLIENT__SECRET}\n\
+    \        loginRealm: ${KEYCLOAK__REALM}\n        realm: ${KEYCLOAK__REALM}\n \
+    \       schedule:\n          frequency:\n            minutes: 1\n          initialDelay:\n\
+    \            seconds: 15\n          timeout:\n            minutes: 3\n  rules:\n\
+    \    - allow:\n        - Domain\n        - Component\n        - System\n     \
+    \   - Group\n        - User\n        - Resource\n        - Location\n        -\
+    \ Template\n        - API\n\nintegrations:\n  github:\n    - host: github.com\n\
+    \      token: ${GITHUB_TOKEN}\n\npermission:\n  enabled: true\n  rbac:\n    defaultPolicy:\
+    \ allow\n    precedingPolicy: allow\n    policies-csv-file: /opt/app-root/src/rbac-policy.csv\n\
+    \    policyFileReload: true\n    admin:\n      superUsers:\n        - name: group:default/rhdp-administrators\n\
+    \nproxy:\n  endpoints:\n    /sonataflow:\n      target: http://sonataflow-platform-data-index-service.publishing-house.svc.cluster.local/graphql\n\
+    \      changeOrigin: true\n      secure: false\n      allowedMethods: ['POST']\n\
+    \    /central-api/auth/keys/exchange:\n      target: http://central-api.publishing-house.svc.cluster.local:8000/api/v1/auth/keys/exchange\n\
+    \      changeOrigin: true\n      secure: false\n      allowedMethods: ['POST']\n\
+    \      headers:\n        Authorization: Bearer ${PH_API_KEY}\n    /central-api/projects:\n\
+    \      target: http://central-api.publishing-house.svc.cluster.local:8000/api/v1/projects\n\
+    \      changeOrigin: true\n      secure: false\n      allowedMethods: ['POST']\n\
+    \      headers:\n        Authorization: Bearer ${PH_API_KEY}\n    /github-api:\n\
+    \      target: https://api.github.com\n      changeOrigin: true\n      secure:\
+    \ true\n      headers:\n        Authorization: Bearer ${GITHUB_TOKEN}\n\nscaffolder:\n\
+    \  defaultEnvironment:\n    parameters:\n      baseDomain: {{ .Values.appsDomain }}\n\
+    \      phGitRef: main\n\nphWorkflows:\n  centralApiUrl: https://central-api-publishing-house.{{ .Values.appsDomain }}\n\
+    \nsignInPage: oidc\n\ntechdocs:\n  builder: local\n  generator:\n    runIn: local\n\
+    \  publisher:\n    type: local\n"
+kind: ConfigMap
+metadata:
+  annotations:
+    rhdh.redhat.com/backstage-name: developer-hub
+    argocd.argoproj.io/sync-wave: '6'
+  labels:
+    rhdh.redhat.com/ext-config-sync: 'true'
+  name: ph-developer-hub-app-config
+  namespace: publishing-house

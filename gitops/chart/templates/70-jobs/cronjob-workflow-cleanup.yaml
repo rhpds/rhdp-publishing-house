@@ -1,0 +1,74 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    app: publishing-house
+    component: jobs
+  name: workflow-cleanup
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '7'
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      creationTimestamp: null
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            app: publishing-house
+            job: workflow-cleanup
+        spec:
+          containers:
+          - command:
+            - python
+            - /scripts/workflow-cleanup.py
+            env:
+            - name: CENTRAL_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  key: CENTRAL_API_URL
+                  name: central-api-config
+            - name: PH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: api-key
+                  name: publishing-house-credentials
+            - name: CLEANUP_DAYS
+              valueFrom:
+                configMapKeyRef:
+                  key: WORKFLOW_CLEANUP__DAYS
+                  name: central-api-config
+            image: python:3.11-slim
+            imagePullPolicy: IfNotPresent
+            name: workflow-cleanup
+            resources:
+              limits:
+                cpu: 200m
+                memory: 128Mi
+              requests:
+                cpu: 50m
+                memory: 64Mi
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /scripts
+              name: script
+              readOnly: true
+          dnsPolicy: ClusterFirst
+          restartPolicy: OnFailure
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - configMap:
+              defaultMode: 420
+              name: workflow-cleanup-script
+            name: script
+  schedule: 0 5 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false

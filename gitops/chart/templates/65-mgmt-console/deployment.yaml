@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: publishing-house
+    component: management-console
+  name: sonataflow-management-console
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '6'
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: sonataflow-management-console
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: sonataflow-management-console
+    spec:
+      containers:
+      - env:
+        - name: SONATAFLOW_MANAGEMENT_CONSOLE_KOGITO_ENV_MODE
+          value: DEV
+        - name: SONATAFLOW_MANAGEMENT_CONSOLE_DATA_INDEX_ENDPOINT
+          value: http://sonataflow-platform-data-index-service.publishing-house.svc.cluster.local/graphql
+        - name: QUARKUS_HTTP_CORS
+          value: 'true'
+        - name: QUARKUS_HTTP_CORS_ORIGINS
+          value: https://sonataflow-management-console-publishing-house.{{ .Values.appsDomain }}
+        image: docker.io/apache/incubator-kie-sonataflow-management-console:main
+        imagePullPolicy: Always
+        name: console
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      - args:
+        - --http-address=0.0.0.0:4180
+        - --upstream=http://localhost:8080
+        - --provider=oidc
+        - --oidc-issuer-url=https://keycloak-keycloak.{{ .Values.appsDomain }}/realms/publishing-house
+        - --client-id=sonataflow-management-console
+        - --redirect-url=https://sonataflow-management-console-publishing-house.{{ .Values.appsDomain }}/oauth2/callback
+        - --email-domain=*
+        - --cookie-secure=true
+        - --cookie-name=_sf_console_proxy
+        - --skip-provider-button=true
+        - --allowed-group=rhdp-administrators
+        - --oidc-groups-claim=groups
+        - --ssl-insecure-skip-verify=true
+        - --insecure-oidc-allow-unverified-email=true
+        - --scope=openid email profile groups
+        env:
+        - name: OAUTH2_PROXY_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: client-secret
+              name: sonataflow-console-oauth-proxy
+        - name: OAUTH2_PROXY_COOKIE_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: cookie-secret
+              name: sonataflow-console-oauth-proxy
+        image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+        imagePullPolicy: IfNotPresent
+        name: oauth-proxy
+        ports:
+        - containerPort: 4180
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30

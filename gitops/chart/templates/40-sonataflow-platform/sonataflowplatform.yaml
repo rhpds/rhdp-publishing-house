@@ -1,0 +1,83 @@
+apiVersion: sonataflow.org/v1alpha08
+kind: SonataFlowPlatform
+metadata:
+  name: sonataflow-platform
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '4'
+spec:
+  build:
+    config:
+      registry: {}
+      strategy: platform
+      strategyOptions:
+        MAVEN_ARGS: -DskipTests
+        MAVEN_ARGS_APPEND: -DskipTests
+      timeout: 5m0s
+    template:
+      buildArgs:
+      - name: MAVEN_ARGS_APPEND
+        value: -DskipTests -Dquarkus.generate-code.skip=false
+      envs:
+      - name: MAVEN_ARGS_APPEND
+        value: -DskipTests -Dquarkus.generate-code.skip=false
+      resources:
+        limits:
+          cpu: '4'
+          memory: 4Gi
+        requests:
+          cpu: '2'
+          memory: 2Gi
+      timeout: 0s
+  devMode: {}
+  monitoring:
+    enabled: true
+  properties:
+    flow:
+    - name: quarkus.openapi-generator.central_api_yaml.auth.bearerAuth.bearer-token
+      valueFrom:
+        secretKeyRef:
+          key: api-key
+          name: publishing-house-credentials
+    - name: org.kogito.workitem.rest.publishinghouseworkflowRestWorkItemHandler.url
+      value: https://central-api-publishing-house.{{ .Values.appsDomain }}
+    - name: org.kogito.workitem.rest.url
+      value: https://central-api-publishing-house.{{ .Values.appsDomain }}
+  services:
+    dataIndex:
+      enabled: true
+      persistence:
+        dbMigrationStrategy: service
+        postgresql:
+          secretRef:
+            name: sonataflow-postgresql-svcbind
+            passwordKey: password
+            userKey: username
+          serviceRef:
+            databaseName: sonataflow
+            name: sonataflow-postgresql
+            namespace: publishing-house
+      podTemplate:
+        container:
+          env:
+          - name: QUARKUS_HTTP_CORS
+            value: 'true'
+          - name: QUARKUS_HTTP_CORS_ORIGINS
+            value: https://sonataflow-management-console-publishing-house.{{ .Values.appsDomain }}
+          resources: {}
+    jobService:
+      enabled: true
+      persistence:
+        dbMigrationStrategy: service
+        postgresql:
+          secretRef:
+            name: sonataflow-postgresql-svcbind
+            passwordKey: password
+            userKey: username
+          serviceRef:
+            databaseName: sonataflow
+            name: sonataflow-postgresql
+            namespace: publishing-house
+      podTemplate:
+        container:
+          resources: {}

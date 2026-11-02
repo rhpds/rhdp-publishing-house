@@ -1,0 +1,144 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    {{- if eq .Values.sonataflow.profile "preview" }}
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"{{ .Values.sonataflow.workflowImage }}"},"fieldPath":"spec.template.spec.containers[?(@.name==\"workflow\")].image"}]'
+    {{- end }}
+    argocd.argoproj.io/sync-wave: '6'
+  labels:
+    app: rhdp-published
+    app.kubernetes.io/component: serverless-workflow
+    app.kubernetes.io/instance: rhdp-published
+    app.kubernetes.io/managed-by: sonataflow-operator
+    app.kubernetes.io/name: rhdp-published
+    app.kubernetes.io/part-of: sonataflow-platform
+    app.kubernetes.io/version: 1.38.0
+    component: workflow
+    sonataflow.org/workflow-app: rhdp-published
+    sonataflow.org/workflow-namespace: publishing-house
+  name: rhdp-published
+  namespace: publishing-house
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: rhdp-published
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        sonataflow.org/checksum-config: 48b40cb2c7de21067997431ba652345ec26a045a57077a03c3bf063e3aa09688
+        sonataflow.org/restartedAt: '2026-10-13T13:08:20Z'
+      creationTimestamp: null
+      labels:
+        app: rhdp-published
+        app.kubernetes.io/component: serverless-workflow
+        app.kubernetes.io/instance: rhdp-published
+        app.kubernetes.io/name: rhdp-published
+        component: workflow
+        sonataflow.org/workflow-app: rhdp-published
+    spec:
+      containers:
+      - env:
+        - name: QUARKUS_FLYWAY_MIGRATE_AT_START
+          value: 'true'
+        - name: QUARKUS_FLYWAY_BASELINE_ON_MIGRATE
+          value: 'true'
+        - name: KIE_FLYWAY_ENABLED
+          value: 'true'
+        - name: QUARKUS_REST_CLIENT_READ_TIMEOUT
+          value: '70000'
+        - name: QUARKUS_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: sonataflow-postgresql-svcbind
+        - name: QUARKUS_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: sonataflow-postgresql-svcbind
+        - name: QUARKUS_DATASOURCE_DB_KIND
+          value: postgresql
+        - name: QUARKUS_DATASOURCE_JDBC_URL
+          value: jdbc:postgresql://sonataflow-postgresql.publishing-house:5432/sonataflow?currentSchema=publishing-house-workflow
+        - name: KOGITO_PERSISTENCE_TYPE
+          value: jdbc
+        image: {{ .Values.sonataflow.workflowImage }}
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /q/health/live
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 15
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: workflow
+        ports:
+        - containerPort: 8080
+          name: h2c
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /q/health/ready
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 15
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        startupProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /q/health/started
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /deployments/config
+          name: workflow-properties
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: workflow-properties
+        projected:
+          defaultMode: 420
+          sources:
+          - configMap:
+              items:
+              - key: application.properties
+                path: application.properties
+              name: rhdp-published-props
+          - configMap:
+              items:
+              - key: application-prod.properties
+                path: application-prod.properties
+              name: rhdp-published-managed-props

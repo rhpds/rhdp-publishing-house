@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: drift-checker-script
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '7'
+data:
+  drift-checker.py: |
+{{- (.Files.Get "files/drift-checker.py") | nindent 4 }}

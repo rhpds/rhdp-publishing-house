@@ -1,0 +1,30 @@
+apiVersion: v1
+data:
+  input-schema.json: "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\"\
+    ,\n  \"type\": \"object\",\n  \"required\": [\"projectId\"],\n  \"properties\"\
+    : {\n    \"projectId\": {\n      \"type\": \"string\",\n      \"description\"\
+    : \"Unique identifier for the publishing project\"\n    },\n    \"repoUrl\": {\n\
+    \      \"type\": \"string\",\n      \"description\": \"Git repository URL for\
+    \ the content\"\n    },\n    \"ssoUser\": {\n      \"type\": \"string\",\n   \
+    \   \"description\": \"SSO/OIDC username of the project owner\"\n    },\n    \"\
+    ssoEmail\": {\n      \"type\": \"string\",\n      \"description\": \"SSO/OIDC\
+    \ email of the project owner\"\n    },\n    \"deploymentMode\": {\n      \"type\"\
+    : \"string\",\n      \"description\": \"Deployment mode (rhdp_published or self_published)\"\
+    \n    },\n    \"contentType\": {\n      \"type\": \"string\",\n      \"description\"\
+    : \"Content type (workshop, lab, demo)\"\n    },\n    \"tags\": {\n      \"type\"\
+    : \"array\",\n      \"items\": { \"type\": \"string\" },\n      \"description\"\
+    : \"Optional tags for filtering and search\"\n    },\n    \"projectDescription\"\
+    : {\n      \"type\": \"string\",\n      \"description\": \"Brief overview of what\
+    \ the project will deliver\"\n    },\n    \"hasDrift\": {\n      \"type\": \"\
+    boolean\",\n      \"description\": \"Whether design drift was detected during\
+    \ development submission\",\n      \"default\": false\n    },\n    \"showroomType\"\
+    : {\n      \"type\": \"string\",\n      \"description\": \"Showroom type (classic\
+    \ or zero_touch)\"\n    },\n    \"intakeType\": {\n      \"type\": \"string\"\
+    ,\n      \"description\": \"Intake type (new or migration)\",\n      \"default\"\
+    : \"new\"\n    }\n  }\n}\n"
+kind: ConfigMap
+metadata:
+  name: rhdp-published-input-schema
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '5'

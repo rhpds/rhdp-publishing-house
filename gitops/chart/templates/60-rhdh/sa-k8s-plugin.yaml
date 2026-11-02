@@ -1,0 +1,12 @@
+apiVersion: v1
+imagePullSecrets:
+- name: rhdh-kubernetes-plugin-dockercfg-tlnxf
+kind: ServiceAccount
+metadata:
+  annotations:
+    openshift.io/internal-registry-pull-secret-ref: rhdh-kubernetes-plugin-dockercfg-tlnxf
+    argocd.argoproj.io/sync-wave: '6'
+  name: rhdh-kubernetes-plugin
+  namespace: publishing-house
+secrets:
+- name: rhdh-kubernetes-plugin-dockercfg-tlnxf

@@ -1,0 +1,29 @@
+# Placeholder defaults ONLY. Do NOT hardcode cluster/deploy values here.
+# All real values are supplied per-cluster by the ArgoCD Application via
+# spec.source.helm.parameters (see gitops/argocd/apps/*.yaml).
+
+# OpenShift apps wildcard domain — drives every external hostname.
+appsDomain: ""
+
+# Central API image (repo + tag). Bump tag to upgrade.
+centralApi:
+  image: ""
+  tag: ""
+
+sonataflow:
+  # preview = operator builds workflow image in-cluster; gitops = pre-built image.
+  profile: ""
+  workflowImage: ""
+
+# Custom Publishing House RHDH dynamic plugin versions (upgrade = bump value).
+rhdhPlugins:
+  phWorkflows: ""
+  scaffolderModule: ""
+  readme: ""
+  readmeBackend: ""
+
+# Keycloak secrets — supplied at deploy time (never committed).
+keycloak:
+  rhdhClientSecret: ""
+  portalClientSecret: ""
+  corporateSsoClientSecret: ""

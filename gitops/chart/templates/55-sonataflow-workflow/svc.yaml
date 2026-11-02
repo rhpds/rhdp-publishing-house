@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: rhdp-published
+    app.kubernetes.io/component: serverless-workflow
+    app.kubernetes.io/instance: rhdp-published
+    app.kubernetes.io/managed-by: sonataflow-operator
+    app.kubernetes.io/name: rhdp-published
+    app.kubernetes.io/part-of: sonataflow-platform
+    app.kubernetes.io/version: 1.39.0
+    component: workflow
+    sonataflow.org/workflow-app: rhdp-published
+    sonataflow.org/workflow-namespace: publishing-house
+  name: rhdp-published
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '6'
+spec:
+  ports:
+  - name: web
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: rhdp-published
+    component: workflow
+  type: ClusterIP

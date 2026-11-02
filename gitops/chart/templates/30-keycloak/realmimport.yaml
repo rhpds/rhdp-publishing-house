@@ -1,0 +1,224 @@
+apiVersion: k8s.keycloak.org/v2beta1
+kind: KeycloakRealmImport
+metadata:
+  name: publishing-house
+  namespace: keycloak
+  annotations:
+    argocd.argoproj.io/sync-wave: '3'
+spec:
+  keycloakCRName: keycloak
+  realm:
+    authenticationFlows:
+    - alias: Direct IdP Redirect Flow
+      authenticationExecutions:
+      - authenticator: auth-cookie
+        priority: 10
+        requirement: ALTERNATIVE
+      - authenticator: identity-provider-redirector
+        authenticatorConfig: redirector-config
+        priority: 20
+        requirement: REQUIRED
+      builtIn: false
+      providerId: basic-flow
+      topLevel: true
+    authenticatorConfig:
+    - alias: redirector-config
+      config:
+        defaultProvider: corporate-sso
+    browserFlow: Direct IdP Redirect Flow
+    bruteForceProtected: true
+    clients:
+    - clientId: central-api
+      defaultClientScopes:
+      - profile
+      - email
+      - roles
+      directAccessGrantsEnabled: true
+      enabled: true
+      implicitFlowEnabled: false
+      name: Central API Portal
+      protocol: openid-connect
+      protocolMappers:
+      - config:
+          access.token.claim: 'true'
+          claim.name: email
+          id.token.claim: 'true'
+          jsonType.label: String
+          user.attribute: email
+          userinfo.token.claim: 'true'
+        name: email
+        protocol: openid-connect
+        protocolMapper: oidc-usermodel-property-mapper
+      - config:
+          access.token.claim: 'true'
+          claim.name: preferred_username
+          id.token.claim: 'true'
+          jsonType.label: String
+          user.attribute: username
+          userinfo.token.claim: 'true'
+        name: preferred_username
+        protocol: openid-connect
+        protocolMapper: oidc-usermodel-property-mapper
+      publicClient: true
+      redirectUris:
+      - https://central-api-publishing-house.{{ .Values.appsDomain }}/*
+      serviceAccountsEnabled: false
+      standardFlowEnabled: true
+      webOrigins:
+      - https://central-api-publishing-house.{{ .Values.appsDomain }}
+    - clientAuthenticatorType: client-secret
+      clientId: rhdh
+      defaultClientScopes:
+      - profile
+      - email
+      - roles
+      description: RHDH OIDC client with service account for user/group sync
+      directAccessGrantsEnabled: true
+      enabled: true
+      implicitFlowEnabled: false
+      name: Red Hat Developer Hub
+      optionalClientScopes:
+      - address
+      - phone
+      protocol: openid-connect
+      publicClient: false
+      redirectUris:
+      - https://central-publishing-house-publishing-house.{{ .Values.appsDomain }}/api/auth/oidc/handler/frame
+      - https://central-publishing-house-publishing-house.{{ .Values.appsDomain }}/*
+      secret: {{ .Values.keycloak.rhdhClientSecret }}
+      serviceAccountsEnabled: true
+      standardFlowEnabled: true
+      webOrigins:
+      - https://central-publishing-house-publishing-house.{{ .Values.appsDomain }}
+    - clientAuthenticatorType: client-secret
+      clientId: publishing-house-portal
+      defaultClientScopes:
+      - profile
+      - email
+      - roles
+      directAccessGrantsEnabled: true
+      enabled: true
+      implicitFlowEnabled: false
+      name: Publishing House Portal
+      protocol: openid-connect
+      protocolMappers:
+      - config:
+          access.token.claim: 'true'
+          claim.name: email
+          id.token.claim: 'true'
+          jsonType.label: String
+          user.attribute: email
+          userinfo.token.claim: 'true'
+        name: email
+        protocol: openid-connect
+        protocolMapper: oidc-usermodel-property-mapper
+      - config:
+          access.token.claim: 'true'
+          claim.name: email_verified
+          id.token.claim: 'true'
+          jsonType.label: boolean
+          user.attribute: emailVerified
+          userinfo.token.claim: 'true'
+        name: email_verified
+        protocol: openid-connect
+        protocolMapper: oidc-usermodel-property-mapper
+      publicClient: false
+      redirectUris:
+      - https://publishing-house-portal-publishing-house.{{ .Values.appsDomain }}/oauth2/callback
+      secret: {{ .Values.keycloak.portalClientSecret }}
+      serviceAccountsEnabled: false
+      standardFlowEnabled: true
+      webOrigins:
+      - https://publishing-house-portal-publishing-house.{{ .Values.appsDomain }}
+    duplicateEmailsAllowed: false
+    editUsernameAllowed: false
+    enabled: true
+    identityProviderMappers:
+    - config:
+        claim: email
+        syncMode: INHERIT
+        user.attribute: email
+      identityProviderAlias: corporate-sso
+      identityProviderMapper: oidc-user-attribute-idp-mapper
+      name: email
+    - config:
+        claim: given_name
+        syncMode: INHERIT
+        user.attribute: firstName
+      identityProviderAlias: corporate-sso
+      identityProviderMapper: oidc-user-attribute-idp-mapper
+      name: first-name
+    - config:
+        claim: family_name
+        syncMode: INHERIT
+        user.attribute: lastName
+      identityProviderAlias: corporate-sso
+      identityProviderMapper: oidc-user-attribute-idp-mapper
+      name: last-name
+    - config:
+        syncMode: INHERIT
+        template: ${CLAIM.preferred_username}
+      identityProviderAlias: corporate-sso
+      identityProviderMapper: oidc-username-idp-mapper
+      name: username
+    identityProviders:
+    - alias: corporate-sso
+      config:
+        authorizationUrl: https://auth.redhat.com/auth/realms/GPTEInternal/protocol/openid-connect/auth
+        clientId: infra01
+        clientSecret: {{ .Values.keycloak.corporateSsoClientSecret }}
+        defaultProvider: 'true'
+        defaultScope: openid email profile
+        issuer: https://auth.redhat.com/auth/realms/GPTEInternal
+        jwksUrl: https://auth.redhat.com/auth/realms/GPTEInternal/protocol/openid-connect/certs
+        logoutUrl: https://auth.redhat.com/auth/realms/GPTEInternal/protocol/openid-connect/logout
+        syncMode: FORCE
+        tokenUrl: https://auth.redhat.com/auth/realms/GPTEInternal/protocol/openid-connect/token
+        useJwksUrl: 'true'
+        userInfoUrl: https://auth.redhat.com/auth/realms/GPTEInternal/protocol/openid-connect/userinfo
+        validateSignature: 'true'
+      displayName: Red Hat Internal SSO
+      enabled: true
+      firstBrokerLoginFlowAlias: first broker login
+      providerId: oidc
+      trustEmail: true
+    loginWithEmailAllowed: true
+    realm: publishing-house
+    registrationAllowed: false
+    resetPasswordAllowed: true
+    roles:
+      realm:
+      - composite: true
+        composites:
+          realm:
+          - offline_access
+          - uma_authorization
+        name: default-roles-publishing-house
+      - name: offline_access
+      - name: uma_authorization
+    scopeMappings:
+    - clientScope: offline_access
+      roles:
+      - offline_access
+    sslRequired: external
+    users:
+    - clientRoles:
+        realm-management:
+        - query-groups
+        - query-users
+        - view-users
+        - view-realm
+      enabled: true
+      serviceAccountClientId: rhdh
+      username: service-account-rhdh
+    - credentials:
+      - temporary: false
+        type: password
+        value: wKyvks0fXbLE
+      email: admin@publishing-house.local
+      enabled: true
+      firstName: Admin
+      lastName: User
+      realmRoles:
+      - default-roles-publishing-house
+      username: admin

@@ -86,3 +86,6 @@ temp/
 # Claude Code
 CLAUDE.md
 .claude/
+
+# Cluster backup snapshots (contain plaintext secrets)
+cluster-backup/

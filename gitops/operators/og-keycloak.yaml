@@ -1,0 +1,12 @@
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  annotations:
+    olm.providedAPIs: Keycloak.v2alpha1.k8s.keycloak.org,Keycloak.v2beta1.k8s.keycloak.org,KeycloakRealmImport.v2alpha1.k8s.keycloak.org,KeycloakRealmImport.v2beta1.k8s.keycloak.org
+    argocd.argoproj.io/sync-wave: '0'
+  name: keycloak-operators
+  namespace: keycloak
+spec:
+  targetNamespaces:
+  - keycloak
+  upgradeStrategy: Default

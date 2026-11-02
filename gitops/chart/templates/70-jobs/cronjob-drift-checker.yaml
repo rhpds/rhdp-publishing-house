@@ -1,0 +1,79 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    app: publishing-house
+    component: jobs
+  name: drift-checker
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '7'
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      creationTimestamp: null
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            app: publishing-house
+            job: drift-checker
+        spec:
+          containers:
+          - command:
+            - python
+            - /scripts/drift-checker.py
+            env:
+            - name: SONATAFLOW_GRAPHQL_URL
+              valueFrom:
+                configMapKeyRef:
+                  key: SONATAFLOW_GRAPHQL_URL
+                  name: central-api-config
+            - name: SONATAFLOW_URL
+              valueFrom:
+                configMapKeyRef:
+                  key: SONATAFLOW_URL
+                  name: central-api-config
+            - name: CENTRAL_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  key: CENTRAL_API_URL
+                  name: central-api-config
+            - name: PH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: api-key
+                  name: publishing-house-credentials
+            image: python:3.11-slim
+            imagePullPolicy: IfNotPresent
+            name: drift-checker
+            resources:
+              limits:
+                cpu: 200m
+                memory: 128Mi
+              requests:
+                cpu: 50m
+                memory: 64Mi
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /scripts
+              name: script
+              readOnly: true
+          dnsPolicy: ClusterFirst
+          restartPolicy: OnFailure
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - configMap:
+              defaultMode: 420
+              name: drift-checker-script
+            name: script
+  schedule: 0 6 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false

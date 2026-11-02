@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inactivity-checker-script
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '7'
+data:
+  inactivity-checker.py: |
+{{- (.Files.Get "files/inactivity-checker.py") | nindent 4 }}

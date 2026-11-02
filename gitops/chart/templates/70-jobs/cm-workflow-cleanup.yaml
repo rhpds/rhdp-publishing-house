@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workflow-cleanup-script
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '7'
+data:
+  workflow-cleanup.py: |
+{{- (.Files.Get "files/workflow-cleanup.py") | nindent 4 }}

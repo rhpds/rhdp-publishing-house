@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: sonataflow-postgresql
+  name: sonataflow-postgresql
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '2'
+spec:
+  ports:
+  - port: 5432
+    protocol: TCP
+    targetPort: 5432
+  selector:
+    app: sonataflow-postgresql
+  type: ClusterIP

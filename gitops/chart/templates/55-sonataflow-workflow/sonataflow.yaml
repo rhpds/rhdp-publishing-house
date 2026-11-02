@@ -1,0 +1,556 @@
+apiVersion: sonataflow.org/v1alpha08
+kind: SonataFlow
+metadata:
+  annotations:
+    sonataflow.org/description: RHDP Published content lifecycle with pre-intake review
+    sonataflow.org/profile: {{ .Values.sonataflow.profile }}
+    sonataflow.org/version: '2.0'
+    argocd.argoproj.io/sync-wave: '5'
+  finalizers:
+  - workflow-deletion
+  labels:
+    app: publishing-house
+    component: workflow
+    sonataflow.org/workflow-app: rhdp-published
+  name: rhdp-published
+  namespace: publishing-house
+spec:
+  flow:
+    dataInputSchema:
+      failOnValidationErrors: false
+      schema: input-schema.json
+    events:
+    - correlation:
+      - contextAttributeName: projectid
+      dataOnly: true
+      kind: consumed
+      name: IntakeCompleteEvent
+      source: publishing-house
+      type: ph.intake.complete
+    - correlation:
+      - contextAttributeName: projectid
+      dataOnly: true
+      kind: consumed
+      name: ContentReviewCompleteEvent
+      source: publishing-house
+      type: ph.content-review.complete
+    - correlation:
+      - contextAttributeName: projectid
+      dataOnly: true
+      kind: consumed
+      name: InfraReviewCompleteEvent
+      source: publishing-house
+      type: ph.infra-review.complete
+    - correlation:
+      - contextAttributeName: projectid
+      dataOnly: true
+      kind: consumed
+      name: ContentReviewRejectedEvent
+      source: publishing-house
+      type: ph.content-review.rejected
+    - correlation:
+      - contextAttributeName: projectid
+      dataOnly: true
+      kind: consumed
+      name: InfraReviewRejectedEvent
+      source: publishing-house
+      type: ph.infra-review.rejected
+    - correlation:
+      - contextAttributeName: projectid
+      dataOnly: true
+      kind: consumed
+      name: EnvSetupCompleteEvent
+      source: publishing-house
+      type: ph.env-setup.complete
+    - correlation:
+      - contextAttributeName: projectid
+      dataOnly: true
+      kind: consumed
+      name: DevelopmentCompleteEvent
+      source: publishing-house
+      type: ph.development.complete
+    - correlation:
+      - contextAttributeName: projectid
+      dataOnly: true
+      kind: consumed
+      name: TestingCompleteEvent
+      source: publishing-house
+      type: ph.testing.complete
+    - correlation:
+      - contextAttributeName: projectid
+      dataOnly: true
+      kind: consumed
+      name: PreIntakeReviewApprovedEvent
+      source: publishing-house
+      type: ph.preintake-review.approved
+    - correlation:
+      - contextAttributeName: projectid
+      dataOnly: true
+      kind: consumed
+      name: PreIntakeReviewCancelledEvent
+      source: publishing-house
+      type: ph.preintake-review.cancelled
+    - correlation:
+      - contextAttributeName: projectid
+      dataOnly: true
+      kind: consumed
+      name: CatalogCreatedEvent
+      source: publishing-house
+      type: ph.catalog.created
+    functions:
+    - name: printMessage
+      operation: sysout
+      type: custom
+    - name: createjiraepic
+      operation: specs/central-api.yaml#createJiraEpic
+      type: rest
+    - name: syncjiratasks
+      operation: specs/central-api.yaml#syncJiraTasks
+      type: rest
+    - name: updatejiraepic
+      operation: specs/central-api.yaml#updateJiraEpic
+      type: rest
+    - name: createcatalog
+      operation: specs/central-api.yaml#createCatalog
+      type: rest
+    start:
+      stateName: Init
+    states:
+    - data: {}
+      name: Init
+      transition:
+        nextState: Setup
+      type: inject
+    - data: {}
+      name: Setup
+      stateDataFilter:
+        output: ". + {\n  createdAt: now(),\n  workflow_id: $WORKFLOW.instanceId,\n\
+          \  deploymentMode: .deploymentMode,\n  ssoUser: .ssoUser,\n  ssoEmail: .ssoEmail,\n\
+          \  projectid: .projectId,\n  contentType: .contentType,\n  repoUrl: (.repoUrl\
+          \ // \"\"),\n  tags: (.tags // []),\n  projectDescription: (.projectDescription\
+          \ // \"\"),\n  showroomType: (.showroomType // \"classic\"),\n  intakeType:\
+          \ (.intakeType // \"new\"),\n  assetTitle: (.assetTitle // \"\"),\n  contentOutline:\
+          \ (.contentOutline // \"\"),\n  learningObjectives: (.learningObjectives\
+          \ // \"\"),\n  associatedOpportunities: (.associatedOpportunities // \"\"\
+          ),\n  salesPlayTdp: (.salesPlayTdp // \"\"),\n  aiRelated: .aiRelated,\n\
+          \  canUseMaas: .canUseMaas,\n  maasModels: (.maasModels // \"\"),\n  gpuJustification:\
+          \ (.gpuJustification // \"\"),\n  partnersAccess: .partnersAccess,\n  platform:\
+          \ (.platform // \"ocp\"),\n  cloudProvider: (.cloudProvider // \"cnv\"),\n\
+          \  clusterType: (.clusterType // \"sno\"),\n  ocpVersion: (.ocpVersion //\
+          \ \"4.21\"),\n  rhelVersion: (.rhelVersion // \"9\"),\n  showroomType: (.showroomType\
+          \ // \"classic\"),\n  initiativeKey: (.initiativeKey // \"none\"),\n  teamMembers:\
+          \ (.teamMembers // []),\n  reviews: {\n    content: false,\n    infra: false\n\
+          \  },\n  rejection: {\n    isRejected: false\n  },\n  reviewHistory: [],\n\
+          \  notes: [],\n  baselineSha: \"\",\n  auditTrailSha: (.auditTrailSha //\
+          \ \"\"),\n  hasDrift: false,\n  epic_key: \"\",\n  jira_url: \"\"\n}\n"
+      transition:
+        nextState: CreateEpic
+      type: inject
+    - actions:
+      - actionDataFilter:
+          toStateData: .epicResponse
+        functionRef:
+          arguments:
+            workflow_id: .workflow_id
+          refName: createjiraepic
+        name: CreateJiraEpic
+      name: CreateEpic
+      stateDataFilter:
+        output: ". + {\n  epic_key: (\n    if .epicResponse\n    then .epicResponse.epic_key\n\
+          \    else \"\"\n    end\n  ),\n  jira_url: (\n    if .epicResponse\n   \
+          \ then .epicResponse.jira_url\n    else \"\"\n    end\n  )\n} | del(.epicResponse)\n"
+      transition:
+        nextState: PreIntakeReview
+      type: operation
+    - exclusive: true
+      name: PreIntakeReview
+      onEvents:
+      - eventDataFilter:
+          toStateData: .reviewAction
+        eventRefs:
+        - PreIntakeReviewApprovedEvent
+      - eventDataFilter:
+          toStateData: .reviewAction
+        eventRefs:
+        - PreIntakeReviewCancelledEvent
+      stateDataFilter:
+        input: ". + {\n  reviewAction: null,\n  reviewHistory: ((.reviewHistory //\
+          \ []) + [{\n    stage: \"pre_intake_review\",\n    action: \"started\",\n\
+          \    timestamp: (now | tostring),\n    user: \"system\"\n  }])\n}\n"
+        output: ". + {\n  reviewHistory: ((.reviewHistory // []) + (if .reviewAction\
+          \ then [.reviewAction] else [] end))\n} | del(.reviewAction)\n"
+      timeouts:
+        stateExecTimeout: PT168H
+      transition:
+        nextState: PreIntakeReviewDecision
+      type: event
+    - dataConditions:
+      - condition: "${\n  (.reviewHistory // [])[-1].action == \"cancelled\"\n}\n"
+        name: Cancelled
+        transition:
+          nextState: Rejected
+      defaultCondition:
+        transition:
+          nextState: UpdateEpic
+      name: PreIntakeReviewDecision
+      type: switch
+    - actions:
+      - condition: ${ .epic_key != "" }
+        functionRef:
+          arguments:
+            workflow_id: .workflow_id
+          refName: updatejiraepic
+        name: UpdateJiraEpic
+      name: UpdateEpic
+      transition:
+        nextState: CreateCatalog
+      type: operation
+    - actions:
+      - functionRef:
+          arguments:
+            collaborators: (.teamMembers // [])
+            repo_owner: rhpds
+            workflow_id: .workflow_id
+          refName: createcatalog
+        name: CreateGitHubRepoAndCatalog
+      name: CreateCatalog
+      transition:
+        nextState: WaitForCatalog
+      type: operation
+    - exclusive: true
+      name: WaitForCatalog
+      onEvents:
+      - eventDataFilter:
+          toStateData: .catalogData
+        eventRefs:
+        - CatalogCreatedEvent
+      stateDataFilter:
+        output: ". + {\n  repoUrl: (.catalogData.repoUrl // \"\"),\n  commitHash:\
+          \ (.catalogData.commitHash // \"\"),\n  catalogRegistered: (.catalogData.catalogRegistered\
+          \ // false),\n  auditTrailSha: (.catalogData.commitSha // \"\")\n} | del(.catalogData)\n"
+      timeouts:
+        stateExecTimeout: PT60S
+      transition:
+        nextState: Intake
+      type: event
+    - data:
+        stage: rejected
+      end:
+        terminate: true
+      name: Rejected
+      type: inject
+    - exclusive: true
+      name: Intake
+      onEvents:
+      - actions:
+        - functionRef:
+            arguments:
+              message: Intake completed, starting reviews
+            refName: printMessage
+          name: LogIntakeComplete
+        eventDataFilter:
+          toStateData: .latestAudit
+        eventRefs:
+        - IntakeCompleteEvent
+      stateDataFilter:
+        input: ". + {\n  latestAudit: null,\n  reviewHistory: ((.reviewHistory //\
+          \ []) + [{stage: \"intake\", action: \"started\", timestamp: (now | tostring),\
+          \ user: \"system\", commitSha: (.auditTrailSha // \"\")}])\n}\n"
+        output: ". + {\n  reviewHistory: ((.reviewHistory // []) + (if .latestAudit\
+          \ then [.latestAudit] else [] end)),\n  auditTrailSha: (.latestAudit.commitSha\
+          \ // .auditTrailSha),\n  baselineSha: (.latestAudit.commitSha // \"\"),\n\
+          \  rejection: (.rejection + { isRejected: false, reasons: [(.rejection.reasons\
+          \ // [])[] | . + {resolved: true}] }),\n  hasDrift: false\n}\n"
+      transition:
+        nextState: ContentReview
+      type: event
+    - exclusive: true
+      name: ContentReview
+      onEvents:
+      - actions:
+        - functionRef:
+            arguments:
+              message: Content review approved
+            refName: printMessage
+          name: LogContentReviewApproved
+        eventDataFilter:
+          toStateData: .latestAudit
+        eventRefs:
+        - ContentReviewCompleteEvent
+      - actions:
+        - functionRef:
+            arguments:
+              message: "Content review rejected \u2014 returning to intake"
+            refName: printMessage
+          name: LogContentReviewRejected
+        eventDataFilter:
+          toStateData: .latestAudit
+        eventRefs:
+        - ContentReviewRejectedEvent
+      stateDataFilter:
+        input: ". + {\n  latestAudit: null,\n  reviewHistory: ((.reviewHistory //\
+          \ []) + [{stage: \"content_review\", action: \"started\", timestamp: (now\
+          \ | tostring), user: \"system\", commitSha: (.auditTrailSha // \"\")}])\n\
+          }\n"
+        output: ". + {\n  reviewHistory: ((.reviewHistory // []) + (if .latestAudit\
+          \ then [.latestAudit] else [] end)),\n  auditTrailSha: (.latestAudit.commitSha\
+          \ // .auditTrailSha),\n  baselineSha: (if .latestAudit then (if .latestAudit.action\
+          \ == \"approved\" then .latestAudit.commitSha else .baselineSha end) else\
+          \ .baselineSha end),\n  rejection: (if .latestAudit then (if .latestAudit.action\
+          \ == \"rejected\" then { isRejected: true, reviewerName: .latestAudit.user,\
+          \ reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp,\
+          \ reasons: ((.rejection.reasons // []) + .latestAudit.reasons) } else (.rejection\
+          \ + { isRejected: false, reasons: [(.rejection.reasons // [])[] | . + {resolved:\
+          \ true}] }) end) else { isRejected: false } end)\n}\n"
+      transition:
+        nextState: ContentReviewDecision
+      type: event
+    - dataConditions:
+      - condition: ${ .rejection.isRejected == true }
+        transition:
+          nextState: Intake
+      defaultCondition:
+        transition:
+          nextState: InfraReview
+      name: ContentReviewDecision
+      type: switch
+    - exclusive: true
+      name: InfraReview
+      onEvents:
+      - actions:
+        - functionRef:
+            arguments:
+              message: Infra review approved
+            refName: printMessage
+          name: LogInfraReviewApproved
+        eventDataFilter:
+          toStateData: .latestAudit
+        eventRefs:
+        - InfraReviewCompleteEvent
+      - actions:
+        - functionRef:
+            arguments:
+              message: "Infra review rejected \u2014 returning to intake"
+            refName: printMessage
+          name: LogInfraReviewRejected
+        eventDataFilter:
+          toStateData: .latestAudit
+        eventRefs:
+        - InfraReviewRejectedEvent
+      stateDataFilter:
+        input: ". + {\n  latestAudit: null,\n  reviewHistory: ((.reviewHistory //\
+          \ []) + [{stage: \"infra_review\", action: \"started\", timestamp: (now\
+          \ | tostring), user: \"system\", commitSha: (.auditTrailSha // \"\")}])\n\
+          }\n"
+        output: ". + {\n  reviewHistory: ((.reviewHistory // []) + (if .latestAudit\
+          \ then [.latestAudit] else [] end)),\n  auditTrailSha: (.latestAudit.commitSha\
+          \ // .auditTrailSha),\n  baselineSha: (if .latestAudit then (if .latestAudit.action\
+          \ == \"approved\" then .latestAudit.commitSha else .baselineSha end) else\
+          \ .baselineSha end),\n  rejection: (if .latestAudit then (if .latestAudit.action\
+          \ == \"rejected\" then { isRejected: true, reviewerName: .latestAudit.user,\
+          \ reviewerStage: .latestAudit.stage, timestamp: .latestAudit.timestamp,\
+          \ reasons: ((.rejection.reasons // []) + .latestAudit.reasons) } else (.rejection\
+          \ + { isRejected: false, reasons: [(.rejection.reasons // [])[] | . + {resolved:\
+          \ true}] }) end) else { isRejected: false } end)\n}\n"
+      transition:
+        nextState: InfraReviewDecision
+      type: event
+    - dataConditions:
+      - condition: ${ .rejection.isRejected == true }
+        transition:
+          nextState: Intake
+      - condition: ${ .showroomType == "zero_touch" }
+        transition:
+          nextState: JiraSyncIntake
+      defaultCondition:
+        transition:
+          nextState: JiraSyncIntake
+      name: InfraReviewDecision
+      type: switch
+    - actions:
+      - actionDataFilter:
+          toStateData: .jiraSyncResponse
+        functionRef:
+          arguments:
+            status: IntakeComplete
+            workflow_id: .workflow_id
+          refName: syncjiratasks
+        name: SyncJiraIntake
+      name: JiraSyncIntake
+      stateDataFilter:
+        output: . | del(.jiraSyncResponse)
+      transition:
+        nextState: EnvSetupOrDev
+      type: operation
+    - dataConditions:
+      - condition: ${ .showroomType == "zero_touch" }
+        transition:
+          nextState: Development
+      defaultCondition:
+        transition:
+          nextState: EnvSetup
+      name: EnvSetupOrDev
+      type: switch
+    - exclusive: true
+      name: EnvSetup
+      onEvents:
+      - actions:
+        - functionRef:
+            arguments:
+              message: Env setup completed, transitioning to Development
+            refName: printMessage
+          name: LogEnvSetupComplete
+        eventDataFilter:
+          toStateData: .latestAudit
+        eventRefs:
+        - EnvSetupCompleteEvent
+      stateDataFilter:
+        input: ". + {\n  latestAudit: null,\n  reviewHistory: ((.reviewHistory //\
+          \ []) + [{stage: \"env_setup\", action: \"started\", timestamp: (now | tostring),\
+          \ user: \"system\", commitSha: (.auditTrailSha // \"\")}])\n}\n"
+        output: ". + {\n  reviewHistory: ((.reviewHistory // []) + (if .latestAudit\
+          \ then [.latestAudit] else [] end)),\n  agnosticvUrls: (.latestAudit.agnosticvUrls\
+          \ // .agnosticvUrls // []),\n  ciUrls: (.latestAudit.ciUrls // .ciUrls //\
+          \ [])\n}\n"
+      transition:
+        nextState: JiraSyncEnvSetup
+      type: event
+    - actions:
+      - actionDataFilter:
+          toStateData: .jiraSyncResponse
+        functionRef:
+          arguments:
+            status: EnvSetupComplete
+            workflow_id: .workflow_id
+          refName: syncjiratasks
+        name: SyncJiraEnvSetup
+      name: JiraSyncEnvSetup
+      stateDataFilter:
+        output: . | del(.jiraSyncResponse)
+      transition:
+        nextState: Development
+      type: operation
+    - exclusive: true
+      name: Development
+      onEvents:
+      - actions:
+        - functionRef:
+            arguments:
+              message: Development completed, transitioning to Testing
+            refName: printMessage
+          name: LogDevelopmentComplete
+        eventDataFilter:
+          toStateData: .latestAudit
+        eventRefs:
+        - DevelopmentCompleteEvent
+      stateDataFilter:
+        input: ". + {\n  latestAudit: null,\n  reviewHistory: ((.reviewHistory //\
+          \ []) + [{stage: \"development\", action: \"started\", timestamp: (now |\
+          \ tostring), user: \"system\", commitSha: (.auditTrailSha // \"\")}])\n\
+          }\n"
+        output: ". + {\n  reviewHistory: ((.reviewHistory // []) + (if .latestAudit\
+          \ then [.latestAudit] else [] end)),\n  auditTrailSha: (.latestAudit.commitSha\
+          \ // .auditTrailSha),\n  rejection: (.rejection + { isRejected: false, reasons:\
+          \ [(.rejection.reasons // [])[] | . + {resolved: true}] }),\n  hasDrift:\
+          \ false\n}\n"
+      transition:
+        nextState: JiraSyncDev
+      type: event
+    - actions:
+      - actionDataFilter:
+          toStateData: .jiraSyncResponse
+        functionRef:
+          arguments:
+            status: DevelopmentComplete
+            workflow_id: .workflow_id
+          refName: syncjiratasks
+        name: SyncJiraDev
+      name: JiraSyncDev
+      stateDataFilter:
+        output: . | del(.jiraSyncResponse)
+      transition:
+        nextState: Testing
+      type: operation
+    - exclusive: true
+      name: Testing
+      onEvents:
+      - actions:
+        - functionRef:
+            arguments:
+              message: Testing completed, transitioning to Published
+            refName: printMessage
+          name: LogTestingComplete
+        eventDataFilter:
+          toStateData: .latestAudit
+        eventRefs:
+        - TestingCompleteEvent
+      stateDataFilter:
+        input: ". + {\n  latestAudit: null,\n  reviewHistory: ((.reviewHistory //\
+          \ []) + [{stage: \"testing\", action: \"started\", timestamp: (now | tostring),\
+          \ user: \"system\", commitSha: (.auditTrailSha // \"\")}])\n}\n"
+        output: ". + {\n  reviewHistory: ((.reviewHistory // []) + (if .latestAudit\
+          \ then [.latestAudit] else [] end)),\n  auditTrailSha: (.latestAudit.commitSha\
+          \ // .auditTrailSha)\n}\n"
+      transition:
+        nextState: JiraSyncFinal
+      type: event
+    - actions:
+      - actionDataFilter:
+          toStateData: .jiraSyncResponse
+        functionRef:
+          arguments:
+            status: TestingComplete
+            workflow_id: .workflow_id
+          refName: syncjiratasks
+        name: SyncJiraFinal
+      name: JiraSyncFinal
+      stateDataFilter:
+        output: . | del(.jiraSyncResponse)
+      transition:
+        nextState: Published
+      type: operation
+    - data:
+        completedAt: ${ now() }
+        stage: published
+      end:
+        terminate: true
+      name: Published
+      stateDataFilter:
+        output: ". + {\n  reviewHistory: ((.reviewHistory // []) + [{stage: \"published\"\
+          , action: \"started\", timestamp: (now | tostring), user: \"system\", commitSha:\
+          \ (.auditTrailSha // \"\")}, {stage: \"published\", action: \"complete\"\
+          , timestamp: (now | tostring), user: \"system\", commitSha: (.auditTrailSha\
+          \ // \"\")}])\n}\n"
+      type: inject
+  persistence:
+    dbMigrationStrategy: service
+    postgresql:
+      secretRef:
+        name: sonataflow-postgresql-svcbind
+        passwordKey: password
+        userKey: username
+      serviceRef:
+        databaseName: ''
+        databaseSchema: publishing-house-workflow
+        name: sonataflow-postgresql
+        port: 5432
+  podTemplate:
+    container:
+      env:
+      - name: QUARKUS_FLYWAY_MIGRATE_AT_START
+        value: 'true'
+      - name: QUARKUS_FLYWAY_BASELINE_ON_MIGRATE
+        value: 'true'
+      - name: KIE_FLYWAY_ENABLED
+        value: 'true'
+      - name: QUARKUS_REST_CLIENT_READ_TIMEOUT
+        value: '70000'
+      resources: {}
+    replicas: 1
+  resources:
+    configMaps:
+    - configMap:
+        name: workflow-input-schema
+    - configMap:
+        name: central-api-spec
+      workflowPath: specs

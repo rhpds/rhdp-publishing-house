@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dynamic-plugins
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '6'
+data:
+  dynamic-plugins.yaml: |
+    {{- $c := .Files.Get "files/rhdh-dynamic-plugins-extra.yaml" }}
+    {{- $c = $c | replace "__PHWORKFLOWS_VERSION__" (.Values.rhdhPlugins.phWorkflows | toString) }}
+    {{- $c = $c | replace "__SCAFFOLDER_VERSION__" (.Values.rhdhPlugins.scaffolderModule | toString) }}
+    {{- $c | nindent 4 }}

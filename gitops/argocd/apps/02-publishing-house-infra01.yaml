@@ -1,0 +1,73 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: publishing-house-infra01
+  namespace: openshift-gitops
+  annotations:
+    # Sync after operators/CRDs are in place.
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rhpds/rhdp-publishing-house.git
+    targetRevision: main
+    path: gitops/chart
+    helm:
+      # ── All deploy/cluster values are passed here, NOT hardcoded in the chart ──
+      parameters:
+        # Cluster endpoint (infra01 dev cluster)
+        - name: appsDomain
+          value: apps.ocpv-infra01.dal12.infra.demo.redhat.com
+        # Central API image
+        - name: centralApi.image
+          value: quay.io/rhpds/central-api
+        - name: centralApi.tag
+          value: "2.0.0"
+        # SonataFlow mode: preview = operator builds image in-cluster
+        - name: sonataflow.profile
+          value: preview
+        - name: sonataflow.workflowImage
+          value: image-registry.openshift-image-registry.svc:5000/publishing-house/rhdp-published:latest
+        # RHDH custom plugin versions
+        - name: rhdhPlugins.phWorkflows
+          value: "2.0.0"
+        - name: rhdhPlugins.scaffolderModule
+          value: "1.1.5"
+        - name: rhdhPlugins.readme
+          value: "0.1.0"
+        - name: rhdhPlugins.readmeBackend
+          value: "0.1.0"
+        # ── Keycloak secrets: DO NOT commit real values here. Inject at deploy time
+        #    (oc -n openshift-gitops patch application ... / sealed values / vault plugin):
+        # - name: keycloak.rhdhClientSecret
+        #   value: "<secret>"
+        # - name: keycloak.portalClientSecret
+        #   value: "<secret>"
+        # - name: keycloak.corporateSsoClientSecret
+        #   value: "<secret>"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: publishing-house
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 10m
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: rhdp-published
+      namespace: publishing-house
+      jsonPointers:
+        - /spec/template/metadata/annotations/sonataflow.org~1restartedAt

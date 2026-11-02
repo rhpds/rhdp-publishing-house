@@ -1,0 +1,22 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  annotations:
+    openshift.io/host.generated: 'true'
+    argocd.argoproj.io/sync-wave: '6'
+  labels:
+    app: publishing-house
+    component: management-console
+  name: sonataflow-management-console
+  namespace: publishing-house
+spec:
+  host: sonataflow-management-console-publishing-house.{{ .Values.appsDomain }}
+  port:
+    targetPort: 4180
+  tls:
+    termination: edge
+  to:
+    kind: Service
+    name: sonataflow-management-console
+    weight: 100
+  wildcardPolicy: None

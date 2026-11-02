@@ -1,0 +1,12 @@
+apiVersion: v1
+imagePullSecrets:
+- name: central-api-dockercfg-ggmsj
+kind: ServiceAccount
+metadata:
+  annotations:
+    openshift.io/internal-registry-pull-secret-ref: central-api-dockercfg-ggmsj
+    argocd.argoproj.io/sync-wave: '5'
+  name: central-api
+  namespace: publishing-house
+secrets:
+- name: central-api-dockercfg-ggmsj

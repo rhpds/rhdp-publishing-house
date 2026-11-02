@@ -1,0 +1,68 @@
+apiVersion: org.eclipse.che/v2
+kind: CheCluster
+metadata:
+  annotations:
+    che.eclipse.org/checluster-defaults-cleanup: '{"containers.resources":"true","spec.components.dashboard.headerMessage":"true","spec.components.pluginRegistry.openVSXURL":"true","spec.devEnvironments.containerRunConfiguration.containerSecurityContext.capabilities.add":"true","spec.devEnvironments.defaultComponents":"true","spec.devEnvironments.defaultEditor":"true","spec.devEnvironments.disableContainerBuildCapabilities":"true"}'
+    argocd.argoproj.io/sync-wave: '6'
+  finalizers:
+  - cheGateway.clusterpermissions.finalizers.che.eclipse.org
+  - oauthclients.finalizers.che.eclipse.org
+  - dashboard.clusterpermissions.finalizers.che.eclipse.org
+  - container-build.finalizers.che.eclipse.org
+  - consolelink.finalizers.che.eclipse.org
+  labels:
+    rht-gitops.com/openshift-gitops: devspaces
+  name: devspaces
+  namespace: openshift-devspaces
+spec:
+  components:
+    cheServer:
+      debug: false
+      logLevel: INFO
+    dashboard:
+      logLevel: ERROR
+    devWorkspace: {}
+    devfileRegistry: {}
+    imagePuller:
+      enable: false
+      spec: {}
+    metrics:
+      enable: true
+    openVSXRegistry:
+      enable: false
+      extensionAutoUpdate:
+        enable: false
+        schedule: 0 0 * * 0
+    pluginRegistry:
+      openVSXURL: https://open-vsx.org
+  containerRegistry: {}
+  devEnvironments:
+    containerBuildConfiguration:
+      openShiftSecurityContextConstraint: container-build
+    defaultEditor: che-incubator/che-code/latest
+    defaultNamespace:
+      autoProvision: true
+      template: <username>-devspaces
+    disableContainerRunCapabilities: true
+    ignoredUnrecoverableEvents:
+    - FailedScheduling
+    maxNumberOfRunningWorkspacesPerUser: 3
+    maxNumberOfWorkspacesPerUser: -1
+    persistUserHome:
+      enabled: true
+    secondsOfInactivityBeforeIdling: -1
+    secondsOfRunBeforeIdling: -1
+    security: {}
+    serviceAccount: devworkspace-sa
+    startTimeoutSeconds: 300
+    storage:
+      pvcStrategy: per-workspace
+  gitServices:
+    github:
+    - secretName: github-oauth-config
+  networking:
+    auth:
+      gateway:
+        configLabels:
+          app: che
+          component: che-gateway-config

@@ -1,0 +1,63 @@
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: developer-hub
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '6'
+spec:
+  application:
+    appConfig:
+      configMaps:
+      - name: ph-developer-hub-app-config
+      mountPath: /opt/app-root/src
+    dynamicPluginsConfigMapName: ph-developer-hub-dynamic-plugins
+    extraEnvs:
+      secrets:
+      - name: ph-developer-hub-env
+    route:
+      enabled: false
+  database:
+    enableLocalDb: true
+  deployment:
+    patch:
+      spec:
+        template:
+          spec:
+            containers:
+            - env:
+              - name: PH_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    key: api-key
+                    name: publishing-house-credentials
+              name: backstage-backend
+              resources:
+                limits:
+                  cpu: '4'
+                requests:
+                  cpu: 250m
+              volumeMounts:
+              - mountPath: /opt/app-root/src/rbac-policy.csv
+                name: rbac-policy
+                readOnly: true
+                subPath: rbac-policy.csv
+            initContainers:
+            - $patch: merge
+              env:
+              - name: MAX_ENTRY_SIZE
+                value: '30000000'
+              name: install-dynamic-plugins
+            volumes:
+            - $patch: replace
+              name: dynamic-plugins-root
+              persistentVolumeClaim:
+                claimName: developer-hub-dynamic-plugins-root
+            - configMap:
+                name: ph-rbac-policy
+              name: rbac-policy
+  flavours:
+  - enabled: false
+    name: lightspeed
+  monitoring:
+    enabled: false

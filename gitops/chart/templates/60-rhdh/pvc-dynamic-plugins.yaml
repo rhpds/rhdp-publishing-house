@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    reclaimspace.csiaddons.openshift.io/cronjob: developer-hub-dynamic-plugins-root-1784342319
+    reclaimspace.csiaddons.openshift.io/schedule: '@weekly'
+    argocd.argoproj.io/sync-wave: '6'
+  finalizers:
+  - kubernetes.io/pvc-protection
+  name: developer-hub-dynamic-plugins-root
+  namespace: publishing-house
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
