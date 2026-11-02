@@ -58,7 +58,7 @@ All endpoints are prefixed with `/api/v1`.
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | POST | `/jira/epic` | Bearer | Create Jira epic for project |
-| POST | `/jira/sync` | Bearer | Sync Jira tasks for stage |
+| POST | `/jira/sync` | Bearer | Sync Jira tasks for stage (on `DevelopmentComplete`, also labels the Testing task `ready-for-testing` and posts a one-shot PH link comment) |
 | POST | `/jira/{epic_key}/comment` | Bearer | Add comment to epic |
 | GET | `/jira/{epic_key}/comments` | Bearer | Get epic comments |
 | POST | `/jira/{epic_key}/task/{task_id}/complete` | Bearer | Transition task to Done |

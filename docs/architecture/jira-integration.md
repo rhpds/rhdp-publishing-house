@@ -101,6 +101,21 @@ Sync is designed to be self-correcting:
 
 The manifest is always the source of truth. Jira is brought into alignment with whatever the manifest says.
 
+### Ready for Testing notify
+
+When development completes and the workflow enters the **Testing** stage (`DevelopmentComplete` Jira sync), Central:
+
+1. Adds the `ready-for-testing` label on the `[PH] Testing` task (`ph:testing`)
+2. Posts **one** clear comment on that task with a link back to the Publishing House workflow (search Workflows for the parent epic key if needed)
+
+Both steps are idempotent — re-running sync will not spam comments or re-apply the label. When testing completes (`TestingComplete`), the `ready-for-testing` label is removed.
+
+Ops can filter assigned work that is actually ready with:
+
+```
+project = RHDPCD AND labels = ready-for-testing AND assignee = currentUser() AND resolution = EMPTY
+```
+
 ---
 
 ## Example: What a Developer Sees vs. What Jira Shows

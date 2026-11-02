@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     jira_project_key: str = "RHDPCD"
     jira_default_assignee: str = ""
 
+    # Public Publishing House portal URL (RHDH) — used in Jira comments
+    # e.g. https://central-publishing-house-publishing-house.apps.example.com
+    ph_portal_url: str = ""
+
     # GitHub integration
     github_token: str = ""
     github_template_repo: str = "https://github.com/rhpds/rhdp-publishing-house-template"
