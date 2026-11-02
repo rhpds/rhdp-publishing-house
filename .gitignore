@@ -87,8 +87,6 @@ temp/
 CLAUDE.md
 .claude/
 
-# Cluster backup snapshots (contain plaintext secrets)
-cluster-backup/
 
 # Cluster-only ArgoCD Application with real secret parameters (never commit)
 cluster-secrets/
