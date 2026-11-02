@@ -21,6 +21,19 @@ spec:
       builtIn: false
       providerId: basic-flow
       topLevel: true
+    - alias: Auto Link First Broker Login
+      authenticationExecutions:
+      - authenticator: idp-create-user-if-unique
+        authenticatorFlow: false
+        priority: 0
+        requirement: ALTERNATIVE
+      - authenticator: idp-auto-link
+        authenticatorFlow: false
+        priority: 1
+        requirement: ALTERNATIVE
+      builtIn: false
+      providerId: basic-flow
+      topLevel: true
     authenticatorConfig:
     - alias: redirector-config
       config:
@@ -179,13 +192,15 @@ spec:
         validateSignature: 'true'
       displayName: Red Hat Internal SSO
       enabled: true
-      firstBrokerLoginFlowAlias: first broker login
+      firstBrokerLoginFlowAlias: Auto Link First Broker Login
       providerId: oidc
       trustEmail: true
     loginWithEmailAllowed: true
     realm: publishing-house
     registrationAllowed: false
     resetPasswordAllowed: true
+    defaultGroups:
+    - /rhdp-developers
     groups:
     - name: rhdp-administrators
       path: /rhdp-administrators
