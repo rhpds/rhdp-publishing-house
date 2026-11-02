@@ -1,0 +1,15 @@
+# Values supplied by the ArgoCD Application (publishing-house-secrets).
+appsDomain: ""
+phCatalogUrl: ""
+keycloak:
+  rhdhClientSecret: ""     # also used by the keycloak realm (must match)
+secrets:
+  keycloakDb: { username: "", password: "" }
+  sonataflowDb: { username: "", password: "" }
+  consoleOauth: { clientSecret: "", cookieSecret: "" }
+  developerHubEnv:
+    backendSecret: ""
+    githubToken: ""
+    phApiKey: ""
+    rhdhServiceToken: ""
+    k8sServiceAccountToken: ""
