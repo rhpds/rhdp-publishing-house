@@ -189,12 +189,18 @@ spec:
     groups:
     - name: rhdp-administrators
       path: /rhdp-administrators
-    - name: rhdp-developers
-      path: /rhdp-developers
+    - name: rhdp-content-developers
+      path: /rhdp-content-developers
     - name: rhdp-content-review
       path: /rhdp-content-review
+    - name: rhdp-developers
+      path: /rhdp-developers
     - name: rhdp-infra-review
       path: /rhdp-infra-review
+    - name: rhdp-operations
+      path: /rhdp-operations
+    - name: rhdp-project-managers
+      path: /rhdp-project-managers
     roles:
       realm:
       - composite: true
