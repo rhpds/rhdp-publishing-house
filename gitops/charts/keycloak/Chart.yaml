@@ -1,0 +1,6 @@
+apiVersion: v2
+name: publishing-house-keycloak
+description: Publishing House - keycloak component
+type: application
+version: 0.1.0
+appVersion: "2.0"

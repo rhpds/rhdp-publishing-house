@@ -1,0 +1,4 @@
+appsDomain: ""
+sonataflow:
+  profile: ""          # preview | gitops
+  workflowImage: ""

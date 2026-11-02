@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: publishing-house-keycloak
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rhpds/rhdp-publishing-house.git
+    targetRevision: main
+    path: gitops/charts/keycloak
+    helm:
+      parameters:
+        - { name: appsDomain, value: apps.ocpv-infra01.dal12.infra.demo.redhat.com }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keycloak
+  syncPolicy:
+    automated: { prune: false, selfHeal: false }
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+      - ServerSideApply=true
+    retry:
+      limit: 10
+      backoff: { duration: 15s, factor: 2, maxDuration: 10m }

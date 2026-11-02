@@ -20,8 +20,13 @@ spec:
   syncPolicy:
     automated:
       prune: true
-      # selfHeal off: secret params patched onto the workloads child on the
-      # cluster must not be reverted (secrets are never committed to git).
       selfHeal: false
     syncOptions:
       - CreateNamespace=false
+  # Secret helm parameters are patched onto the child Applications on the cluster
+  # (never committed). Ignore them here so app-of-apps syncs don't wipe them.
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jsonPointers:
+        - /spec/source/helm/parameters

@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: publishing-house-sonataflow
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rhpds/rhdp-publishing-house.git
+    targetRevision: main
+    path: gitops/charts/sonataflow
+    helm:
+      parameters:
+        - { name: appsDomain, value: apps.ocpv-infra01.dal12.infra.demo.redhat.com }
+        - { name: sonataflow.profile, value: preview }
+        - { name: sonataflow.workflowImage, value: image-registry.openshift-image-registry.svc:5000/publishing-house/rhdp-published:latest }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: publishing-house
+  syncPolicy:
+    automated: { prune: false, selfHeal: false }
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+      - ServerSideApply=true
+    retry:
+      limit: 10
+      backoff: { duration: 15s, factor: 2, maxDuration: 10m }

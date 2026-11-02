@@ -1,9 +1,0 @@
-apiVersion: v2
-name: publishing-house
-description: >-
-  Publishing House platform, captured as-is from the live cluster. Cluster-specific
-  endpoints, images, and the SonataFlow deployment profile are parameterized so the
-  same chart deploys to different clusters / modes (infra01 preview, infra02 gitops).
-type: application
-version: 0.1.0
-appVersion: "2.0"

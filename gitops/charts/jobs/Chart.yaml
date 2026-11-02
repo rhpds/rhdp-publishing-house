@@ -1,0 +1,6 @@
+apiVersion: v2
+name: publishing-house-jobs
+description: Publishing House - jobs component
+type: application
+version: 0.1.0
+appVersion: "2.0"

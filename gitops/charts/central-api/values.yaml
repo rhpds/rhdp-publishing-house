@@ -1,0 +1,4 @@
+appsDomain: ""
+centralApi:
+  image: ""
+  tag: ""

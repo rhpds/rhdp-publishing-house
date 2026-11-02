@@ -1,0 +1,5 @@
+appsDomain: ""
+keycloak:
+  rhdhClientSecret: ""
+  portalClientSecret: ""
+  corporateSsoClientSecret: ""
