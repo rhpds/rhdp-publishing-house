@@ -1,7 +1,8 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: publishing-house-bootstrap
+  # The single top-level app. Everything else is a child Application it deploys.
+  name: publishing-house
   namespace: openshift-gitops
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -10,7 +11,6 @@ spec:
   source:
     repoURL: https://github.com/rhpds/rhdp-publishing-house.git
     targetRevision: main
-    # App-of-apps: this directory holds child Application manifests.
     path: gitops/argocd/apps
     directory:
       recurse: true
@@ -20,6 +20,8 @@ spec:
   syncPolicy:
     automated:
       prune: true
-      selfHeal: true
+      # selfHeal off: secret params patched onto the workloads child on the
+      # cluster must not be reverted (secrets are never committed to git).
+      selfHeal: false
     syncOptions:
       - CreateNamespace=false
