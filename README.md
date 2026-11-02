@@ -1,363 +1,94 @@
 # RHDP Publishing House
 
-**Central repository for RHDP Publishing House deployment automation and source code**
+AI-powered content lifecycle management for the Red Hat Demo Platform. Publishing
+House orchestrates the full lifecycle of RHDP labs, workshops, and demos — intake,
+content writing, automation, reviews, testing, and publishing — through a Backstage
+(RHDH) portal, a SonataFlow workflow engine, a FastAPI "Central" backend, and a set
+of Claude Code skills.
 
-This repository contains all source code, workflows, services, skills, and Ansible playbooks for deploying the RHDH Publishing House system to OpenShift clusters.
+> Architecture, lifecycle, and component details live in [`docs/`](docs/) (MkDocs).
+> Start with [`docs/overview.md`](docs/overview.md) and
+> [`docs/architecture/system-design.md`](docs/architecture/system-design.md).
 
-## Overview
-
-The RHDH Publishing House is deployed as a complete system using Ansible automation. When you get a new cluster, you run the deployment playbooks from this repository to install and configure all components.
-
-## Repository Structure
+## Repository layout
 
 ```
 rhdp-publishing-house/
-├── ansible/                           # Ansible deployment automation
-│   ├── deploy.yml                     # Main deployment playbook
-│   ├── undeploy.yml                   # Cleanup playbook
-│   ├── roles/
-│   │   ├── operators/                 # Install operators (SonataFlow, RHDH, PostgreSQL)
-│   │   ├── infrastructure/            # Deploy infrastructure (PostgreSQL, Data Index, SonataFlow platform)
-│   │   ├── workflows/                 # Deploy SonataFlow workflows
-│   │   ├── services/                  # Deploy integration services
-│   │   ├── skills/                    # Deploy MCP skills server
-│   │   ├── rhdh-plugin/               # Deploy RHDH dashboard plugin
-│   │   └── monitoring/                # Deploy Prometheus/Grafana
-│   ├── inventory/
-│   │   ├── group_vars/
-│   │   └── host_vars/
-│   └── files/                         # Static files (manifests, configs)
-├── workflows/                         # SonataFlow workflow definitions
-│   ├── main-publishing-workflow.sw.yaml
-│   └── sub-workflows/
-│       ├── parallel-work-workflow.sw.yaml
-│       ├── write-module-workflow.sw.yaml
-│       ├── automation-workflow.sw.yaml
-│       ├── code-review-workflow.sw.yaml
-│       ├── security-review-workflow.sw.yaml
-│       └── e2e-testing-workflow.sw.yaml
-├── services/                          # Integration microservices
-│   ├── jira-sync/
-│   │   ├── src/
-│   │   ├── Dockerfile
-│   │   └── package.json
-│   ├── rcars-client/
-│   │   ├── src/
-│   │   ├── Dockerfile
-│   │   └── package.json
-│   └── github-ops/
-│       ├── src/
-│       ├── Dockerfile
-│       └── package.json
-├── skills/                            # Claude Code MCP skills
-│   ├── src/
-│   │   ├── intake/
-│   │   ├── spec-refiner/
-│   │   ├── writer/
-│   │   ├── editor/
-│   │   ├── automator/
-│   │   └── lib/
-│   ├── mcp-server.ts
-│   ├── Dockerfile
-│   └── package.json
-├── plugins/                           # RHDH plugins
-│   ├── publishing-dashboard/
-│   │   ├── src/
-│   │   ├── package.json
-│   │   └── README.md
-│   └── publishing-dashboard-backend/
-│       ├── src/
-│       └── package.json
-├── infrastructure/                    # Kubernetes/OpenShift manifests
-│   ├── operators/
-│   │   ├── sonataflow-operator.yaml
-│   │   ├── rhdh-operator.yaml
-│   │   └── postgresql-operator.yaml
-│   ├── manifests/
-│   │   ├── namespace.yaml
-│   │   ├── sonataflow-platform.yaml
-│   │   ├── data-index.yaml
-│   │   ├── postgresql.yaml
-│   │   └── rhdh-instance.yaml
-│   ├── monitoring/
-│   │   ├── prometheus/
-│   │   └── grafana/
-│   └── security/
-│       ├── networkpolicies/
-│       └── rbac/
-├── docs/                              # Documentation
-│   ├── deployment.md                  # Deployment guide
-│   ├── development.md                 # Development guide
-│   └── troubleshooting.md             # Troubleshooting guide
-├── tests/                             # Integration tests
-│   ├── integration/
-│   └── e2e/
-└── requirements.txt                   # Python dependencies (for Ansible)
+├── gitops/           # Deployment — ArgoCD app-of-apps + per-component Helm charts
+├── central-api/      # Central backend (FastAPI + MCP) — source for the central-api image
+├── plugins/          # RHDH dynamic plugins — source for the published OCI plugins
+├── templates/        # RHDH scaffolder templates + catalog locations
+├── skills/           # Git submodule → rhdp-publishing-house-skills (Claude Code skills)
+├── docs/             # MkDocs documentation site
+└── cluster-secrets/  # Local, git-ignored — off-repo secret parameters for ArgoCD
 ```
 
-## Quick Start
+`central-api/` and `plugins/` are **build inputs**: GitOps deploys the pre-built
+image (`quay.io/rhpds/central-api`) and OCI plugins; this is where they're built from.
 
-### Prerequisites
+## Deployment (GitOps / ArgoCD)
 
-- OpenShift cluster (4.14+)
-- `oc` CLI logged into the cluster
-- Ansible 2.15+
-- Python 3.11+
+Everything is deployed by a single **app-of-apps** that fans out to one ArgoCD
+Application per component.
 
-### Deploy Full System
+```
+gitops/
+├── bootstrap/                 # root app-of-apps Helm chart (single repoURL/targetRevision knob)
+├── argocd/apps-chart/         # child Application definitions (templated git source)
+├── charts/                    # per-component Helm charts
+│   ├── ph-secrets/            # ClusterSecretStore, ExternalSecrets, static Secrets
+│   └── keycloak/ sonataflow/ central-api/ rhdh/ devspaces/ jobs/
+└── operators/                 # OLM Subscriptions + OperatorGroups + namespaces
+#                                (External Secrets Operator = Helm chart app in apps-chart)
+```
+
+**Sync-wave order:** `external-secrets` (-1) → `operators` (0) → `secrets` (1) →
+`keycloak`/`sonataflow` (2) → `central-api` (3) → `rhdh`/`devspaces` (4) → `jobs` (5).
+
+### Prerequisites (per cluster)
+- **OpenShift GitOps** (ArgoCD) installed.
+- **Vault** deployed, unsealed, and **seeded** (the ExternalSecrets pull from it).
+- Catalog sources for `redhat-operators` available (rhbk, rhdh, devspaces,
+  logic-operator) — the operators app installs the Subscriptions.
+  (ESO is installed by GitOps as a Helm chart.)
+
+### Deploy
 
 ```bash
-# 1. Clone this repository
-git clone https://github.com/rhpds/rhdp-publishing-house.git
-cd rhdp-publishing-house
+# 1. Bootstrap the root app-of-apps (one manual step). Branch/tag is a single knob:
+helm template publishing-house gitops/bootstrap \
+  --set targetRevision=main | oc apply -f -
 
-# 2. Install Ansible dependencies
-pip install -r requirements.txt
-ansible-galaxy collection install -r ansible/requirements.yml
-
-# 3. Configure deployment
-cp ansible/inventory/group_vars/all.yml.example ansible/inventory/group_vars/all.yml
-# Edit ansible/inventory/group_vars/all.yml with your settings
-
-# 4. Run deployment
-cd ansible
-ansible-playbook -i inventory deploy.yml
+# 2. Supply secret values (never committed) to the secret-bearing child apps:
+./cluster-secrets/patch-secrets.sh
 ```
 
-### Deployment Phases
+ArgoCD then reconciles everything from git.
 
-The `deploy.yml` playbook runs these phases in order:
+### Parameters
+| Where | Parameter | Purpose |
+|---|---|---|
+| `gitops/bootstrap` | `repoURL`, `targetRevision` | git source for the whole stack (one knob) |
+| per child app (`apps-chart`) | `appsDomain` | cluster apps domain (routes, OIDC, CORS) |
+| | `centralApi.image` / `.tag` | central-api image |
+| | `sonataflow.profile` / `.workflowImage` | `preview` (build in-cluster) vs `gitops` (pre-built) |
+| | `rhdhPlugins.*` | custom RHDH plugin versions |
+| off-repo (`cluster-secrets/`) | `keycloak.*`, `secrets.*` | secret values — supplied on the cluster, never in git |
 
-1. **Operators** - Install SonataFlow, RHDH, PostgreSQL operators
-2. **Infrastructure** - Deploy PostgreSQL, SonataFlow platform, Data Index
-3. **Workflows** - Deploy all SonataFlow workflow definitions
-4. **Services** - Deploy integration services (Jira sync, RCARS, GitHub ops)
-5. **Skills** - Deploy MCP skills server (optional, for DevSpaces)
-6. **RHDH Plugin** - Deploy Publishing House dashboard plugin
-7. **Monitoring** - Deploy Prometheus/Grafana stack
+## Secrets
 
-### Undeploy
+- `publishing-house-credentials` + `github-oauth-config` are generated by
+  **ExternalSecrets** from Vault.
+- Static secrets (keycloak-db, sonataflow-svcbind, console-oauth,
+  ph-developer-hub-env) and the Keycloak client secrets are supplied as Helm
+  parameters from `cluster-secrets/` (git-ignored) and patched onto the relevant
+  ArgoCD apps; `ignoreDifferences` keeps them from being reverted on sync.
+
+## Documentation
+
+Build the docs site locally:
 
 ```bash
-cd ansible
-ansible-playbook -i inventory undeploy.yml
+pip install -r requirements-docs.txt
+mkdocs serve
 ```
-
-## Development Workflow
-
-### Local Development
-
-Each component can be developed and tested locally:
-
-**Workflows**:
-```bash
-cd workflows
-# Edit workflow YAML
-# Validate with SonataFlow CLI
-swf-parser validate main-publishing-workflow.sw.yaml
-```
-
-**Services**:
-```bash
-cd services/jira-sync
-npm install
-npm run dev
-# Test locally
-curl -X POST http://localhost:3000/api/jira/create-epic -d '{"spec": {...}}'
-```
-
-**Skills**:
-```bash
-cd skills
-npm install
-npm run dev
-# Test with Claude Code in DevSpaces
-```
-
-**RHDH Plugin**:
-```bash
-cd plugins/publishing-dashboard
-yarn install
-yarn dev
-```
-
-### Deploy Changes
-
-After making changes:
-
-```bash
-# Build and deploy specific component
-cd ansible
-ansible-playbook -i inventory deploy.yml --tags workflows  # Deploy only workflows
-ansible-playbook -i inventory deploy.yml --tags services   # Deploy only services
-ansible-playbook -i inventory deploy.yml --tags skills     # Deploy only skills
-ansible-playbook -i inventory deploy.yml --tags plugin     # Deploy only RHDH plugin
-```
-
-## Configuration
-
-### Ansible Variables
-
-Key variables in `ansible/inventory/group_vars/all.yml`:
-
-```yaml
-# OpenShift/Kubernetes
-openshift_cluster_url: https://api.cluster.example.com:6443
-namespace: backstage
-
-# PostgreSQL
-postgres_storage_size: 50Gi
-postgres_replicas: 2
-
-# External Integrations
-jira_url: https://issues.redhat.com
-jira_token: "{{ vault_jira_token }}"  # Stored in Ansible Vault
-
-rcars_url: https://rcars.internal.example.com
-rcars_api_key: "{{ vault_rcars_api_key }}"
-
-litellm_url: https://litellm.example.com
-litellm_api_keys:
-  - "{{ vault_openai_key }}"
-  - "{{ vault_anthropic_key }}"
-
-github_app_id: 12345
-github_app_private_key: "{{ vault_github_private_key }}"
-
-# RHDH
-rhdh_image: quay.io/rhdh/rhdh-hub-rhel9:1.2-latest
-
-# SonataFlow
-sonataflow_platform_image: quay.io/kiegroup/kogito-swf-platform:latest
-```
-
-### Secrets Management
-
-Secrets are managed using Ansible Vault:
-
-```bash
-# Encrypt secrets file
-ansible-vault encrypt ansible/inventory/group_vars/vault.yml
-
-# Edit secrets
-ansible-vault edit ansible/inventory/group_vars/vault.yml
-
-# Deploy with vault password
-ansible-playbook -i inventory deploy.yml --ask-vault-pass
-```
-
-## Component Details
-
-### Workflows (SonataFlow)
-
-Located in `workflows/`, these define the orchestration logic:
-
-- **main-publishing-workflow.sw.yaml**: 12-phase lifecycle orchestration
-- **Sub-workflows**: Parallel execution for writing, automation, reviews, testing
-
-### Services (Node.js/TypeScript)
-
-Located in `services/`, these provide integrations:
-
-- **jira-sync**: Jira epic/task creation and status sync
-- **rcars-client**: Content overlap detection via RCARS API
-- **github-ops**: Repository creation, file commits, PR management
-
-### Skills (MCP Server)
-
-Located in `skills/`, these provide interactive capabilities:
-
-- **intake**: Project onboarding conversation
-- **spec-refiner**: Spec quality improvement
-- **writer**: Content generation wrapper
-- **editor**: Content review wrapper
-- **automator**: Catalog generation wrapper
-
-### RHDH Plugin
-
-Located in `plugins/publishing-dashboard/`, provides:
-
-- Project list view
-- Project detail view with real-time updates
-- Approval workflow interface
-- Phase progression timeline
-
-## Testing
-
-### Integration Tests
-
-```bash
-cd tests/integration
-pytest test_workflow_execution.py
-pytest test_skills_integration.py
-pytest test_services.py
-```
-
-### End-to-End Tests
-
-```bash
-cd tests/e2e
-# Deploy to test cluster
-ansible-playbook -i ../ansible/inventory deploy.yml -e namespace=test
-
-# Run E2E test
-./test_full_lifecycle.sh
-```
-
-## Monitoring
-
-Access monitoring dashboards:
-
-```bash
-# Port-forward Grafana
-oc port-forward svc/grafana 3000:3000 -n backstage
-
-# Visit http://localhost:3000
-# Dashboards:
-# - Publishing House Overview
-# - Workflow Performance
-# - Skills Usage
-# - Integration Health
-```
-
-## Troubleshooting
-
-See [docs/troubleshooting.md](docs/troubleshooting.md) for common issues and solutions.
-
-### Quick Diagnostics
-
-```bash
-# Check all pods
-oc get pods -n backstage
-
-# Check workflow status
-oc get sonataflows -n backstage
-
-# Check Data Index
-oc logs -n backstage deployment/sonataflow-platform-data-index-service
-
-# Check PostgreSQL
-oc get postgrescluster -n backstage
-```
-
-## Related Repositories
-
-- [rhdp-publishing-house-nate](https://github.com/rhpds/rhdp-publishing-house-nate) - Original Python-based implementation (legacy)
-
-## Contributing
-
-1. Create feature branch: `git checkout -b feature-name`
-2. Make changes and test locally
-3. Deploy to test cluster: `ansible-playbook -i inventory deploy.yml -e namespace=test`
-4. Run tests: `pytest tests/`
-5. Create pull request
-
-## License
-
-Apache 2.0
-
-## Support
-
-- **Issues**: https://github.com/rhpds/rhdp-publishing-house/issues
-- **Slack**: #rhdp-publishing-house
-- **Email**: rhdp-team@redhat.com
