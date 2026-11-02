@@ -39,14 +39,21 @@ spec:
           value: "0.1.0"
         - name: rhdhPlugins.readmeBackend
           value: "0.1.0"
-        # ── Keycloak secrets: DO NOT commit real values here. Inject at deploy time
-        #    (oc -n openshift-gitops patch application ... / sealed values / vault plugin):
-        # - name: keycloak.rhdhClientSecret
-        #   value: "<secret>"
-        # - name: keycloak.portalClientSecret
-        #   value: "<secret>"
-        # - name: keycloak.corporateSsoClientSecret
-        #   value: "<secret>"
+        # Non-secret config
+        - name: phCatalogUrl
+          value: https://github.com/rhpds/rhdp-publishing-house/blob/main/templates/all-locations.yaml
+        # ─────────────────────────────────────────────────────────────────────────
+        # SECRETS ARE NOT COMMITTED. They are supplied only on the cluster, by adding
+        # these parameters to this Application there (oc apply of an off-repo copy, or
+        # `oc -n openshift-gitops patch application publishing-house-infra01 ...`):
+        #   keycloak.rhdhClientSecret, keycloak.portalClientSecret,
+        #   keycloak.corporateSsoClientSecret,
+        #   secrets.keycloakDb.username/password,
+        #   secrets.sonataflowDb.username/password,
+        #   secrets.consoleOauth.clientSecret/cookieSecret,
+        #   secrets.developerHubEnv.backendSecret/githubToken/phApiKey/
+        #     rhdhServiceToken/k8sServiceAccountToken
+        # ─────────────────────────────────────────────────────────────────────────
   destination:
     server: https://kubernetes.default.svc
     namespace: publishing-house

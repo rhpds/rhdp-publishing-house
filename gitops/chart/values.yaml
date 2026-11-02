@@ -22,8 +22,30 @@ rhdhPlugins:
   readme: ""
   readmeBackend: ""
 
+# Non-secret: RHDH catalog locations URL.
+phCatalogUrl: ""
+
 # Keycloak secrets — supplied at deploy time (never committed).
 keycloak:
   rhdhClientSecret: ""
   portalClientSecret: ""
   corporateSsoClientSecret: ""
+
+# All other secrets — supplied by the ArgoCD Application via helm.parameters.
+# Kept out of the repo; the real values live only on the cluster.
+secrets:
+  keycloakDb:
+    username: ""
+    password: ""
+  sonataflowDb:
+    username: ""
+    password: ""
+  consoleOauth:
+    clientSecret: ""
+    cookieSecret: ""
+  developerHubEnv:
+    backendSecret: ""
+    githubToken: ""
+    phApiKey: ""
+    rhdhServiceToken: ""
+    k8sServiceAccountToken: ""
