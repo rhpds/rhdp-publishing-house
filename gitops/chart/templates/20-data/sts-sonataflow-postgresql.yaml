@@ -56,11 +56,19 @@ spec:
         volumeMounts:
         - mountPath: /var/lib/pgsql/data
           name: data
+        - mountPath: /opt/app-root/src/postgresql-start/create-sonataflow-db.sh
+          name: init-script
+          subPath: create-sonataflow-db.sh
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext: {}
       terminationGracePeriodSeconds: 30
+      volumes:
+      - name: init-script
+        configMap:
+          name: sonataflow-postgresql-init
+          defaultMode: 0755
   updateStrategy:
     rollingUpdate:
       partition: 0

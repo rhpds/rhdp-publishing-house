@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sonataflow-postgresql-init
+  namespace: publishing-house
+  annotations:
+    argocd.argoproj.io/sync-wave: '2'
+data:
+  # Sourced by the RHEL postgres image on every start
+  # (process_extending_files /opt/app-root/src/postgresql-start). Because
+  # POSTGRESQL_USER=postgres (superuser) the image skips POSTGRESQL_DATABASE
+  # creation, so we create it here. Idempotent.
+  create-sonataflow-db.sh: |
+    if ! psql -tAc "SELECT 1 FROM pg_database WHERE datname='sonataflow'" | grep -q 1; then
+      echo "creating database 'sonataflow'"
+      createdb sonataflow
+    else
+      echo "database 'sonataflow' already exists"
+    fi
