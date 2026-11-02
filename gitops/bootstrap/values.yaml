@@ -1,0 +1,3 @@
+# One place to set the Git source + branch for the ENTIRE deployment.
+repoURL: https://github.com/rhpds/rhdp-publishing-house.git
+targetRevision: main

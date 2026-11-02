@@ -1,0 +1,5 @@
+apiVersion: v2
+name: publishing-house-bootstrap
+description: Root app-of-apps (single targetRevision/repoURL knob for the whole stack)
+type: application
+version: 0.1.0
