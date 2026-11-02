@@ -11,8 +11,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/rhpds/rhdp-publishing-house.git
-    targetRevision: main
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
     path: gitops/operators
     directory:
       recurse: true

@@ -1,25 +1,23 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: publishing-house-rhdh
+  name: publishing-house-sonataflow
   namespace: openshift-gitops
   annotations:
-    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-wave: "2"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
-    repoURL: https://github.com/rhpds/rhdp-publishing-house.git
-    targetRevision: main
-    path: gitops/charts/rhdh
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: gitops/charts/sonataflow
     helm:
       parameters:
         - { name: appsDomain, value: apps.ocpv-infra01.dal12.infra.demo.redhat.com }
-        - { name: rhdhPlugins.phWorkflows, value: "2.0.0" }
-        - { name: rhdhPlugins.scaffolderModule, value: "1.1.5" }
-        - { name: rhdhPlugins.readme, value: "0.1.0" }
-        - { name: rhdhPlugins.readmeBackend, value: "0.1.0" }
+        - { name: sonataflow.profile, value: preview }
+        - { name: sonataflow.workflowImage, value: image-registry.openshift-image-registry.svc:5000/publishing-house/rhdp-published:latest }
   destination:
     server: https://kubernetes.default.svc
     namespace: publishing-house

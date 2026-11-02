@@ -10,10 +10,17 @@ spec:
   project: default
   source:
     repoURL: https://github.com/rhpds/rhdp-publishing-house.git
+    # Branch/tag/commit this app-of-apps reads the child chart from.
+    # Keep this and helm.parameters.targetRevision in sync to deploy a branch.
     targetRevision: main
-    path: gitops/argocd/apps
-    directory:
-      recurse: true
+    path: gitops/argocd/apps-chart
+    helm:
+      parameters:
+        # Git source propagated to every component child Application.
+        - name: repoURL
+          value: https://github.com/rhpds/rhdp-publishing-house.git
+        - name: targetRevision
+          value: main
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-gitops
@@ -23,8 +30,6 @@ spec:
       selfHeal: false
     syncOptions:
       - CreateNamespace=false
-      # Required so sync honors ignoreDifferences and does NOT overwrite the
-      # secret helm parameters patched onto child Applications on the cluster.
       - RespectIgnoreDifferences=true
   # Secret helm parameters are patched onto the child Applications on the cluster
   # (never committed). Ignore them here so app-of-apps syncs don't wipe them.

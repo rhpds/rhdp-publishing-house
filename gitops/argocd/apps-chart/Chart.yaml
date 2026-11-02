@@ -1,0 +1,5 @@
+apiVersion: v2
+name: publishing-house-apps
+description: App-of-apps child Applications (templated repoURL + targetRevision)
+type: application
+version: 0.1.0

@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: publishing-house-sonataflow
+  name: publishing-house-keycloak
   namespace: openshift-gitops
   annotations:
     argocd.argoproj.io/sync-wave: "2"
@@ -10,17 +10,15 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/rhpds/rhdp-publishing-house.git
-    targetRevision: main
-    path: gitops/charts/sonataflow
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: gitops/charts/keycloak
     helm:
       parameters:
         - { name: appsDomain, value: apps.ocpv-infra01.dal12.infra.demo.redhat.com }
-        - { name: sonataflow.profile, value: preview }
-        - { name: sonataflow.workflowImage, value: image-registry.openshift-image-registry.svc:5000/publishing-house/rhdp-published:latest }
   destination:
     server: https://kubernetes.default.svc
-    namespace: publishing-house
+    namespace: keycloak
   syncPolicy:
     automated: { prune: false, selfHeal: false }
     syncOptions:

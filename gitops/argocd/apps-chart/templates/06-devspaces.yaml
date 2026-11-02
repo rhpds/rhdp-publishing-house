@@ -1,25 +1,21 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: publishing-house-secrets
+  name: publishing-house-devspaces
   namespace: openshift-gitops
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "4"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
-    repoURL: https://github.com/rhpds/rhdp-publishing-house.git
-    targetRevision: main
-    path: gitops/charts/ph-secrets
-    helm:
-      parameters:
-        - { name: appsDomain, value: apps.ocpv-infra01.dal12.infra.demo.redhat.com }
-        - { name: phCatalogUrl, value: https://github.com/rhpds/rhdp-publishing-house/blob/main/templates/all-locations.yaml }
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: gitops/charts/devspaces
   destination:
     server: https://kubernetes.default.svc
-    namespace: publishing-house
+    namespace: openshift-devspaces
   syncPolicy:
     automated: { prune: false, selfHeal: false }
     syncOptions:

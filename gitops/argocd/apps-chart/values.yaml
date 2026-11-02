@@ -1,0 +1,4 @@
+# Git source for all Publishing House component Applications.
+# Override targetRevision to deploy a different branch/tag/commit.
+repoURL: https://github.com/rhpds/rhdp-publishing-house.git
+targetRevision: main
