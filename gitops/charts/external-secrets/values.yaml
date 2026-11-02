@@ -1,0 +1,14 @@
+# Values for the upstream external-secrets subchart.
+external-secrets:
+  installCRDs: true
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: null
+  webhook:
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: null
+  certController:
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: null
