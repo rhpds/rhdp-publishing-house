@@ -50,8 +50,11 @@ spec:
             secretKeyRef:
               key: jira-url
               name: publishing-house-credentials
-        - name: JIRA_CLOUD_ID
-          value: {{ .Values.jira.cloudId | quote }}
+        - name: JIRA_EMAIL
+          valueFrom:
+            secretKeyRef:
+              key: jira-email
+              name: publishing-house-credentials
         - name: JIRA_API_TOKEN
           valueFrom:
             secretKeyRef:

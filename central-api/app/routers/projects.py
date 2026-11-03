@@ -2813,7 +2813,7 @@ async def delete_project(
 
             # Find child issues (POST endpoint — GET /search is 410 Gone)
             try:
-                search_url = f"{settings.jira_api_base}/rest/api/3/search/jql"
+                search_url = f"{settings.jira_url}/rest/api/3/search/jql"
                 search_body = json.dumps({"jql": f"parent={epic_key}", "fields": ["key"]}).encode()
                 req = urllib.request.Request(search_url, data=search_body, headers=headers, method="POST")
                 with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
@@ -2823,7 +2823,7 @@ async def delete_project(
             except Exception as e:
                 logger.warning("delete: failed to query children for %s: %s", epic_key, e)
 
-            archive_url = f"{settings.jira_api_base}/rest/api/3/issue/archive"
+            archive_url = f"{settings.jira_url}/rest/api/3/issue/archive"
             req = urllib.request.Request(
                 archive_url,
                 data=json.dumps({"issueIdsOrKeys": keys_to_archive}).encode(),
