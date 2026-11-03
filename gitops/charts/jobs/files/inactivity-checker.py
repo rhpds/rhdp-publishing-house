@@ -3,7 +3,6 @@
 flags Jira epics when no git commits in INACTIVITY_DAYS days,
 and @-mentions RHDH group members in the comment."""
 
-import base64
 import json
 import os
 import ssl
@@ -14,9 +13,10 @@ from datetime import datetime, timezone, timedelta
 
 GRAPHQL_URL = os.environ["SONATAFLOW_GRAPHQL_URL"].rstrip("/") + "/graphql"
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
-JIRA_URL = os.environ["JIRA_URL"].rstrip("/")
-JIRA_EMAIL = os.environ["JIRA_EMAIL"]
+JIRA_CLOUD_ID = os.environ["JIRA_CLOUD_ID"]
 JIRA_API_TOKEN = os.environ["JIRA_API_TOKEN"]
+# Service-account token auth goes through the api.atlassian.com gateway.
+JIRA_API_BASE = f"https://api.atlassian.com/ex/jira/{JIRA_CLOUD_ID}"
 RHDH_URL = os.environ["RHDH_URL"].rstrip("/")
 RHDH_TOKEN = os.environ["RHDH_SERVICE_TOKEN"]
 REVIEW_GROUP = os.environ.get("REVIEW_GROUP", "rhdp-content-review")
@@ -178,10 +178,9 @@ def lookup_jira_account_id(email):
     if email in _jira_account_cache:
         return _jira_account_cache[email]
 
-    creds = base64.b64encode(f"{JIRA_EMAIL}:{JIRA_API_TOKEN}".encode()).decode()
-    url = f"{JIRA_URL}/rest/api/3/user/search?query={urllib.parse.quote(email)}"
+    url = f"{JIRA_API_BASE}/rest/api/3/user/search?query={urllib.parse.quote(email)}"
     hdrs = {
-        "Authorization": f"Basic {creds}",
+        "Authorization": f"Bearer {JIRA_API_TOKEN}",
         "Accept": "application/json",
     }
     req = urllib.request.Request(url, headers=hdrs)
@@ -236,10 +235,9 @@ def post_jira_comment(epic_key, slug, repo_url, last_commit_date, reviewers):
         ],
     }
 
-    creds = base64.b64encode(f"{JIRA_EMAIL}:{JIRA_API_TOKEN}".encode()).decode()
-    url = f"{JIRA_URL}/rest/api/3/issue/{epic_key}/comment"
+    url = f"{JIRA_API_BASE}/rest/api/3/issue/{epic_key}/comment"
     hdrs = {
-        "Authorization": f"Basic {creds}",
+        "Authorization": f"Bearer {JIRA_API_TOKEN}",
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
