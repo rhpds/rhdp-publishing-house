@@ -4,7 +4,7 @@ data:
     \  version: 1.0.0\n  description: OpenAPI spec consumed by SonataFlow for workflow\
     \ REST calls\nservers:\n  - url: http://central-api.publishing-house:8000/api/v1\n\
     paths:\n  /jira/epic:\n    post:\n      operationId: createJiraEpic\n      summary:\
-    \ Create a Jira epic with rich description and optional ProForma form\n      requestBody:\n\
+    \ Create a Jira epic with rich description\n      requestBody:\n\
     \        required: true\n        content:\n          application/json:\n     \
     \       schema:\n              type: object\n              required:\n       \
     \         - workflow_id\n              properties:\n                workflow_id:\n\
@@ -13,8 +13,7 @@ data:
     \          content:\n            application/json:\n              schema:\n  \
     \              type: object\n                properties:\n                  epic_key:\n\
     \                    type: string\n                  jira_url:\n             \
-    \       type: string\n                  proforma_form_id:\n                  \
-    \  type: string\n      security:\n        - bearerAuth: []\n  /jira/epic/update:\n\
+    \       type: string\n      security:\n        - bearerAuth: []\n  /jira/epic/update:\n\
     \    post:\n      operationId: updateJiraEpic\n      summary: Update Jira epic\
     \ description and create initial tasks after pre-intake approval\n      requestBody:\n\
     \        required: true\n        content:\n          application/json:\n     \
@@ -57,8 +56,7 @@ data:
     \  type: string\n                  tasks_created:\n                    type: integer\n\
     \                  intake_closed:\n                    type: boolean\n      security:\n\
     \        - bearerAuth: []\n  /jira/epic/{epic_key}/preintake-data:\n    get:\n\
-    \      operationId: getPreIntakeData\n      summary: Get pre-intake data from\
-    \ ProForma form\n      parameters:\n        - name: epic_key\n          in: path\n\
+    \      operationId: getPreIntakeData\n      summary: Get pre-intake data from epic\n      parameters:\n        - name: epic_key\n          in: path\n\
     \          required: true\n          schema:\n            type: string\n     \
     \ responses:\n        '200':\n          description: Pre-intake data retrieved\
     \ successfully\n          content:\n            application/json:\n          \

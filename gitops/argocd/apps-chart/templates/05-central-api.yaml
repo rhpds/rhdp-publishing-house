@@ -18,6 +18,7 @@ spec:
         - { name: appsDomain, value: apps.ocpv-infra01.dal12.infra.demo.redhat.com }
         - { name: centralApi.image, value: quay.io/rhpds/central-api }
         - { name: centralApi.tag, value: "2.0.0" }
+        - { name: jira.cloudId, value: 2b9e35e3-6bd3-4cec-b838-f4249ee02432 }
   destination:
     server: https://kubernetes.default.svc
     namespace: publishing-house

@@ -3,20 +3,24 @@
 flags Jira epics when no git commits in INACTIVITY_DAYS days,
 and @-mentions RHDH group members in the comment."""
 
-import base64
 import json
 import os
 import ssl
 import sys
+import time
 import urllib.request
 import urllib.parse
 from datetime import datetime, timezone, timedelta
 
 GRAPHQL_URL = os.environ["SONATAFLOW_GRAPHQL_URL"].rstrip("/") + "/graphql"
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
-JIRA_URL = os.environ["JIRA_URL"].rstrip("/")
-JIRA_EMAIL = os.environ["JIRA_EMAIL"]
-JIRA_API_TOKEN = os.environ["JIRA_API_TOKEN"]
+JIRA_CLOUD_ID = os.environ["JIRA_CLOUD_ID"]
+JIRA_CLIENT_ID = os.environ["JIRA_CLIENT_ID"]
+JIRA_CLIENT_SECRET = os.environ["JIRA_CLIENT_SECRET"]
+# Service-account 2LO OAuth2 token auth via the api.atlassian.com gateway.
+JIRA_API_BASE = f"https://api.atlassian.com/ex/jira/{JIRA_CLOUD_ID}"
+_ATLASSIAN_TOKEN_URL = "https://auth.atlassian.com/oauth/token"
+_jira_token_cache = {"token": None, "expiry": 0.0}
 RHDH_URL = os.environ["RHDH_URL"].rstrip("/")
 RHDH_TOKEN = os.environ["RHDH_SERVICE_TOKEN"]
 REVIEW_GROUP = os.environ.get("REVIEW_GROUP", "rhdp-content-review")
@@ -25,6 +29,30 @@ INACTIVITY_DAYS = int(os.environ.get("INACTIVITY_DAYS", "7"))
 SSL_CTX = ssl.create_default_context()
 SSL_CTX.check_hostname = False
 SSL_CTX.verify_mode = ssl.CERT_NONE
+
+
+def get_jira_token():
+    """Return a cached Jira OAuth2 (2LO) token, refreshing ~60s before expiry."""
+    now = time.time()
+    if _jira_token_cache["token"] and now < _jira_token_cache["expiry"] - 60:
+        return _jira_token_cache["token"]
+    data = urllib.parse.urlencode({
+        "grant_type": "client_credentials",
+        "client_id": JIRA_CLIENT_ID,
+        "client_secret": JIRA_CLIENT_SECRET,
+    }).encode()
+    req = urllib.request.Request(
+        _ATLASSIAN_TOKEN_URL,
+        data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, context=SSL_CTX, timeout=15) as r:
+        resp = json.loads(r.read().decode())
+    _jira_token_cache["token"] = resp["access_token"]
+    _jira_token_cache["expiry"] = now + int(resp.get("expires_in", 3600))
+    return _jira_token_cache["token"]
+
 
 STATE_MAP = {
     "createepic": "intake",
@@ -178,10 +206,9 @@ def lookup_jira_account_id(email):
     if email in _jira_account_cache:
         return _jira_account_cache[email]
 
-    creds = base64.b64encode(f"{JIRA_EMAIL}:{JIRA_API_TOKEN}".encode()).decode()
-    url = f"{JIRA_URL}/rest/api/3/user/search?query={urllib.parse.quote(email)}"
+    url = f"{JIRA_API_BASE}/rest/api/3/user/search?query={urllib.parse.quote(email)}"
     hdrs = {
-        "Authorization": f"Basic {creds}",
+        "Authorization": f"Bearer {get_jira_token()}",
         "Accept": "application/json",
     }
     req = urllib.request.Request(url, headers=hdrs)
@@ -236,10 +263,9 @@ def post_jira_comment(epic_key, slug, repo_url, last_commit_date, reviewers):
         ],
     }
 
-    creds = base64.b64encode(f"{JIRA_EMAIL}:{JIRA_API_TOKEN}".encode()).decode()
-    url = f"{JIRA_URL}/rest/api/3/issue/{epic_key}/comment"
+    url = f"{JIRA_API_BASE}/rest/api/3/issue/{epic_key}/comment"
     hdrs = {
-        "Authorization": f"Basic {creds}",
+        "Authorization": f"Bearer {get_jira_token()}",
         "Content-Type": "application/json",
         "Accept": "application/json",
     }

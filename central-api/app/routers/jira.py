@@ -1,10 +1,10 @@
 """Jira system endpoints — epic creation, updates, task management, and sync."""
 import asyncio
-import base64
 import json
 import logging
 import re
 import ssl
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -52,10 +52,56 @@ class PreIntakeDataResponse(BaseModel):
 
 
 
+# ── Jira OAuth2 (2LO client-credentials) token cache ─────────────────────────
+_ATLASSIAN_TOKEN_URL = "https://auth.atlassian.com/oauth/token"
+_JIRA_TOKEN_LOCK = threading.Lock()
+_jira_token_cache = {"token": None, "expiry": 0.0}
+
+
+def _fetch_jira_token(settings: Settings) -> tuple[str, float]:
+    """Fetch a fresh OAuth2 access token via client-credentials (2LO).
+    Returns (access_token, absolute_expiry_epoch)."""
+    data = urllib.parse.urlencode({
+        "grant_type": "client_credentials",
+        "client_id": settings.jira_client_id,
+        "client_secret": settings.jira_client_secret,
+    }).encode()
+    req = urllib.request.Request(
+        _ATLASSIAN_TOKEN_URL,
+        data=data,
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, context=_SSL_CTX, timeout=15) as r:
+        resp = json.loads(r.read().decode())
+    return resp["access_token"], time.time() + int(resp.get("expires_in", 3600))
+
+
+def _get_jira_token(settings: Settings, force: bool = False) -> str:
+    """Return a cached Jira OAuth2 token, refreshing when missing or near expiry.
+    Refreshes ~60s before expiry. Pass force=True to bypass the cache (e.g. after a 401)."""
+    now = time.time()
+    if not force and _jira_token_cache["token"] and now < _jira_token_cache["expiry"] - 60:
+        return _jira_token_cache["token"]
+    with _JIRA_TOKEN_LOCK:
+        now = time.time()
+        if not force and _jira_token_cache["token"] and now < _jira_token_cache["expiry"] - 60:
+            return _jira_token_cache["token"]
+        token, expiry = _fetch_jira_token(settings)
+        _jira_token_cache["token"] = token
+        _jira_token_cache["expiry"] = expiry
+        logger.info("jira: acquired OAuth2 token (expires in %ds)", int(expiry - now))
+        return token
+
+
 def _jira_headers(settings: Settings) -> dict:
-    creds = base64.b64encode(f"{settings.jira_email}:{settings.jira_api_token}".encode()).decode()
+    # Proactively refreshes the cached OAuth2 token when near expiry, so the
+    # token endpoint is hit roughly once an hour per process rather than per call.
     return {
-        "Authorization": f"Basic {creds}",
+        "Authorization": f"Bearer {_get_jira_token(settings)}",
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
@@ -413,122 +459,6 @@ def _format_field_source_epic(fields: dict) -> tuple[str, dict]:
     return summary, description
 
 
-# ── ProForma Form Creation ──────────────────────────────────────────────────
-
-def _create_proforma_form(epic_key: str, epic_type: str, fields: dict, settings: Settings) -> str:
-    """Create ProForma form on epic. Returns form_id or empty string on failure."""
-    auth_str = base64.b64encode(f"{settings.jira_email}:{settings.jira_api_token}".encode()).decode()
-    headers = {
-        "Authorization": f"Basic {auth_str}",
-        "Content-Type": "application/json",
-    }
-
-    # Build ProForma form template with onboarding fields
-    form_data = {
-        "name": "Pre-Intake Onboarding",
-        "description": "Pre-intake onboarding questions for content creation",
-        "questions": [
-            {
-                "id": "asset_title",
-                "label": "Asset Title",
-                "type": "text",
-                "required": True,
-                "value": fields.get("assetTitle", "")
-            },
-            {
-                "id": "project_description",
-                "label": "Description / Abstract",
-                "type": "paragraph",
-                "required": True,
-                "value": fields.get("projectDescription", "")
-            },
-            {
-                "id": "content_outline",
-                "label": "Content Outline",
-                "type": "paragraph",
-                "required": True,
-                "value": fields.get("contentOutline", "")
-            },
-            {
-                "id": "learning_objectives",
-                "label": "Learning Objectives",
-                "type": "paragraph",
-                "required": True,
-                "value": fields.get("learningObjectives", "")
-            },
-            {
-                "id": "content_type",
-                "label": "Is this a lab or a demo?",
-                "type": "radio",
-                "required": True,
-                "options": ["lab", "demo"],
-                "value": fields.get("contentType", "lab")
-            },
-            {
-                "id": "associated_opportunities",
-                "label": "Associated opportunities",
-                "type": "paragraph",
-                "required": False,
-                "value": fields.get("associatedOpportunities", "")
-            },
-            {
-                "id": "sales_play_tdp",
-                "label": "Sales Play / TDP relevance",
-                "type": "paragraph",
-                "required": False,
-                "value": fields.get("salesPlayTdp", "")
-            },
-            {
-                "id": "ai_related",
-                "label": "Is this related to AI?",
-                "type": "radio",
-                "required": False,
-                "options": ["yes", "no"],
-                "value": "yes" if fields.get("aiRelated") else "no"
-            },
-            {
-                "id": "gpu_needed",
-                "label": "Do you need direct GPU access?",
-                "type": "radio",
-                "required": False,
-                "options": ["yes", "no"],
-                "value": "yes" if fields.get("gpuNeeded") else "no"
-            },
-            {
-                "id": "maas_instead",
-                "label": "Can you use MaaS instead?",
-                "type": "radio",
-                "required": False,
-                "options": ["yes", "no"],
-                "value": "yes" if fields.get("maasInstead") else "no"
-            },
-            {
-                "id": "partners_access",
-                "label": "Should it be available to Partners?",
-                "type": "radio",
-                "required": False,
-                "options": ["yes", "no"],
-                "value": "yes" if fields.get("partnersAccess") else "no"
-            }
-        ]
-    }
-
-    try:
-        req = urllib.request.Request(
-            f"{settings.jira_url.rstrip('/')}/rest/api/1/form/{epic_key}",
-            data=json.dumps(form_data).encode(),
-            headers=headers,
-            method="POST",
-        )
-        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=20) as r:
-            response_data = json.loads(r.read().decode())
-            form_id = response_data.get("id", "")
-            logger.info("ProForma form created for epic %s: %s", epic_key, form_id)
-            return form_id
-    except Exception as e:
-        logger.error("ProForma form creation failed for epic %s: %s", epic_key, e)
-        return ""
-
 
 def _get_workflow_data_by_business_key(business_key: str, deployment_mode: str, settings: Settings) -> dict:
     """Query SonataFlow runtime API to get workflow data by business key.
@@ -646,7 +576,7 @@ def create_epic(
     _caller: str = Depends(_require_auth),
     settings: Settings = Depends(get_settings),
 ):
-    """Create Jira epic with rich description and optional ProForma form.
+    """Create Jira epic with rich description.
     Called by SonataFlow during the CreateEpic state with all template fields."""
     if not settings.jira_url:
         raise HTTPException(status_code=503, detail="Jira not configured")
@@ -700,7 +630,7 @@ def create_epic(
 
     # Create epic
     req = urllib.request.Request(
-        f"{settings.jira_url}/rest/api/3/issue",
+        f"{settings.jira_api_base}/rest/api/3/issue",
         data=json.dumps({"fields": jira_fields}).encode(),
         headers=_jira_headers(settings),
         method="POST",
@@ -711,7 +641,7 @@ def create_epic(
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Jira epic creation failed: {e}")
 
-    # ProForma form creation removed - all fields stored in epic description
+    # All fields stored in epic description
     # Description format is driven by epic_type (onboarded vs field_source)
     jira_url = f"{settings.jira_url}/browse/{epic_key}"
     project_id = workflow_data.get("projectId", "unknown")
@@ -729,8 +659,7 @@ def update_epic(
     _caller: str = Depends(_require_auth),
     settings: Settings = Depends(get_settings),
 ):
-    """Update Jira epic description after pre-intake approval.
-    Reads ProForma form if available, otherwise uses workflow fields."""
+    """Update Jira epic description after pre-intake approval."""
     if not settings.jira_url:
         raise HTTPException(status_code=503, detail="Jira not configured")
 
@@ -762,7 +691,7 @@ def update_epic(
     }
 
     req = urllib.request.Request(
-        f"{settings.jira_url}/rest/api/3/issue/{epic_key}",
+        f"{settings.jira_api_base}/rest/api/3/issue/{epic_key}",
         data=json.dumps({"fields": update_fields}).encode(),
         headers=_jira_headers(settings),
         method="PUT",
@@ -799,7 +728,7 @@ def update_epic(
     }
     try:
         intake_req = urllib.request.Request(
-            f"{settings.jira_url}/rest/api/3/issue",
+            f"{settings.jira_api_base}/rest/api/3/issue",
             data=json.dumps({"fields": intake_fields}).encode(),
             headers=_jira_headers(settings),
             method="POST",
@@ -830,7 +759,7 @@ def update_epic(
     }
     try:
         testing_req = urllib.request.Request(
-            f"{settings.jira_url}/rest/api/3/issue",
+            f"{settings.jira_api_base}/rest/api/3/issue",
             data=json.dumps({"fields": testing_fields}).encode(),
             headers=_jira_headers(settings),
             method="POST",
@@ -863,7 +792,7 @@ def update_epic(
         }
         try:
             dev_ci_req = urllib.request.Request(
-                f"{settings.jira_url}/rest/api/3/issue",
+                f"{settings.jira_api_base}/rest/api/3/issue",
                 data=json.dumps({"fields": dev_ci_fields}).encode(),
                 headers=_jira_headers(settings),
                 method="POST",
@@ -896,7 +825,7 @@ def update_epic(
     }
     try:
         automation_req = urllib.request.Request(
-            f"{settings.jira_url}/rest/api/3/issue",
+            f"{settings.jira_api_base}/rest/api/3/issue",
             data=json.dumps({"fields": automation_fields}).encode(),
             headers=_jira_headers(settings),
             method="POST",
@@ -927,7 +856,7 @@ def update_epic(
     }
     try:
         health_check_req = urllib.request.Request(
-            f"{settings.jira_url}/rest/api/3/issue",
+            f"{settings.jira_api_base}/rest/api/3/issue",
             data=json.dumps({"fields": health_check_fields}).encode(),
             headers=_jira_headers(settings),
             method="POST",
@@ -958,7 +887,7 @@ def update_epic(
     }
     try:
         e2e_req = urllib.request.Request(
-            f"{settings.jira_url}/rest/api/3/issue",
+            f"{settings.jira_api_base}/rest/api/3/issue",
             data=json.dumps({"fields": e2e_fields}).encode(),
             headers=_jira_headers(settings),
             method="POST",
@@ -975,7 +904,7 @@ def update_epic(
 def _lookup_jira_account_id(email: str, settings: Settings) -> dict | None:
     """Look up a Jira user by email. Returns {accountId, displayName} or None."""
     headers = _jira_headers(settings)
-    search_url = f"{settings.jira_url}/rest/api/3/user/search?query={urllib.parse.quote(email)}"
+    search_url = f"{settings.jira_api_base}/rest/api/3/user/search?query={urllib.parse.quote(email)}"
     req = urllib.request.Request(search_url, headers=headers)
     try:
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
@@ -1036,7 +965,7 @@ def notify_reviewers_bg(epic_key: str, group_name: str, settings: Settings) -> N
         headers = _jira_headers(settings)
         comment_body = {"body": {"type": "doc", "version": 1, "content": content}}
         req = urllib.request.Request(
-            f"{settings.jira_url}/rest/api/3/issue/{epic_key}/comment",
+            f"{settings.jira_api_base}/rest/api/3/issue/{epic_key}/comment",
             data=json.dumps(comment_body).encode(),
             headers=headers,
             method="POST",
@@ -1096,7 +1025,7 @@ def _get_epic_tasks(epic_key: str, settings: Settings) -> list[dict]:
         f"AND parent = {epic_key}"
     )
     req = urllib.request.Request(
-        f"{settings.jira_url}/rest/api/3/search/jql",
+        f"{settings.jira_api_base}/rest/api/3/search/jql",
         data=json.dumps({
             "jql": jql,
             "fields": ["key", "summary", "labels", "status"],
@@ -1127,7 +1056,7 @@ def _get_epic_tasks(epic_key: str, settings: Settings) -> list[dict]:
 def _transition_to_done(task_key: str, settings: Settings) -> bool:
     """Transition a Jira task to Done."""
     headers = _jira_headers(settings)
-    trans_url = f"{settings.jira_url}/rest/api/3/issue/{task_key}/transitions"
+    trans_url = f"{settings.jira_api_base}/rest/api/3/issue/{task_key}/transitions"
     req = urllib.request.Request(trans_url, headers=headers)
     try:
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
@@ -1180,7 +1109,7 @@ def _update_task_fields(task_key: str, summary: str, description: str, settings:
             ],
         }
     req = urllib.request.Request(
-        f"{settings.jira_url}/rest/api/3/issue/{task_key}",
+        f"{settings.jira_api_base}/rest/api/3/issue/{task_key}",
         data=json.dumps({"fields": fields}).encode(),
         headers=headers,
         method="PUT",
@@ -1202,7 +1131,7 @@ def _find_task_by_label(epic_key: str, ph_label: str, settings: Settings) -> dic
         f"AND parent = {epic_key} AND labels = \"{ph_label}\""
     )
     req = urllib.request.Request(
-        f"{settings.jira_url}/rest/api/3/search/jql",
+        f"{settings.jira_api_base}/rest/api/3/search/jql",
         data=json.dumps({
             "jql": jql,
             "fields": ["key", "assignee", "status"],
@@ -1233,7 +1162,7 @@ def _find_task_by_label(epic_key: str, ph_label: str, settings: Settings) -> dic
 def _assign_ticket(ticket_key: str, email: str, settings: Settings) -> bool:
     """Assign a Jira ticket to a user by email lookup."""
     headers = _jira_headers(settings)
-    search_url = f"{settings.jira_url}/rest/api/3/user/search?query={urllib.parse.quote(email)}"
+    search_url = f"{settings.jira_api_base}/rest/api/3/user/search?query={urllib.parse.quote(email)}"
     req = urllib.request.Request(search_url, headers=headers)
     try:
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:
@@ -1251,7 +1180,7 @@ def _assign_ticket(ticket_key: str, email: str, settings: Settings) -> bool:
         return False
 
     req = urllib.request.Request(
-        f"{settings.jira_url}/rest/api/3/issue/{ticket_key}",
+        f"{settings.jira_api_base}/rest/api/3/issue/{ticket_key}",
         data=json.dumps({"fields": {"assignee": {"accountId": account_id}}}).encode(),
         headers=headers,
         method="PUT",
@@ -1281,7 +1210,7 @@ def _add_comment(ticket_key: str, text: str, author_name: str, settings: Setting
         },
     }
     req = urllib.request.Request(
-        f"{settings.jira_url}/rest/api/3/issue/{ticket_key}/comment",
+        f"{settings.jira_api_base}/rest/api/3/issue/{ticket_key}/comment",
         data=json.dumps(comment_body).encode(),
         headers=headers,
         method="POST",
@@ -1299,7 +1228,7 @@ def _get_comments(ticket_key: str, settings: Settings) -> list[dict]:
     """Fetch comments from a Jira issue."""
     headers = _jira_headers(settings)
     req = urllib.request.Request(
-        f"{settings.jira_url}/rest/api/3/issue/{ticket_key}/comment?orderBy=created",
+        f"{settings.jira_api_base}/rest/api/3/issue/{ticket_key}/comment?orderBy=created",
         headers=headers,
     )
     try:
@@ -1353,7 +1282,7 @@ def _create_task(
             ],
         }
     req = urllib.request.Request(
-        f"{settings.jira_url}/rest/api/3/issue",
+        f"{settings.jira_api_base}/rest/api/3/issue",
         data=json.dumps({"fields": fields}).encode(),
         headers=headers,
         method="POST",
@@ -1438,7 +1367,7 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, status
         epic_summary = f"[PH] {title} — {content_type} ({slug})"
 
         req = urllib.request.Request(
-            f"{settings.jira_url}/rest/api/3/issue/{epic_key}",
+            f"{settings.jira_api_base}/rest/api/3/issue/{epic_key}",
             data=json.dumps({"fields": {"summary": epic_summary}}).encode(),
             headers=headers,
             method="PUT",
@@ -1461,7 +1390,7 @@ def _sync_jira_tasks_bg(repo_url: str, epic_key: str, settings: Settings, status
             }
             update_fields: dict = {"description": desc_adf}
             req = urllib.request.Request(
-                f"{settings.jira_url}/rest/api/3/issue/{epic_key}",
+                f"{settings.jira_api_base}/rest/api/3/issue/{epic_key}",
                 data=json.dumps({"fields": update_fields}).encode(),
                 headers=headers,
                 method="PUT",
@@ -1648,19 +1577,15 @@ async def get_preintake_data(
     _require_group(groups, GROUP_BITS["rhdp-developers"], "rhdp-developers")
 
     # Get project_id from epic via Jira
-    if not settings.jira_url or not settings.jira_email or not settings.jira_api_token:
+    if not settings.jira_cloud_id or not settings.jira_client_id or not settings.jira_client_secret:
         raise HTTPException(status_code=503, detail="Jira not configured")
 
     # Fetch epic to get project ID from labels or summary
-    auth_str = base64.b64encode(f"{settings.jira_email}:{settings.jira_api_token}".encode()).decode()
-    headers = {
-        "Authorization": f"Basic {auth_str}",
-        "Content-Type": "application/json",
-    }
+    headers = _jira_headers(settings)
 
     try:
         req = urllib.request.Request(
-            f"{settings.jira_url.rstrip('/')}/rest/api/3/issue/{epic_key}",
+            f"{settings.jira_api_base}/rest/api/3/issue/{epic_key}",
             headers=headers,
         )
         with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as r:

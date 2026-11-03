@@ -31,11 +31,20 @@ class Settings(BaseSettings):
     litellm_master_key: str
 
     # Jira integration
+    # OAuth2 2LO (client-credentials) against the api.atlassian.com gateway.
+    # jira_url is the human-facing site (browse links); API calls go through
+    # jira_api_base (built from jira_cloud_id).
     jira_url: str = ""
-    jira_email: str = ""
-    jira_api_token: str = ""
+    jira_cloud_id: str = ""
+    jira_client_id: str = ""
+    jira_client_secret: str = ""
     jira_project_key: str = "RHDPCD"
     jira_default_assignee: str = ""
+
+    @property
+    def jira_api_base(self) -> str:
+        """Atlassian service-account API gateway base URL."""
+        return f"https://api.atlassian.com/ex/jira/{self.jira_cloud_id}"
 
     # GitHub integration
     github_token: str = ""
