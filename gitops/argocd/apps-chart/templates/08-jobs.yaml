@@ -13,9 +13,6 @@ spec:
     repoURL: {{ .Values.repoURL }}
     targetRevision: {{ .Values.targetRevision }}
     path: gitops/charts/jobs
-    helm:
-      parameters:
-        - { name: jira.cloudId, value: 2b9e35e3-6bd3-4cec-b838-f4249ee02432 }
   destination:
     server: https://kubernetes.default.svc
     namespace: publishing-house

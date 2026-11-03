@@ -1,4 +1,0 @@
-jira:
-  # Non-secret Atlassian tenant (cloud) ID for redhat.atlassian.net.
-  # Used to build the service-account API gateway base URL.
-  cloudId: "2b9e35e3-6bd3-4cec-b838-f4249ee02432"

@@ -39,7 +39,10 @@ spec:
                   key: github-token
                   name: publishing-house-credentials
             - name: JIRA_CLOUD_ID
-              value: {{ .Values.jira.cloudId | quote }}
+              valueFrom:
+                secretKeyRef:
+                  key: jira-cloud-id
+                  name: publishing-house-credentials
             - name: JIRA_CLIENT_ID
               valueFrom:
                 secretKeyRef:
